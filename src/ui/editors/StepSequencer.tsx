@@ -85,7 +85,7 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
 
   const region = found?.region.kind === 'midi' ? found.region : null;
   const track = found?.track;
-  const notes = region?.notes ?? [];
+  const notes = useMemo(() => region?.notes ?? [], [region]);
 
   const cellMap = useMemo(() => {
     const m = new Map<string, Note>();
