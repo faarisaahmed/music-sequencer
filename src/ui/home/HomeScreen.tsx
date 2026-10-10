@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Search, FolderOpen, FileMusic, MoreHorizontal, Music2, Trash2, Copy, Pencil, Download, Play, Wand2, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Search, FolderOpen, FileMusic, MoreHorizontal, Music2, Trash2, Copy, Pencil, Download, Play, Wand2, ChevronDown, ChevronRight, Users } from 'lucide-react';
 import type { ProjectMeta } from '../../model/types';
 import { listProjects, loadProject, saveProject } from '../../state/persistence';
 import { duplicateProjectById, exportProjectFile, importMidiFile, importProjectFile, openProjectById, removeProject, createNewProject } from '../../state/actions';
@@ -157,6 +157,9 @@ export default function HomeScreen() {
           <Search size={14} />
           <input type="search" placeholder="Search songs" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
+        <button className="btn" onClick={() => openModal('collab')} title="Join a friend's jam session with a code or link">
+          <Users size={15} /> Join a Jam
+        </button>
         <button className="btn" onClick={() => fileRef.current?.click()} title="Import a MIDI file or BandForge project">
           <FileMusic size={15} /> Import
         </button>

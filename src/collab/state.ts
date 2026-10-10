@@ -87,8 +87,18 @@ export function loadIdentity(): { name: string; color: string } {
   } catch {
     /* storage unavailable */
   }
-  if (!name) name = ADJ[Math.floor(Math.random() * ADJ.length)] + ' ' + NOUN[Math.floor(Math.random() * NOUN.length)];
-  if (!PEER_COLORS.includes(color)) color = PEER_COLORS[Math.floor(Math.random() * PEER_COLORS.length)];
+  let generated = false;
+  if (!name) {
+    name = ADJ[Math.floor(Math.random() * ADJ.length)] + ' ' + NOUN[Math.floor(Math.random() * NOUN.length)];
+    generated = true;
+  }
+  if (!PEER_COLORS.includes(color)) {
+    color = PEER_COLORS[Math.floor(Math.random() * PEER_COLORS.length)];
+    generated = true;
+  }
+  // Remember the suggested identity right away so everyone sees the same name every time
+  // (otherwise each announcement would invent a new random name).
+  if (generated) saveIdentity(name, color);
   return { name, color };
 }
 

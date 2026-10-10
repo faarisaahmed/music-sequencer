@@ -12,7 +12,7 @@
 // remaining synced peer with the lowest id takes over.
 import { joinRoom, selfId, getRelaySockets, type Room } from 'trystero/nostr';
 import type { Project } from '../model/types';
-import { useStore, toast } from '../state/store';
+import { useStore, toast, pruneSelection } from '../state/store';
 import { openProject, migrate } from '../state/actions';
 import { getEngine } from '../audio/engine';
 import { addClip, getBuffer, getClipBlob, ensureClips } from '../audio/audioStore';
@@ -88,6 +88,13 @@ let identity = loadIdentity();
 let opCounter = 0;
 let awaitingSnapshot = false;
 let lastSnapReq = 0;
+/** Last time snapshot data arrived (progress), to detect a stalled download. */
+let lastSnapProgress = 0;
+/** When a collaborator disappeared without saying goodbye (connection dropped), and who. */
+let lostPeerAt: number | null = null;
+let lostPeerName = '';
+let lastReconnectAt = 0;
+let reconnectBackoff = 8000;
 let lastHashSent: { project: Project | null; hash: string } = { project: null, hash: '' };
 let ignoreTransportUntil = 0;
 let gapTimer: ReturnType<typeof setTimeout> | null = null;
@@ -101,6 +108,17 @@ const pendingKeyCount = new Map<string, number>();
 const reorder = new Map<number, Extract<SyncMsg, { t: 'seq' }>>();
 /** Host: recently sequenced op ids → seq (dedupe resends). */
 const seenOps = new Map<string, number>();
+/**
+ * Host: every delta it sequenced since it last lost a peer unexpectedly (not via "bye").
+ * If the network splits and heals with two hosts, the one that steps down replays this log
+ * to the winner so edits made on its side of the split aren't lost.
+ */
+let splitLog: { opId: string; d: Delta }[] = [];
+const SPLIT_LOG_MAX = 3000;
+function logSequenced(opId: string, d: Delta): void {
+  splitLog.push({ opId, d });
+  if (splitLog.length > SPLIT_LOG_MAX) splitLog.splice(0, splitLog.length - SPLIT_LOG_MAX);
+}
 /** Audio clips requested from peers: id → when, who we asked, and who already said no. */
 const clipRequests = new Map<string, { at: number; asked: string; tried: Set<string> }>();
 /** Peer that most recently introduced each audio id (best source to ask). */
@@ -161,7 +179,13 @@ function refreshConnectedStatus(): void {
   const n = Object.keys(peersState()).length;
   const s = useCollab.getState().status;
   if (!synced) return;
-  if (n === 0) setStatus('waiting', 'Waiting for others to join. Share the link or code.');
+  if (n === 0)
+    setStatus(
+      'waiting',
+      lostPeerAt
+        ? `Lost the connection to ${lostPeerName || 'your collaborator'} — reconnecting automatically. Keep working; your changes will merge.`
+        : 'Waiting for others to join. Share the link or code.',
+    );
   else if (s !== 'error' || n > 0) setStatus('connected', `Connected with ${n} other ${n === 1 ? 'person' : 'people'}`);
 }
 
@@ -211,6 +235,7 @@ function applyRemote(d: Delta): void {
   } finally {
     applyingRemote = false;
   }
+  if (filtered.removedTracks?.length || filtered.removedRegions?.length) pruneSelection();
   void fetchMissingAudio();
 }
 
@@ -257,6 +282,7 @@ function flush(): void {
   if (isHost) {
     seq++;
     seenOps.set(opId, seq);
+    logSequenced(opId, d);
     send({ t: 'seq', seq, from: selfId, opId, d });
   } else if (hostId) {
     addPending(opId, d);
@@ -278,6 +304,7 @@ function hostApplyOp(from: string, opId: string, d: Delta): void {
   applyRemote(d);
   seq++;
   seenOps.set(opId, seq);
+  logSequenced(opId, d);
   if (seenOps.size > 3000) {
     const first = seenOps.keys().next().value;
     if (first !== undefined) seenOps.delete(first);
@@ -389,6 +416,7 @@ function becomeHost(reason: string): void {
   synced = true;
   awaitingSnapshot = false;
   reorder.clear();
+  splitLog = [];
   baseline = useStore.getState().project;
   useCollab.setState({ hostId: selfId });
   sayHello(null);
@@ -444,10 +472,16 @@ function sayHello(target: string | null, reply = false): void {
 
 function onHello(m: Extract<SyncMsg, { t: 'hello' }>, from: string): void {
   const known = !!peersState()[from];
-  updatePeer(from, { name: m.name, color: m.color, isHost: m.isHost, synced: m.synced });
+  const name = String(m.name ?? '').trim().slice(0, 24) || 'Someone';
+  const color = /^#[0-9a-f]{3,8}$/i.test(String(m.color)) ? m.color : '#888';
+  updatePeer(from, { name, color, isHost: m.isHost, synced: m.synced });
+  if (!known) {
+    lostPeerAt = null;
+    reconnectBackoff = 8000;
+  }
   if (!known) refreshConnectedStatus();
   if (!known) {
-    if (synced) toast(`${m.name} joined the session`);
+    if (synced) toast(`${name} joined the session`);
     if (!m.reply) sayHello(from, true);
   }
   if (m.isHost) {
@@ -458,9 +492,18 @@ function onHello(m: Extract<SyncMsg, { t: 'hello' }>, from: string): void {
         hostId = from;
         useCollab.setState({ hostId: from });
         if (hashTimer) clearInterval(hashTimer);
-        synced = false;
-        requestSnapshot('two hosts — joining the other copy');
-        setStatus('syncing', 'Syncing with the session…');
+        // Edits sequenced on our side of the split: hand them to the winning host as ordinary
+        // client ops (kept pending so they're re-applied on top of its snapshot).
+        flush();
+        clearPending();
+        for (const op of splitLog) {
+          addPending(op.opId, op.d);
+          send({ t: 'op', opId: op.opId, d: op.d }, from);
+        }
+        splitLog = [];
+        awaitingSnapshot = false;
+        requestSnapshot('two hosts — merging with the other copy');
+        setStatus('syncing', 'Reconnected — merging your changes…');
       }
       return;
     }
@@ -491,8 +534,14 @@ function onHello(m: Extract<SyncMsg, { t: 'hello' }>, from: string): void {
   }
 }
 
-function onPeerLeave(id: string): void {
+function onPeerLeave(id: string, deliberate = false): void {
   const p = peersState()[id];
+  // An unexpected disconnect may be a network split: only keep what we sequence from now on.
+  if (!deliberate && p && isHost) splitLog = [];
+  if (!deliberate && p) {
+    lostPeerAt ??= Date.now();
+    lostPeerName = p.name;
+  }
   const peers = { ...peersState() };
   delete peers[id];
   useCollab.setState({ peers });
@@ -604,6 +653,8 @@ function schedulePresence(): void {
 
 function onTransport(m: TransportMsg, from: string): void {
   if (!useCollab.getState().playTogether) return;
+  // Never let someone else's play/stop/seek cut into your own recording take.
+  if (useStore.getState().recording) return;
   const engine = getEngine();
   const bpm = useStore.getState().project?.bpm ?? 120;
   const oneWay = (latency.get(from) ?? 60) / 2000; // seconds
@@ -620,7 +671,13 @@ function subscribeStore(): void {
     if (!room) return;
     // Leaving the song (back to My Songs or opening another song) ends participation.
     if (synced && projectId && (s.screen !== 'project' || (s.project && s.project.id !== projectId)) && !applyingRemote) {
-      void leaveSession(true);
+      const others = Object.keys(peersState()).length;
+      void leaveSession(
+        true,
+        s.screen !== 'project'
+          ? `You left the jam session${others ? ' — the others can keep jamming' : ''}. Your copy of the song is saved.`
+          : `You left the jam session to open another song${others ? ' — the others can keep jamming' : ''}.`,
+      );
       return;
     }
     if (s.project !== prev.project && !applyingRemote && s.project?.id === projectId) {
@@ -652,12 +709,14 @@ function onPageHide(): void {
   void syncSend({ t: 'bye' }, null).catch(() => {});
 }
 
-function connect(roomCode: string): void {
+function connect(roomCode: string, reconnecting = false): void {
   const myGen = ++gen;
   const live = () => myGen === gen;
+  window.removeEventListener('pagehide', onPageHide);
   window.addEventListener('pagehide', onPageHide);
   code = roomCode;
-  useCollab.setState({ code: roomCode, selfId, peers: {}, chat: [], unread: 0, transfers: {} });
+  if (reconnecting) useCollab.setState({ peers: {}, transfers: {} });
+  else useCollab.setState({ code: roomCode, selfId, peers: {}, chat: [], unread: 0, transfers: {} });
   room = joinRoom(
     {
       appId: APP_ID,
@@ -695,6 +754,7 @@ function connect(roomCode: string): void {
   snap.onMessage = (m, { peerId }) => void (live() && receiveSnapshot(m as unknown as SnapshotMsg, peerId));
   snap.onReceiveProgress = (p) => {
     if (!live()) return;
+    lastSnapProgress = Date.now();
     if (!synced) useCollab.setState({ joinProgress: p });
   };
 
@@ -718,7 +778,7 @@ function connect(roomCode: string): void {
     if (!live()) return;
     const m = raw as unknown as ChatMsg;
     useCollab.setState((s) => ({
-      chat: [...s.chat.slice(-199), { id: m.id, from: peerId, name: m.name, color: m.color, text: m.text, at: Date.now() }],
+      chat: [...s.chat.slice(-199), { id: String(m.id), from: peerId, name: String(m.name ?? '').slice(0, 24), color: /^#[0-9a-f]{3,8}$/i.test(String(m.color)) ? m.color : '#888', text: String(m.text ?? '').slice(0, 500), at: Date.now() }],
       unread: s.chatOpen ? 0 : s.unread + 1,
     }));
   };
@@ -769,6 +829,22 @@ function connect(roomCode: string): void {
       if (synced) refreshConnectedStatus();
       else setStatus('connecting', 'Looking for the session…');
     }
+    // A collaborator vanished without a goodbye and nobody is connected: re-enter the room so
+    // fresh announcements go out right away (otherwise reconnection can take a minute).
+    if (lostPeerAt && !Object.keys(peersState()).length && synced) {
+      const now = Date.now();
+      if (now - lostPeerAt > 5000 && now - lastReconnectAt > reconnectBackoff) {
+        lastReconnectAt = now;
+        reconnectBackoff = Math.min(60000, reconnectBackoff * 2);
+        void reconnectRoom();
+        return;
+      }
+    }
+    // A snapshot download that stalled (e.g. the connection hiccupped mid-transfer): ask again.
+    if (awaitingSnapshot && hostId && !isHost) {
+      const now = Date.now();
+      if (now - lastSnapReq > 15000 && now - lastSnapProgress > 8000) requestSnapshot('snapshot download stalled');
+    }
     // Resend edits the host never acknowledged.
     if (!isHost && hostId && pendingOps.length) {
       const now = Date.now();
@@ -781,6 +857,27 @@ function connect(roomCode: string): void {
     if (ticks % 10 === 0) for (const id of Object.keys(peersState())) void room?.ping(id).then((ms) => latency.set(id, ms)).catch(() => {});
     if (ticks % 5 === 0) void fetchMissingAudio();
   }, 1000);
+}
+
+/** Leave and re-enter the same room without touching the session/sync state. */
+async function reconnectRoom(): Promise<void> {
+  const r = room;
+  const c = code;
+  if (!r || !c) return;
+  const myGen = gen;
+  console.info('[jam] reconnecting to the room');
+  try {
+    for (const pc of Object.values(r.getPeers())) pc.close();
+  } catch {
+    /* ignore */
+  }
+  await r.leave().catch(() => {});
+  // Someone left the session (or another reconnect started) while we were waiting.
+  if (myGen !== gen || room !== r) return;
+  room = null;
+  connect(c, true);
+  if (isHost) startHashTimer();
+  refreshConnectedStatus();
 }
 
 function onSyncMessage(m: SyncMsg, from: string): void {
@@ -818,18 +915,30 @@ function onSyncMessage(m: SyncMsg, from: string): void {
       if (req && req.asked === from && !getBuffer(m.id)) askForClip(m.id, req.tried);
       break;
     }
-    case 'bye':
-      // The peer is closing their tab: treat as left right away instead of waiting for a timeout.
-      if (peersState()[from]) onPeerLeave(from);
+    case 'bye': {
+      // The peer is closing their tab: treat as left right away instead of waiting for a timeout,
+      // and drop our side of the connection so a later rejoin gets a clean handshake.
+      if (peersState()[from]) onPeerLeave(from, true);
+      const r = room;
+      setTimeout(() => {
+        try {
+          if (r && r === room) r.getPeers()[from]?.close();
+        } catch {
+          /* ignore */
+        }
+      }, 500);
       break;
+    }
   }
 }
 
 /** Start a new session hosting the open song. Returns the room code. */
-export function startSession(roomCode: string): void {
+export async function startSession(roomCode: string): Promise<void> {
+  // Finish leaving any previous room first: re-joining a room that is still closing would
+  // hand back the old, half-closed room.
+  if (room) await leaveSession(true);
   const p = useStore.getState().project;
   if (!p) return;
-  if (room) void leaveSession(true);
   projectId = p.id;
   isHost = true;
   hostId = selfId;
@@ -851,8 +960,8 @@ export function startSession(roomCode: string): void {
  * Join an existing session. If nobody answers and we already have this session's song
  * locally (e.g. after a page reload), we continue the session as host.
  */
-export function joinSession(roomCode: string, localProjectId?: string): void {
-  if (room) void leaveSession(true);
+export async function joinSession(roomCode: string, localProjectId?: string): Promise<void> {
+  if (room) await leaveSession(true);
   isHost = false;
   hostId = null;
   synced = false;
@@ -883,7 +992,7 @@ export function joinSession(roomCode: string, localProjectId?: string): void {
   }, ALONE_HOST_MS);
 }
 
-export async function leaveSession(silent = false): Promise<void> {
+export async function leaveSession(silent = false, why?: string): Promise<void> {
   flush();
   const r = room;
   room = null;
@@ -906,6 +1015,9 @@ export async function leaveSession(silent = false): Promise<void> {
   reorder.clear();
   seenOps.clear();
   clipRequests.clear();
+  splitLog = [];
+  lostPeerAt = null;
+  reconnectBackoff = 8000;
   isHost = false;
   hostId = null;
   hostChanged = false;
@@ -921,10 +1033,19 @@ export async function leaveSession(silent = false): Promise<void> {
   }
   setUrlCode(null);
   useCollab.setState({ status: 'idle', message: '', code: null, hostId: null, peers: {}, transfers: {}, joinProgress: null, chatOpen: false, unread: 0 });
-  if (!silent) toast('You left the jam session');
+  if (why) toast(why);
+  else if (!silent) toast('You left the jam session');
   if (r) {
     // Give the goodbye a moment to go out, but never block leaving on the network.
     if (bye) await Promise.race([bye, new Promise((res) => setTimeout(res, 400))]);
+    // Close the WebRTC connections outright. Trystero otherwise keeps them alive for reuse,
+    // and the other side keeps treating us as connected — so rejoining the same session from
+    // this tab would be ignored until those connections timed out.
+    try {
+      for (const pc of Object.values(r.getPeers())) pc.close();
+    } catch {
+      /* already closed */
+    }
     await r.leave().catch(() => {});
   }
 }

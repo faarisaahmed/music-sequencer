@@ -98,22 +98,32 @@ export function CollabDialog() {
   const [identity, setIdentity] = useIdentity();
   const [joinCode, setJoinCode] = useState('');
   const [busy, setBusy] = useState(false);
+  // Guards against double-clicks firing twice before React re-renders the disabled button.
+  const starting = useRef(false);
   const active = status !== 'idle' && code;
 
   const start = async () => {
+    if (starting.current) return;
     if (!identity.name.trim()) return toast('Pick a name first', 'error');
+    starting.current = true;
     setBusy(true);
-    const s = await loadSession();
-    s.startSession(makeRoomCode());
-    setBusy(false);
+    try {
+      const s = await loadSession();
+      await s.startSession(makeRoomCode());
+    } finally {
+      starting.current = false;
+      setBusy(false);
+    }
   };
   const join = async () => {
+    if (starting.current) return;
     const c = normalizeCode(joinCode);
     if (!c) return toast('That code looks wrong — it should be 8 letters/numbers like ABCD-EFGH', 'error');
     if (!identity.name.trim()) return toast('Pick a name first', 'error');
+    starting.current = true;
     closeModal();
     const s = await loadSession();
-    s.joinSession(c);
+    await s.joinSession(c);
   };
 
   if (active) {
@@ -356,8 +366,9 @@ export function CollabBar() {
   const transfers = useCollab((s) => s.transfers);
   if (status === 'idle')
     return (
-      <button className="btn icon tb" title="Collaborate — make music together in real time" onClick={() => openModal('collab')}>
+      <button className="btn tb jam-open" title="Collaborate — make music together in real time" onClick={() => openModal('collab')}>
         <Users size={17} />
+        <span className="tb-jam-label">Jam</span>
       </button>
     );
   const list = peerList(peers);

@@ -23,5 +23,5 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
 
 // Test hooks for automated browsers only (Playwright sets navigator.webdriver).
 if (navigator.webdriver) {
-  (window as unknown as Record<string, unknown>).__bf = { store, actions, templates, audioStore, collab, session: () => import('./collab/session') };
+  (window as unknown as Record<string, unknown>).__bf = { store, actions, templates, audioStore, collab, session: () => import('./collab/session'), engine: () => import('./audio/engine').then((m) => m.getEngine()) };
 }

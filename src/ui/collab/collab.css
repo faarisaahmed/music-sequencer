@@ -236,7 +236,7 @@
 .jam-pill {
   position: fixed;
   left: 50%;
-  top: 14px;
+  top: 64px;
   transform: translateX(-50%);
   z-index: 950;
   display: flex;
@@ -323,4 +323,18 @@
   background: var(--pc);
   color: #111;
   white-space: nowrap;
+}
+
+.btn.tb.jam-open {
+  padding: 0 9px;
+  gap: 5px;
+}
+@media (max-width: 1500px) {
+  .tb-jam-label {
+    display: none;
+  }
+  .btn.tb.jam-open {
+    width: 34px;
+    padding: 0;
+  }
 }
