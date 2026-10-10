@@ -38,7 +38,8 @@ type SyncMsg =
   | { t: 'snapReq' }
   | { t: 'clipReq'; id: string }
   | { t: 'clipNo'; id: string }
-  | { t: 'bye' };
+  | { t: 'bye' }
+  | { t: 'byeAck' };
 
 interface PresenceMsg {
   sel: string | null;
@@ -271,11 +272,12 @@ function scheduleFlush(): void {
   flushTimer = setTimeout(flush, FLUSH_MS);
 }
 
-/** Send whatever changed locally since the last flush. */
-function flush(): void {
+/** Send whatever changed locally since the last flush. `from` overrides the current song
+ * (used when leaving: the song may already have been closed when we get here). */
+function flush(from?: Project | null): void {
   if (flushTimer) clearTimeout(flushTimer);
   flushTimer = null;
-  const p = useStore.getState().project;
+  const p = from ?? useStore.getState().project;
   if (!room || !p || !baseline || p.id !== projectId || !synced) return;
   const d = computeDelta(baseline, p);
   baseline = p;
@@ -674,6 +676,9 @@ function subscribeStore(): void {
     if (!room) return;
     // Leaving the song (back to My Songs or opening another song) ends participation.
     if (synced && projectId && (s.screen !== 'project' || (s.project && s.project.id !== projectId)) && !applyingRemote) {
+      // Edits made just before navigating away may still be waiting in the 50ms batch:
+      // send them from the song as it was, before it was closed.
+      if (prev.project?.id === projectId) flush(prev.project);
       const others = Object.keys(peersState()).length;
       void leaveSession(
         true,
@@ -708,13 +713,17 @@ function subscribeStore(): void {
 
 function onPageHide(): void {
   if (!room || !syncSend) return;
+  // Send edits still waiting in the 50ms batch before the page goes away.
+  flush();
   // Best effort, sent directly (not queued) so it goes out before the page is gone.
   void syncSend({ t: 'bye' }, null).catch(() => {});
 }
 
 function connect(roomCode: string, reconnecting = false): void {
   const myGen = ++gen;
-  const live = () => myGen === gen;
+  // While leaving (draining) only the sync channel stays live, for goodbye acknowledgements.
+  const live = () => myGen === gen && !draining;
+  const liveSync = () => myGen === gen;
   window.removeEventListener('pagehide', onPageHide);
   window.addEventListener('pagehide', onPageHide);
   code = roomCode;
@@ -749,7 +758,7 @@ function connect(roomCode: string, reconnecting = false): void {
   const sync = room.makeAction('sync');
   syncSend = (m, target) => sync.send(m as never, { target: target ?? null });
   sync.onMessage = (m, { peerId }) => {
-    if (live()) onSyncMessage(m as unknown as SyncMsg, peerId);
+    if (liveSync()) onSyncMessage(m as unknown as SyncMsg, peerId);
   };
 
   const snap = room.makeAction('snap');
@@ -896,6 +905,13 @@ async function reconnectRoom(): Promise<void> {
 }
 
 function onSyncMessage(m: SyncMsg, from: string): void {
+  if (draining) {
+    if (m.t === 'byeAck' && byeWaiting) {
+      byeWaiting.delete(from);
+      if (!byeWaiting.size) byeAllAcked?.();
+    }
+    return;
+  }
   switch (m.t) {
     case 'hello':
       onHello(m, from);
@@ -930,7 +946,11 @@ function onSyncMessage(m: SyncMsg, from: string): void {
       if (req && req.asked === from && !getBuffer(m.id)) askForClip(m.id, req.tried);
       break;
     }
+    case 'byeAck':
+      break;
     case 'bye': {
+      // Acknowledge first: it tells them everything they sent before reached us.
+      void syncSend?.({ t: 'byeAck' }, from).catch(() => {});
       // The peer is closing their tab: treat as left right away instead of waiting for a timeout,
       // and drop our side of the connection so a later rejoin gets a clean handshake.
       if (peersState()[from]) onPeerLeave(from, true);
@@ -998,13 +1018,13 @@ async function rejoinViaReload(roomCode: string, songId: string): Promise<void> 
 }
 
 export async function joinSession(roomCode: string, localProjectId?: string): Promise<void> {
-  if (room && code === roomCode) return; // already in this session
+  if (room && code === roomCode && !draining) return; // already in this session
+  if (room) await leaveSession(true);
   const previous = joinedHere.get(roomCode);
-  if (previous !== undefined && !room) {
+  if (previous !== undefined) {
     await rejoinViaReload(roomCode, localProjectId ?? previous);
     return;
   }
-  if (room) await leaveSession(true);
   joinedHere.set(roomCode, localProjectId ?? '');
   isHost = false;
   hostId = null;
@@ -1039,11 +1059,61 @@ export async function joinSession(roomCode: string, localProjectId?: string): Pr
   }, ALONE_HOST_MS);
 }
 
-export async function leaveSession(silent = false, why?: string): Promise<void> {
+/** Peers that still have to acknowledge our goodbye while we leave, and who to tell when they all have. */
+let byeWaiting: Set<string> | null = null;
+let byeAllAcked: (() => void) | null = null;
+/** True while leaving: only goodbye acknowledgements are processed. */
+let draining = false;
+let leavingPromise: Promise<void> | null = null;
+
+export function leaveSession(silent = false, why?: string): Promise<void> {
+  leavingPromise ??= doLeave(silent, why).finally(() => {
+    leavingPromise = null;
+  });
+  return leavingPromise;
+}
+
+async function doLeave(silent: boolean, why?: string): Promise<void> {
   flush();
   const r = room;
+  // Who must acknowledge our goodbye (read before the UI state below is cleared).
+  const peerIds = Object.keys(peersState());
+  // Stop reacting to the song and tell the user straight away; the network goodbye below
+  // happens in the background.
+  unsubStore?.();
+  unsubStore = null;
+  draining = true;
+  try {
+    sessionStorage.removeItem(SESSION_KEY);
+  } catch {
+    /* ignore */
+  }
+  setUrlCode(null);
+  useCollab.setState({ status: 'idle', message: '', code: null, hostId: null, peers: {}, transfers: {}, joinProgress: null, chatOpen: false, unread: 0 });
+  if (why) toast(why);
+  else if (!silent) toast('You left the jam session');
+
+  // Goodbye handshake. The data channel is ordered, so once a peer acknowledges our goodbye it
+  // has also received every edit we sent before it. Connections can stall for a few seconds
+  // (e.g. while the network path changes) — closing too early would silently drop our last
+  // edits and leave us "online" on everyone else's screen until their connection timed out.
+  if (r && syncSend && peerIds.length) {
+    const fn = syncSend;
+    await new Promise<void>((res) => {
+      byeWaiting = new Set(peerIds);
+      byeAllAcked = res;
+      // Generous: this runs in the background and a stalled path can take several seconds
+      // (retransmission backoff) to recover.
+      setTimeout(res, 10000);
+      void fn({ t: 'bye' }, null).catch(() => res());
+    });
+    byeWaiting = null;
+    byeAllAcked = null;
+  }
+
   room = null;
   gen++;
+  draining = false;
   if (flushTimer) clearTimeout(flushTimer);
   if (hashTimer) clearInterval(hashTimer);
   if (statusTimer) clearInterval(statusTimer);
@@ -1051,10 +1121,7 @@ export async function leaveSession(silent = false, why?: string): Promise<void> 
   if (gapTimer) clearTimeout(gapTimer);
   if (presenceTimer) clearTimeout(presenceTimer);
   flushTimer = hashTimer = statusTimer = aloneTimer = gapTimer = presenceTimer = null;
-  unsubStore?.();
-  unsubStore = null;
   window.removeEventListener('pagehide', onPageHide);
-  const bye = r && syncSend ? syncSend({ t: 'bye' }, null).catch(() => {}) : null;
   syncSend = snapSend = presSend = xportSend = chatSend = null;
   clipSend = null;
   sendChain = Promise.resolve();
@@ -1074,27 +1141,23 @@ export async function leaveSession(silent = false, why?: string): Promise<void> 
   projectId = null;
   baseline = null;
   awaitingSnapshot = false;
-  try {
-    sessionStorage.removeItem(SESSION_KEY);
-  } catch {
-    /* ignore */
-  }
-  setUrlCode(null);
-  useCollab.setState({ status: 'idle', message: '', code: null, hostId: null, peers: {}, transfers: {}, joinProgress: null, chatOpen: false, unread: 0 });
-  if (why) toast(why);
-  else if (!silent) toast('You left the jam session');
   if (r) {
-    // Give the goodbye a moment to go out, but never block leaving on the network.
-    if (bye) await Promise.race([bye, new Promise((res) => setTimeout(res, 400))]);
-    // Close the WebRTC connections outright. Trystero otherwise keeps them alive for reuse,
-    // and the other side keeps treating us as connected — so rejoining the same session from
-    // this tab would be ignored until those connections timed out.
+    let pcs: RTCPeerConnection[] = [];
     try {
-      for (const pc of Object.values(r.getPeers())) pc.close();
+      pcs = Object.values(r.getPeers());
     } catch {
-      /* already closed */
+      /* ignore */
     }
     await r.leave().catch(() => {});
+    // Close the WebRTC connections outright. Trystero otherwise keeps them alive for reuse,
+    // and the other side would keep treating us as connected until they timed out.
+    for (const pc of pcs) {
+      try {
+        pc.close();
+      } catch {
+        /* already closed */
+      }
+    }
   }
 }
 

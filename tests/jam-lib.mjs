@@ -6,10 +6,26 @@ const INSTRUMENT = () => {
   const w = window;
   w.__qa = { dcSends: 0, intervals: new Set(), listeners: 0, types: {}, pcs: [] };
   const DC = RTCDataChannel.prototype.send;
+  w.__qa.log = [];
   RTCDataChannel.prototype.send = function (...a) {
     w.__qa.dcSends++;
+    if (w.__qa.trace) w.__qa.log.push(`${Math.round(performance.now())} send ${this.label} ${this.readyState} buf=${this.bufferedAmount} len=${a[0]?.byteLength ?? a[0]?.length}`);
     return DC.apply(this, a);
   };
+  const desc = Object.getOwnPropertyDescriptor(RTCDataChannel.prototype, 'onmessage');
+  Object.defineProperty(RTCDataChannel.prototype, 'onmessage', {
+    configurable: true,
+    get() {
+      return desc.get.call(this);
+    },
+    set(fn) {
+      const ch = this;
+      desc.set.call(this, fn ? function (e) {
+        if (w.__qa.trace) w.__qa.log.push(`${Math.round(performance.now())} recv ${ch.label} len=${e.data?.byteLength ?? e.data?.length}`);
+        return fn.call(this, e);
+      } : fn);
+    },
+  });
   const si = w.setInterval.bind(w);
   const ci = w.clearInterval.bind(w);
   w.setInterval = (...a) => {
@@ -55,7 +71,7 @@ export async function setup(exe, base) {
     const page = await ctx.newPage();
     page.on('pageerror', (e) => errors.push(`${label} pageerror: ${e.message}`));
     page.on('console', (m) => {
-      if (m.type() === 'error' && !/Failed to load resource|ERR_|WebSocket|relay|User-Initiated Abort/i.test(m.text())) errors.push(`${label} console: ${m.text()}`);
+      if (m.type() === 'error' && !/Failed to load resource|ERR_|WebSocket|relay|User-Initiated Abort|Vite server/i.test(m.text())) errors.push(`${label} console: ${m.text()}`);
     });
     const peer = { ctx, page, label };
     if (opts.url !== null) {
@@ -117,7 +133,13 @@ export async function setup(exe, base) {
     return code;
   }
   async function join(B, code) {
-    await ev(B, async (code) => { await (await window.__bf.session()).joinSession(code); }, code);
+    try {
+      await ev(B, async (code) => { await (await window.__bf.session()).joinSession(code); }, code);
+    } catch {
+      // Re-joining a session from the same tab reloads the page (fresh network identity).
+      await B.page.waitForLoadState('load');
+      await ready(B);
+    }
   }
   return { browser, errors, toasts, log, newPeer, ev, ready, state, waitFor, converged, commit, read, toastsOf, host, join };
 }

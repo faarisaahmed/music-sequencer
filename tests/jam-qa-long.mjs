@@ -127,7 +127,7 @@ try {
             st.commit((d) => {
               if (d.tracks.length < 12 && Math.random() < 0.6) {
                 const src = d.tracks[rnd(d.tracks.length)];
-                if (src) d.tracks.push({ ...JSON.parse(JSON.stringify(src)), id: `soak${i}-${n}`, name: `Soak ${i}-${n}`, regions: [] });
+                if (src) d.tracks.push({ ...JSON.parse(JSON.stringify(src)), id: `soak${i}-${n}-${Date.now()}`, name: `Soak ${i}-${n}`, regions: [] });
               } else if (d.tracks.length > 4) d.tracks.splice(rnd(d.tracks.length), 1);
             });
           } else {
