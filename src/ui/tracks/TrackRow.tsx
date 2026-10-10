@@ -16,6 +16,7 @@ import RegionView from './RegionView';
 import AutomationLane from './AutomationLane';
 import { laneMenu, trackMenu } from './menus';
 import { AUTOMATION_H, useTracksUi } from './tracksUi';
+import { TrackPresence } from '../collab/presence';
 
 function Meter({ trackId }: { trackId: string }) {
   const level = useTransport((s) => s.levels[trackId] ?? 0);
@@ -79,6 +80,7 @@ function TrackHeader({ track, height, selected }: { track: Track; height: number
       }}
     >
       <div className="th-strip" />
+      <TrackPresence trackId={track.id} />
       <div
         className="th-icon"
         title={track.type === 'audio' ? 'Audio track' : 'Change instrument'}

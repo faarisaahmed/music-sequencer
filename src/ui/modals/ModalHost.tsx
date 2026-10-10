@@ -5,6 +5,7 @@ import SettingsDialog from './SettingsDialog';
 import HelpDialog from './HelpDialog';
 import TemplatesDialog from '../home/TemplatesDialog';
 import { lazy, Suspense } from 'react';
+import { CollabDialog, JoinDialog } from '../collab/CollabUI';
 
 const SongWizardDialog = lazy(() => import('../assistant/SongWizardDialog'));
 
@@ -22,6 +23,10 @@ export default function ModalHost() {
       return <HelpDialog />;
     case 'templates':
       return <TemplatesDialog />;
+    case 'collab':
+      return <CollabDialog />;
+    case 'jamJoin':
+      return <JoinDialog />;
     case 'songWizard':
       return (
         <Suspense fallback={null}>

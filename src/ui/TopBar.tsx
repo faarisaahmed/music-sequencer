@@ -33,6 +33,7 @@ import { HSlider } from './common/controls';
 import { startDrag } from './common/drag';
 import FullScoreButton from './editors/score/FullScoreButton';
 import ViewSwitch from './liveloops/ViewSwitch';
+import { CollabBar } from './collab/CollabUI';
 
 function MetronomeIcon({ size = 17 }: { size?: number }) {
   return (
@@ -324,6 +325,7 @@ export default function TopBar() {
       </div>
 
       <div className="tb-group right">
+        <CollabBar />
         <button className="btn icon tb" title="Undo (⌘Z)" disabled={!canUndo} onClick={undo}>
           <Undo2 size={17} />
         </button>

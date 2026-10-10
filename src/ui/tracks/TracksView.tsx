@@ -11,6 +11,7 @@ import ArrangementLane from './ArrangementLane';
 import ChordLane, { ChordToggleButton } from '../assistant/ChordLane';
 import { HEADER_W, RULER_H, useTracksUi } from './tracksUi';
 import './tracks.css';
+import { PeerPlayheads } from '../collab/presence';
 
 const CYCLE_H = 13;
 
@@ -414,6 +415,7 @@ export default function TracksView() {
           {loop.enabled && <div className="tv-cycle-shade" style={{ left: HEADER_W + loop.start * ppb, width: (loop.end - loop.start) * ppb }} />}
           {snapLine !== null && <div className="tv-snapline" style={{ left: HEADER_W + snapLine * ppb }} />}
           <Playhead ppb={ppb} />
+          <PeerPlayheads ppb={ppb} />
           {marquee && (
             <div
               className="tv-marquee"

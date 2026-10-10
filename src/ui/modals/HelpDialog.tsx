@@ -129,6 +129,9 @@ export default function HelpDialog() {
         <li>
           Change tempo and key in the display at the top. When you’re done, <b>Export</b> to MP3, WAV or MIDI.
         </li>
+        <li>
+          Make music with friends: click the <b>people icon</b> in the top bar, press <b>Start Session</b> and send them the link. Everyone edits the same song live.
+        </li>
       </ol>
       <div className="help-cols">
         {SECTIONS.map((s) => (

@@ -12,6 +12,7 @@ let pillTimer: ReturnType<typeof setTimeout> | null = null;
 import { dragFade, dragLoop, dragMove, dragResizeLeft, dragResizeRight } from './regionOps';
 import { openRegionEditor, regionMenu, regionPillItems } from './menus';
 import { useTracksUi } from './tracksUi';
+import { RegionPresence } from '../collab/presence';
 
 const NAME_H = 16;
 
@@ -294,6 +295,7 @@ function RegionView({ region: r, trackId, trackType, color, ppb, height, bpm }: 
         showContextMenu(e, regionMenu(r.id, r.start + (e.clientX - rect.left) / ppb));
       }}
     >
+      <RegionPresence regionId={r.id} />
       <div className="region-name">
         {r.loop && <Repeat size={10} style={{ flexShrink: 0 }} />}
         {r.kind === 'midi' && r.drummer && <span className="drummer-badge">{drummerFor(r.drummer.style).name}</span>}

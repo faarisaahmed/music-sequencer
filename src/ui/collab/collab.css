@@ -1,0 +1,326 @@
+/* ---------------------------------------------------------------- Jam Session */
+
+.jam-identity {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.jam-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #111;
+  flex-shrink: 0;
+  position: relative;
+  box-shadow: 0 0 0 2px var(--panel);
+}
+.jam-avatar.lg {
+  width: 52px;
+  height: 52px;
+  font-size: 18px;
+}
+.jam-avatar.sm {
+  width: 22px;
+  height: 22px;
+  font-size: 9px;
+  box-shadow: 0 0 0 2px #26262b;
+}
+.jam-avatar.more {
+  background: var(--panel-3);
+  color: var(--text);
+}
+.jam-crown {
+  position: absolute;
+  top: -6px;
+  right: -3px;
+  color: var(--yellow);
+  fill: var(--yellow);
+}
+.jam-colors {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.jam-color {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+.jam-color.on {
+  border-color: white;
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.jam-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.jam-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border-soft);
+  background: var(--panel-2);
+}
+.jam-card-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 650;
+  font-size: 14px;
+}
+.jam-card-desc {
+  font-size: 12.5px;
+  flex: 1;
+}
+.jam-code-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--border-soft);
+  text-align: center;
+}
+.jam-code {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #e8f1ff;
+  user-select: all;
+}
+.jam-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.jam-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.jam-people {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.jam-person {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.jam-toggle-row {
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.jam-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.jam-bar-main {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+}
+.jam-bar-main:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.jam-bar-label {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.jam-stack {
+  display: flex;
+}
+.jam-stack .jam-avatar + .jam-avatar {
+  margin-left: -6px;
+}
+.btn.tb {
+  position: relative;
+}
+.jam-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 15px;
+  height: 15px;
+  border-radius: 8px;
+  background: var(--record);
+  color: white;
+  font-size: 9.5px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+}
+
+.jam-chat {
+  position: fixed;
+  right: 14px;
+  top: 64px;
+  width: 300px;
+  height: min(440px, calc(100vh - 90px));
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  background: rgba(36, 36, 42, 0.98);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  animation: pop-in 0.15s ease;
+}
+.jam-chat-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-soft);
+  font-weight: 600;
+}
+.jam-chat-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.jam-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  user-select: text;
+}
+.jam-msg-name {
+  font-size: 11px;
+  font-weight: 650;
+}
+.jam-msg-text {
+  font-size: 13px;
+  word-wrap: break-word;
+}
+.jam-chat-input {
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  border-top: 1px solid var(--border-soft);
+}
+.jam-chat-input input {
+  flex: 1;
+}
+
+.jam-pill {
+  position: fixed;
+  left: 50%;
+  top: 14px;
+  transform: translateX(-50%);
+  z-index: 950;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(680px, 92vw);
+  padding: 8px 10px 8px 14px;
+  background: rgba(40, 40, 46, 0.98);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  box-shadow: var(--shadow);
+  font-size: 13px;
+  animation: pop-in 0.18s ease;
+}
+
+/* presence in the tracks view */
+.presence-dots {
+  position: absolute;
+  right: 6px;
+  top: 5px;
+  display: flex;
+  gap: 2px;
+  z-index: 2;
+  pointer-events: none;
+}
+.presence-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font-size: 7.5px;
+  font-weight: 800;
+  color: #111;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 1.5px #1b1b1f;
+}
+.presence-outline {
+  position: absolute;
+  inset: 0;
+  border: 2px solid;
+  border-radius: 6px;
+  pointer-events: none;
+  z-index: 3;
+}
+.presence-tag {
+  position: absolute;
+  left: 4px;
+  bottom: 3px;
+  /* Stay visible when the region starts off-screen (same trick as the region name). */
+  transform: translateX(clamp(0px, calc(var(--sx, 0px) - var(--rl, 0px)), calc(var(--rw, 0px) - 120px)));
+  z-index: 4;
+  font-size: 10px;
+  font-weight: 650;
+  color: #111;
+  padding: 1px 6px;
+  border-radius: 4px;
+  pointer-events: none;
+  white-space: nowrap;
+  max-width: calc(100% - 4px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.peer-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  border-left: 1.5px dashed var(--pc);
+  pointer-events: none;
+  z-index: 40;
+  will-change: transform;
+}
+.peer-playhead span {
+  position: sticky;
+  top: 2px;
+  display: inline-block;
+  margin-left: 3px;
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--pc);
+  color: #111;
+  white-space: nowrap;
+}
