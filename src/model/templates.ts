@@ -1,8 +1,21 @@
 // New-song templates and demo songs.
 import type { Note, Project } from './types';
-import { createMidiRegion, createProject, createTrack, note, uid } from './defaults';
+import { contentEndBeat, createMidiRegion, createProject, createTrack, note, uid } from './defaults';
+import { diatonic, layChords } from './accompaniment';
 import { SCALES, beatsPerBar, chordPitches, diatonicChords } from './music';
 import { sectionsFromBars } from './sections';
+
+/** Fill the chord track with a repeating diatonic progression so the demo works with the Songwriter tools. */
+function chordTrack(p: Project, degrees: number[], beatsEach: number, seventh = false): void {
+  const bpb = beatsPerBar(p.timeSig);
+  const end = Math.ceil(contentEndBeat(p) / bpb) * bpb;
+  p.chords = layChords(
+    degrees.map((d) => diatonic(p.key, d, seventh)),
+    0,
+    end,
+    beatsEach,
+  );
+}
 
 /** Build drum notes from step strings, e.g. { 36: 'x...x...x...x...' }. 'X' = accent, 'x' = normal, 'o' = ghost. */
 export function drumPattern(lanes: Record<number, string>, stepBeats = 0.25): Note[] {
@@ -281,6 +294,7 @@ function buildDemo(): Project {
   p.sections = sectionsFromBars([['Intro', 8], ['Verse', 8], ['Chorus', 8], ['Outro', 8]], beatsPerBar(p.timeSig));
   p.lengthBars = 36;
   p.loop = { enabled: false, start: 32, end: 48 };
+  chordTrack(p, prog, 4);
   return p;
 }
 
@@ -327,7 +341,7 @@ function buildLofi(): Project {
   const keys = createTrack('instrument', 'electric-piano', 'Dusty Keys', 0);
   const prog = [1, 4, 0, 5]; // ii7 V7 Imaj7 vi7
   const chords: Note[] = [];
-  prog.forEach((d, i) => seventh(p, d, 55).forEach((pt, j) => chords.push(note(pt, i * 4 + j * 0.05, 3.6, 0.5))));
+  prog.forEach((d, i) => seventh(p, d, 48).forEach((pt, j) => chords.push(note(pt, i * 4 + j * 0.05, 3.6, 0.5))));
   keys.regions.push(loopReg(0, 128, chords, 16, 'Sevenths'));
   keys.fx = { ...keys.fx, eqHigh: -6, drive: 0.25, chorus: 0.35, reverb: 0.35, filterCutoff: 0.6 };
 
@@ -364,6 +378,7 @@ function buildLofi(): Project {
   ];
   p.sections = sectionsFromBars([['Intro', 4], ['Verse', 8], ['Chorus', 8], ['Verse 2', 8], ['Outro', 4]], beatsPerBar(p.timeSig));
   p.lengthBars = 34;
+  chordTrack(p, prog, 4, true);
   return p;
 }
 
@@ -396,7 +411,7 @@ function buildPop(): Project {
     { beat: 48, value: 0 },
     { beat: 64, value: 0.9 },
   ];
-  synth.regions.push(loopReg(48, 16, progression(p, [3, 3, 4, 4], 4, 66, 'pulse', 0.5), 16, 'Riser'));
+  synth.regions.push(loopReg(48, 16, progression(p, prog, 4, 66, 'pulse', 0.5), 16, 'Riser'));
 
   const lead = createTrack('instrument', 'analog-lead', 'Lead Synth', 0);
   lead.regions.push(
@@ -427,6 +442,7 @@ function buildPop(): Project {
   p.sections = sectionsFromBars([['Intro', 4], ['Verse', 8], ['Pre-Chorus', 4], ['Chorus', 8], ['Chorus 2', 8], ['Outro', 4]], beatsPerBar(p.timeSig));
   p.lengthBars = 38;
   p.loop = { enabled: false, start: 64, end: 96 };
+  chordTrack(p, prog, 4);
   return p;
 }
 
@@ -486,6 +502,7 @@ function buildCinematic(): Project {
   p.tracks.push(strings, cello, harp, horn, perc);
   p.sections = sectionsFromBars([['Intro', 4], ['Build', 12], ['Climax', 8], ['Outro', 4]], beatsPerBar(p.timeSig));
   p.lengthBars = 28;
+  chordTrack(p, prog, 8);
   return p;
 }
 
@@ -553,5 +570,6 @@ function buildSynthwave(): Project {
   p.delayTime = '1/8d';
   p.sections = sectionsFromBars([['Intro', 4], ['Verse', 8], ['Chorus', 8], ['Verse 2', 8], ['Outro', 4]], beatsPerBar(p.timeSig));
   p.lengthBars = 34;
+  chordTrack(p, prog, 4);
   return p;
 }
