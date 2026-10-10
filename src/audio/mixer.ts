@@ -1,0 +1,355 @@
+// Audio graph: per-track channel strips, effect buses and master bus.
+// Context-agnostic so the same graph renders live and offline (export).
+import type { AutomationPoint, Project, Track } from '../model/types';
+import { DRUM_LANES } from '../model/music';
+import { makeImpulse } from './context';
+import { getBuffer } from './audioStore';
+import { DrumKitInstrument, SamplerInstrument, SynthInstrument, driveCurve, type Instrument } from './instruments';
+import { getPreset } from './presets';
+
+export function faderGain(v: number): number {
+  return Math.pow(Math.max(0, v) / 0.8, 2);
+}
+
+export function automationValueAt(points: AutomationPoint[], beat: number, fallback: number): number {
+  if (!points.length) return fallback;
+  if (beat <= points[0].beat) return points[0].value;
+  const last = points[points.length - 1];
+  if (beat >= last.beat) return last.value;
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1];
+    const b = points[i];
+    if (beat <= b.beat) {
+      const t = b.beat === a.beat ? 1 : (beat - a.beat) / (b.beat - a.beat);
+      return a.value + (b.value - a.value) * t;
+    }
+  }
+  return last.value;
+}
+
+const DELAY_DIV: Record<Project['delayTime'], number> = { '1/4': 1, '1/8': 0.5, '1/8d': 0.75, '1/16': 0.25, '1/4d': 1.5 };
+const REVERB: Record<Project['reverbType'], [number, number, number, number]> = {
+  // seconds, decay power, predelay, brightness
+  room: [1.1, 3.2, 0.005, 0.7],
+  plate: [2.0, 2.6, 0.01, 0.95],
+  hall: [3.0, 2.4, 0.025, 0.6],
+  cathedral: [5.5, 2.0, 0.04, 0.45],
+};
+
+export class Channel {
+  readonly input: GainNode;
+  private filter: BiquadFilterNode;
+  private eqLow: BiquadFilterNode;
+  private eqMid: BiquadFilterNode;
+  private eqHigh: BiquadFilterNode;
+  private comp: DynamicsCompressorNode;
+  private compMakeup: GainNode;
+  private driveDry: GainNode;
+  private driveWet: GainNode;
+  private shaper: WaveShaperNode;
+  private chorusWet: GainNode;
+  private chorusL: DelayNode;
+  private chorusR: DelayNode;
+  private chorusLfo: OscillatorNode;
+  readonly autoGain: GainNode;
+  readonly fader: GainNode;
+  readonly panner: StereoPannerNode;
+  readonly muteGain: GainNode;
+  readonly analyser: AnalyserNode;
+  private reverbSend: GainNode;
+  private delaySend: GainNode;
+  instrument: Instrument | null = null;
+  instrumentKey = '';
+  private lastDrive = -1;
+  private ctx: BaseAudioContext;
+
+  constructor(ctx: BaseAudioContext, mixer: Mixer) {
+    this.ctx = ctx;
+    this.input = ctx.createGain();
+    this.filter = ctx.createBiquadFilter();
+    this.filter.type = 'lowpass';
+    this.filter.frequency.value = 20000;
+    this.eqLow = ctx.createBiquadFilter();
+    this.eqLow.type = 'lowshelf';
+    this.eqLow.frequency.value = 220;
+    this.eqMid = ctx.createBiquadFilter();
+    this.eqMid.type = 'peaking';
+    this.eqMid.frequency.value = 1200;
+    this.eqMid.Q.value = 0.8;
+    this.eqHigh = ctx.createBiquadFilter();
+    this.eqHigh.type = 'highshelf';
+    this.eqHigh.frequency.value = 5000;
+    this.comp = ctx.createDynamicsCompressor();
+    this.compMakeup = ctx.createGain();
+    this.driveDry = ctx.createGain();
+    this.driveWet = ctx.createGain();
+    this.shaper = ctx.createWaveShaper();
+    this.shaper.oversample = '2x';
+    const driveSum = ctx.createGain();
+    const chorusSum = ctx.createGain();
+    this.chorusWet = ctx.createGain();
+    this.chorusWet.gain.value = 0;
+    this.chorusL = ctx.createDelay(0.05);
+    this.chorusR = ctx.createDelay(0.05);
+    this.chorusL.delayTime.value = 0.012;
+    this.chorusR.delayTime.value = 0.017;
+    this.chorusLfo = ctx.createOscillator();
+    this.chorusLfo.frequency.value = 0.8;
+    const lfoL = ctx.createGain();
+    lfoL.gain.value = 0.003;
+    const lfoR = ctx.createGain();
+    lfoR.gain.value = -0.003;
+    this.chorusLfo.connect(lfoL);
+    this.chorusLfo.connect(lfoR);
+    lfoL.connect(this.chorusL.delayTime);
+    lfoR.connect(this.chorusR.delayTime);
+    this.chorusLfo.start();
+    const merger = ctx.createChannelMerger(2);
+    this.autoGain = ctx.createGain();
+    this.fader = ctx.createGain();
+    this.panner = ctx.createStereoPanner();
+    this.muteGain = ctx.createGain();
+    this.analyser = ctx.createAnalyser();
+    this.analyser.fftSize = 512;
+    this.reverbSend = ctx.createGain();
+    this.delaySend = ctx.createGain();
+
+    this.input.connect(this.filter);
+    this.filter.connect(this.eqLow);
+    this.eqLow.connect(this.eqMid);
+    this.eqMid.connect(this.eqHigh);
+    this.eqHigh.connect(this.comp);
+    this.comp.connect(this.compMakeup);
+    this.compMakeup.connect(this.driveDry);
+    this.compMakeup.connect(this.shaper);
+    this.shaper.connect(this.driveWet);
+    this.driveDry.connect(driveSum);
+    this.driveWet.connect(driveSum);
+    driveSum.connect(chorusSum);
+    driveSum.connect(this.chorusL);
+    driveSum.connect(this.chorusR);
+    this.chorusL.connect(merger, 0, 0);
+    this.chorusR.connect(merger, 0, 1);
+    merger.connect(this.chorusWet);
+    this.chorusWet.connect(chorusSum);
+    chorusSum.connect(this.autoGain);
+    this.autoGain.connect(this.fader);
+    this.fader.connect(this.panner);
+    this.panner.connect(this.muteGain);
+    this.muteGain.connect(mixer.masterIn);
+    this.muteGain.connect(this.analyser);
+    this.muteGain.connect(this.reverbSend);
+    this.muteGain.connect(this.delaySend);
+    this.reverbSend.connect(mixer.reverbIn);
+    this.delaySend.connect(mixer.delayIn);
+  }
+
+  apply(t: Track, audible: boolean, hasPanAutomation: boolean): void {
+    const now = this.ctx.currentTime;
+    const smooth = (p: AudioParam, v: number) => p.setTargetAtTime(v, now, 0.02);
+    const fx = t.fx;
+    smooth(this.filter.frequency, 80 * Math.pow(250, fx.filterCutoff));
+    smooth(this.eqLow.gain, fx.eqLow);
+    smooth(this.eqMid.gain, fx.eqMid);
+    smooth(this.eqHigh.gain, fx.eqHigh);
+    smooth(this.comp.threshold, -fx.compressor * 32);
+    smooth(this.comp.ratio, 1 + fx.compressor * 7);
+    this.comp.attack.value = 0.008;
+    this.comp.release.value = 0.15;
+    smooth(this.compMakeup.gain, 1 + fx.compressor * 0.9);
+    if (fx.drive !== this.lastDrive) {
+      this.shaper.curve = driveCurve(1 + fx.drive * 30);
+      this.lastDrive = fx.drive;
+    }
+    smooth(this.driveWet.gain, fx.drive * 0.6);
+    smooth(this.driveDry.gain, 1 - fx.drive * 0.7);
+    smooth(this.chorusWet.gain, fx.chorus * 0.9);
+    smooth(this.fader.gain, faderGain(t.volume));
+    if (!hasPanAutomation) smooth(this.panner.pan, t.pan);
+    smooth(this.muteGain.gain, audible ? 1 : 0);
+    smooth(this.reverbSend.gain, fx.reverb * 0.9);
+    smooth(this.delaySend.gain, fx.delay * 0.8);
+  }
+
+  setInstrument(inst: Instrument | null, key: string): void {
+    if (this.instrument) {
+      const old = this.instrument;
+      old.allNotesOff(this.ctx.currentTime);
+      setTimeout(() => old.dispose(), 3000);
+    }
+    this.instrument = inst;
+    this.instrumentKey = key;
+    if (inst) inst.output.connect(this.input);
+  }
+
+  dispose(): void {
+    this.setInstrument(null, '');
+    this.chorusLfo.stop();
+    this.muteGain.disconnect();
+    this.reverbSend.disconnect();
+    this.delaySend.disconnect();
+  }
+}
+
+export class Mixer {
+  readonly ctx: BaseAudioContext;
+  readonly masterIn: GainNode;
+  readonly masterAuto: GainNode;
+  readonly masterVol: GainNode;
+  readonly analyserL: AnalyserNode;
+  readonly analyserR: AnalyserNode;
+  readonly reverbIn: GainNode;
+  readonly delayIn: GainNode;
+  private convolver: ConvolverNode;
+  private delayL: DelayNode;
+  private delayR: DelayNode;
+  private delayFb: GainNode;
+  readonly channels = new Map<string, Channel>();
+  private reverbKey = '';
+  /** Output node (connect to destination). */
+  readonly output: AudioNode;
+
+  constructor(ctx: BaseAudioContext) {
+    this.ctx = ctx;
+    this.masterIn = ctx.createGain();
+    this.masterAuto = ctx.createGain();
+    const glue = ctx.createDynamicsCompressor();
+    glue.threshold.value = -14;
+    glue.ratio.value = 2;
+    glue.attack.value = 0.02;
+    glue.release.value = 0.25;
+    glue.knee.value = 8;
+    const limiter = ctx.createDynamicsCompressor();
+    limiter.threshold.value = -1.5;
+    limiter.ratio.value = 20;
+    limiter.attack.value = 0.002;
+    limiter.release.value = 0.08;
+    limiter.knee.value = 0;
+    this.masterVol = ctx.createGain();
+    this.masterIn.connect(this.masterAuto);
+    this.masterAuto.connect(glue);
+    glue.connect(this.masterVol);
+    this.masterVol.connect(limiter);
+    const splitter = ctx.createChannelSplitter(2);
+    limiter.connect(splitter);
+    this.analyserL = ctx.createAnalyser();
+    this.analyserR = ctx.createAnalyser();
+    this.analyserL.fftSize = 1024;
+    this.analyserR.fftSize = 1024;
+    splitter.connect(this.analyserL, 0);
+    splitter.connect(this.analyserR, 1);
+    this.output = limiter;
+
+    // Reverb bus
+    this.reverbIn = ctx.createGain();
+    this.convolver = ctx.createConvolver();
+    const revHp = ctx.createBiquadFilter();
+    revHp.type = 'highpass';
+    revHp.frequency.value = 180;
+    const revRet = ctx.createGain();
+    revRet.gain.value = 0.9;
+    this.reverbIn.connect(revHp);
+    revHp.connect(this.convolver);
+    this.convolver.connect(revRet);
+    revRet.connect(this.masterIn);
+
+    // Stereo ping-pong delay bus
+    this.delayIn = ctx.createGain();
+    this.delayL = ctx.createDelay(4);
+    this.delayR = ctx.createDelay(4);
+    this.delayFb = ctx.createGain();
+    const dlp = ctx.createBiquadFilter();
+    dlp.type = 'lowpass';
+    dlp.frequency.value = 4500;
+    const dMerge = ctx.createChannelMerger(2);
+    const dRet = ctx.createGain();
+    dRet.gain.value = 0.8;
+    this.delayIn.connect(dlp);
+    dlp.connect(this.delayL);
+    this.delayL.connect(this.delayR);
+    this.delayR.connect(this.delayFb);
+    this.delayFb.connect(dlp);
+    this.delayL.connect(dMerge, 0, 0);
+    this.delayR.connect(dMerge, 0, 1);
+    dMerge.connect(dRet);
+    dRet.connect(this.masterIn);
+  }
+
+  /** Bring the graph in line with the project. */
+  sync(p: Project): void {
+    const now = this.ctx.currentTime;
+    const anySolo = p.tracks.some((t) => t.solo);
+    const seen = new Set<string>();
+    for (const t of p.tracks) {
+      seen.add(t.id);
+      let ch = this.channels.get(t.id);
+      if (!ch) {
+        ch = new Channel(this.ctx, this);
+        this.channels.set(t.id, ch);
+      }
+      const audible = !t.mute && (!anySolo || t.solo);
+      ch.apply(t, audible, t.automation.pan.length > 0);
+      const key = instrumentKey(t);
+      if (ch.instrumentKey !== key) ch.setInstrument(createInstrument(this.ctx, t), key);
+      ch.instrument?.setParams(t.instrumentParams);
+    }
+    for (const [id, ch] of this.channels) {
+      if (!seen.has(id)) {
+        ch.dispose();
+        this.channels.delete(id);
+      }
+    }
+    this.masterVol.gain.setTargetAtTime(faderGain(p.masterVolume), now, 0.02);
+    const spb = 60 / p.bpm;
+    const dt = Math.min(3.9, DELAY_DIV[p.delayTime] * spb);
+    this.delayL.delayTime.setTargetAtTime(dt / 2, now, 0.05);
+    this.delayR.delayTime.setTargetAtTime(dt / 2, now, 0.05);
+    this.delayFb.gain.setTargetAtTime(Math.min(0.85, p.delayFeedback), now, 0.02);
+    if (this.reverbKey !== p.reverbType) {
+      this.reverbKey = p.reverbType;
+      const [s, d, pre, br] = REVERB[p.reverbType];
+      this.convolver.buffer = makeImpulse(this.ctx, s, d, pre, br);
+    }
+  }
+
+  async ready(): Promise<void> {
+    await Promise.all([...this.channels.values()].map((c) => c.instrument?.ready));
+  }
+
+  dispose(): void {
+    for (const ch of this.channels.values()) ch.dispose();
+    this.channels.clear();
+    this.output.disconnect();
+  }
+}
+
+export function instrumentKey(t: Track): string {
+  if (t.type === 'audio') return 'audio';
+  return t.instrument + (t.instrument === 'user-sampler' ? ':' + (t.samplerAudioId ?? '') + ':' + (t.samplerRoot ?? 60) + ':' + (t.samplerAudioId && getBuffer(t.samplerAudioId) ? 1 : 0) : '');
+}
+
+export function createInstrument(ctx: BaseAudioContext, t: Track): Instrument | null {
+  if (t.type === 'audio') return null;
+  const preset = getPreset(t.instrument);
+  let inst: Instrument | null = null;
+  switch (preset.kind) {
+    case 'sampler':
+      inst = new SamplerInstrument(ctx, preset.sampler);
+      break;
+    case 'synth':
+      inst = new SynthInstrument(ctx, preset.synth);
+      break;
+    case 'drums':
+      inst = new DrumKitInstrument(ctx, preset.kit, DRUM_LANES);
+      break;
+    case 'user-sampler': {
+      const buf = t.samplerAudioId ? getBuffer(t.samplerAudioId) : undefined;
+      const map = new Map<number, AudioBuffer>();
+      if (buf) map.set(t.samplerRoot ?? 60, buf);
+      inst = new SamplerInstrument(ctx, { samples: {}, release: 0.3, velocityFilter: false }, map);
+      break;
+    }
+  }
+  inst?.setParams(t.instrumentParams);
+  return inst;
+}
