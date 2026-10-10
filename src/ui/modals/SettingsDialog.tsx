@@ -6,6 +6,7 @@ import { setBpm, setKey, setTimeSig } from '../../state/actions';
 import { keyUsesFlats, pitchClassName } from '../../model/music';
 import { enableMidi, useMidiDevices } from '../../audio/midiInput';
 import { getAudioContext } from '../../audio/context';
+import InputSetup from '../instruments/InputSetup';
 import { NumberField, Toggle } from '../common/controls';
 import Modal from './Modal';
 import '../mixer/mixer.css';
@@ -157,6 +158,8 @@ export default function SettingsDialog() {
         <span className="label">Output latency</span>
         <span className="dim">{Math.round(((ctx.baseLatency || 0) + (ctx.outputLatency || 0)) * 1000)} ms</span>
       </div>
+      <div className="form-section">Recording Input</div>
+      <InputSetup />
     </Modal>
   );
 }

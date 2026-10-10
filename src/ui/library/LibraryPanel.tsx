@@ -4,6 +4,7 @@ import { findTrack, useStore } from '../../state/store';
 import { setTrackInstrument } from '../../state/actions';
 import { CATEGORIES, PRESETS, getPreset, type InstrumentCategory } from '../../audio/presets';
 import { getEngine } from '../../audio/engine';
+import AudioPatchList from '../mixer/AudioPatchList';
 import { chordPitches, diatonicChords } from '../../model/music';
 import { IconFor, TrackIcon } from '../common/icons';
 import { LOOPS, LOOP_KINDS, addLoopToSong, previewLoop, stopLoopPreview, type LoopKind } from './loops';
@@ -36,13 +37,7 @@ function InstrumentsTab() {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState<Record<string, boolean>>({});
   if (!t) return <div className="empty-state">Select a track to choose its sound.</div>;
-  if (t.type === 'audio')
-    return (
-      <div className="empty-state">
-        <h3>Audio track</h3>
-        <div>Audio tracks record from your microphone. Use Smart Controls (B) to shape the sound with effects.</div>
-      </div>
-    );
+  if (t.type === 'audio') return <AudioPatchList t={t} />;
   const current = getPreset(t.instrument);
   const cats: InstrumentCategory[] = t.type === 'drums' ? ['Drums'] : CATEGORIES.filter((c) => c !== 'Drums');
   const q = query.trim().toLowerCase();
