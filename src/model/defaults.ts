@@ -102,6 +102,7 @@ export function createProject(name = 'My Song'): Project {
     createdAt: now,
     updatedAt: now,
     coverHue: Math.floor(Math.random() * 360),
+    chords: [],
   };
 }
 

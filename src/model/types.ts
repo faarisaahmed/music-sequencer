@@ -12,6 +12,27 @@ export interface Note {
   chance?: number;
   /** Drum-sequencer extras: number of hits subdividing this step (1 = normal). */
   repeat?: number;
+  /** Score: voice within its staff (1 = stems up, 2 = stems down). */
+  voice?: 1 | 2;
+  /** Score: lyric syllable sung on this note ("lo-" continues into the next note). */
+  lyric?: string;
+  /** Score: articulations; staccato/accent/marcato also change playback. */
+  artic?: Articulation[];
+}
+
+export type Articulation = 'staccato' | 'accent' | 'tenuto' | 'marcato' | 'fermata';
+
+/** Score markings stored on a MIDI region (content-relative beats). */
+export interface ScoreMark {
+  id: string;
+  kind: 'dyn' | 'cresc' | 'dim';
+  beat: number;
+  /** Hairpin end (beats). */
+  end?: number;
+  /** Dynamic level, e.g. 'mf'. */
+  value?: string;
+  /** Staff index within the part (grand staff: 0 = treble, 1 = bass). */
+  staff?: number;
 }
 
 interface RegionBase {
@@ -34,6 +55,8 @@ interface RegionBase {
 export interface MidiRegion extends RegionBase {
   kind: 'midi';
   notes: Note[];
+  /** Score dynamics & hairpins. */
+  marks?: ScoreMark[];
   /** Present on Drummer regions: notes are generated from these settings. */
   drummer?: DrummerSettings;
 }
@@ -56,6 +79,31 @@ export interface AutomationPoint {
   value: number; // volume: 0..1 (maps to track gain multiplier), pan: -1..1
 }
 
+export type AmpModel = 'clean' | 'crunch' | 'british' | 'highgain' | 'bass';
+
+/** Insert effects. Each is optional; `on` switches it in/out of the channel. */
+export interface InsertFx {
+  gate?: { on: boolean; threshold: number /* dB -80..0 */ };
+  amp?: { on: boolean; model: AmpModel; gain: number; bass: number; mid: number; treble: number; presence: number; level: number /* 0..1 each */ };
+  deesser?: { on: boolean; amount: number };
+  autowah?: { on: boolean; mode: 'envelope' | 'lfo'; sensitivity: number; rate: number; base: number; q: number; mix: number };
+  phaser?: { on: boolean; rate: number; depth: number; feedback: number; mix: number };
+  flanger?: { on: boolean; rate: number; depth: number; feedback: number; mix: number };
+  tremolo?: { on: boolean; rate: number; depth: number };
+  lofi?: { on: boolean; bits: number; tone: number; mix: number };
+  widener?: { on: boolean; width: number; haas: number };
+}
+
+export interface MasteringSettings {
+  preset: string;
+  low: number; // dB
+  mid: number;
+  high: number;
+  glue: number; // 0..1
+  ceiling: number; // dBFS, e.g. -1
+  loudness: number; // dB of drive into the limiter
+}
+
 export interface TrackFx {
   eqLow: number; // dB -12..12
   eqMid: number;
@@ -66,6 +114,8 @@ export interface TrackFx {
   reverb: number; // 0..1 send
   delay: number; // 0..1 send
   filterCutoff: number; // 0..1 (1 = open)
+  /** Optional insert effects (only instantiated when switched on). */
+  inserts?: InsertFx;
 }
 
 export interface Track {
@@ -104,6 +154,18 @@ export interface KeySignature {
   mode: 'major' | 'minor';
 }
 
+export type ChordQuality = '' | 'm' | 'dim' | 'aug' | '7' | 'maj7' | 'm7' | 'sus4' | 'sus2' | 'add9' | '6' | 'm6' | 'm9' | '9';
+
+export interface ChordSymbol {
+  id: string;
+  beat: number;
+  length: number;
+  root: number; // pitch class 0..11
+  quality: ChordQuality;
+  /** Slash-chord bass pitch class. */
+  bass?: number;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -125,6 +187,10 @@ export interface Project {
   updatedAt: number;
   /** Data-URL thumbnail colour stripe for the song browser. */
   coverHue?: number;
+  /** Chord track: chord symbols on the timeline that drive accompaniment generation. */
+  chords: ChordSymbol[];
+  /** Master-bus mastering chain settings. */
+  mastering?: MasteringSettings;
   /** Arrangement markers (Intro, Verse, Chorus…). */
   sections?: Section[];
 }
