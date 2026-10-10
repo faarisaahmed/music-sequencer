@@ -201,3 +201,7 @@
 .score-editor.full .score-scroll {
   padding-top: 12px;
 }
+.score-system {
+  position: absolute;
+  left: 0;
+}

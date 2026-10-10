@@ -138,8 +138,31 @@ function measureMinWidth(model: ScoreModel, m: number): number {
   return Math.max(110, (60 + n * 32) * lyricBoost);
 }
 
-export function renderScore(container: HTMLDivElement, model: ScoreModel, widthPx: number, zoom: number, opts: RenderOpts): ScoreLayout {
-  container.innerHTML = '';
+interface Line {
+  measures: number[];
+  widths: number[];
+  left: number;
+}
+
+/** Cheap layout pass: line breaks, system positions and cross-system tie bookkeeping (no VexFlow). */
+export interface ScorePlan {
+  model: ScoreModel;
+  opts: RenderOpts;
+  zoom: number;
+  logicalW: number;
+  /** Logical (unzoomed) height of the whole score. */
+  height: number;
+  lines: Line[];
+  sysLayout: { top: number; staffY: number[]; bottom: number }[];
+  multi: boolean;
+  firstHeaderW: number;
+  headerW: number;
+  /** `${system}|${key}` of tied notes continuing into a later system / arriving from an earlier one. */
+  crossOut: Set<string>;
+  crossIn: Set<string>;
+}
+
+export function planScore(model: ScoreModel, widthPx: number, zoom: number, opts: RenderOpts): ScorePlan {
   const logicalW = Math.max(400, widthPx / zoom);
   const maxFifths = Math.max(0, ...opts.partKeys.map((k) => keyAlters(k).filter((a) => a !== 0).length));
   const hasGrand = model.parts.some((p) => p.clefs.length > 1);
@@ -153,8 +176,8 @@ export function renderScore(container: HTMLDivElement, model: ScoreModel, widthP
 
   // ---- line breaking
   const headerW = (first: boolean) => 38 + maxFifths * 11 + 10 + (first ? 30 : 0) + (hasGrand || multi ? 14 : 0);
-  const lines: { measures: number[]; widths: number[]; left: number }[] = [];
-  let cur: { measures: number[]; widths: number[]; left: number } = { measures: [], widths: [], left: MARGIN + nameW(true) };
+  const lines: Line[] = [];
+  let cur: Line = { measures: [], widths: [], left: MARGIN + nameW(true) };
   let used = 0;
   model.measures.forEach((_, m) => {
     const avail = logicalW - MARGIN - cur.left;
@@ -224,11 +247,94 @@ export function renderScore(container: HTMLDivElement, model: ScoreModel, widthP
     yCursor = bottom + SYSTEM_GAP;
   }
   const height = yCursor + 10;
+
+  // Ties that cross a line break are drawn as two halves, one per system.
+  const crossOut = new Set<string>();
+  const crossIn = new Set<string>();
+  const lastSys = new Map<string, number>();
+  lines.forEach((line, li) => {
+    for (const m of line.measures)
+      for (const sm of model.measures[m].staves)
+        for (const v of sm.voices)
+          for (const piece of v) {
+            if (piece.rest) continue;
+            piece.keys.forEach((key, idx) => {
+              const prev = lastSys.get(key);
+              if (piece.tied[idx] && prev !== undefined && prev !== li) {
+                crossOut.add(prev + '|' + key);
+                crossIn.add(li + '|' + key);
+              }
+              lastSys.set(key, li);
+            });
+          }
+  });
+
+  return { model, opts, zoom, logicalW, height, lines, sysLayout, multi, firstHeaderW: headerW(true), headerW: headerW(false), crossOut, crossIn };
+}
+
+/** Logical y-range owned by a system (boxes tile the page without gaps). */
+export function systemBounds(plan: ScorePlan, li: number): { top: number; bottom: number } {
+  const top = li === 0 ? 0 : plan.sysLayout[li].top - SYSTEM_GAP;
+  const bottom = li === plan.lines.length - 1 ? plan.height : plan.sysLayout[li].bottom;
+  return { top, bottom };
+}
+
+/** Layout with estimated geometry for every system; exact geometry/heads arrive as systems are drawn. */
+export function emptyLayout(plan: ScorePlan): ScoreLayout {
+  const { model, zoom } = plan;
+  const systems: SystemGeom[] = plan.lines.map((line, li) => {
+    const vl = plan.sysLayout[li];
+    let x = line.left;
+    const measures: MeasureGeom[] = line.measures.map((m, k) => {
+      const w = line.widths[k];
+      const head = k === 0 ? (li === 0 ? plan.firstHeaderW : plan.headerW) : 10;
+      const g: MeasureGeom = { index: m, x, w, noteX0: x + Math.min(head, w * 0.5), noteX1: x + w - 10, anchors: [] };
+      x += w;
+      return g;
+    });
+    return {
+      y0: vl.top,
+      y1: vl.bottom,
+      staves: model.staves.map((ref, si) => ({ clef: ref.clef, topLineY: vl.staffY[si] + 40, spacing: 10, index: si })),
+      measures,
+    };
+  });
+  return { systems, heads: [], width: plan.logicalW * zoom, height: plan.height * zoom, bpb: model.bpb };
+}
+
+/** Render the whole score into one SVG (used for printing). */
+export function renderScore(container: HTMLDivElement, model: ScoreModel, widthPx: number, zoom: number, opts: RenderOpts): ScoreLayout {
+  container.innerHTML = '';
+  const plan = planScore(model, widthPx, zoom, opts);
+  const layout = emptyLayout(plan);
   const renderer = new Renderer(container, Renderer.Backends.SVG);
-  renderer.resize(logicalW * zoom, height * zoom);
+  renderer.resize(plan.logicalW * zoom, plan.height * zoom);
   const ctx = renderer.getContext();
   ctx.scale(zoom, zoom);
-  if (opts.title) {
+  for (let li = 0; li < plan.lines.length; li++) drawSystem(ctx, plan, li, layout);
+  return layout;
+}
+
+/** Render one system into its own SVG inside `host` (absolute logical coordinates via the viewBox). */
+export function renderSystemInto(host: HTMLDivElement, plan: ScorePlan, li: number, layout: ScoreLayout): void {
+  const { top, bottom } = systemBounds(plan, li);
+  const zoom = plan.zoom;
+  const renderer = new Renderer(host, Renderer.Backends.SVG);
+  renderer.resize(plan.logicalW * zoom, (bottom - top) * zoom);
+  const ctx = renderer.getContext() as SVGContext;
+  ctx.scale(zoom, zoom);
+  ctx.setViewBox(0, top, plan.logicalW, bottom - top);
+  (ctx.svg as SVGSVGElement).style.overflow = 'visible';
+  drawSystem(ctx, plan, li, layout);
+}
+
+type DrawCtx = ReturnType<Renderer['getContext']>;
+
+/** Draw system `li`, replacing its estimated geometry in `layout` and appending its noteheads. */
+function drawSystem(ctx: DrawCtx, plan: ScorePlan, li: number, layout: ScoreLayout): void {
+  const { model, opts, logicalW, multi } = plan;
+  const line = plan.lines[li];
+  if (li === 0 && opts.title) {
     ctx.save();
     ctx.setFont('Georgia, serif', 22, 'bold');
     const tw = ctx.measureText(opts.title).width;
@@ -241,17 +347,17 @@ export function renderScore(container: HTMLDivElement, model: ScoreModel, widthP
     ctx.restore();
   }
 
-  const layout: ScoreLayout = { systems: [], heads: [], width: logicalW * zoom, height: height * zoom, bpb: model.bpb };
   const timeSpec = `${opts.timeSig[0]}/${opts.timeSig[1]}`;
   const compound = opts.timeSig[1] === 8 && opts.timeSig[0] % 3 === 0 && opts.timeSig[0] > 3;
   const beamUnit = compound ? 1.5 : opts.timeSig[1] === 2 ? 2 : 1;
 
-  // Tie bookkeeping across measures/systems (keyed by unique note instance).
+  // Tie bookkeeping within this system (keyed by unique note instance).
   const lastSeen = new Map<string, { note: StaveNote; index: number; system: number }>();
   const ties: { a: { note: StaveNote; index: number; system: number }; b: { note: StaveNote; index: number; system: number } }[] = [];
+  const tieIns: { note: StaveNote; index: number }[] = [];
 
-  lines.forEach((line, li) => {
-    const vl = sysLayout[li];
+  {
+    const vl = plan.sysLayout[li];
     let x = line.left;
     const sys: SystemGeom = { y0: vl.top, y1: vl.bottom, staves: [], measures: [] };
     let firstStaves: Stave[] = [];
@@ -438,6 +544,7 @@ export function renderScore(container: HTMLDivElement, model: ScoreModel, widthP
           if (piece.tied[idx]) {
             const prev = lastSeen.get(key);
             if (prev) ties.push({ a: prev, b: entry });
+            else if (plan.crossIn.has(li + '|' + key)) tieIns.push({ note, index: idx });
           }
           lastSeen.set(key, entry);
           if (!piece.tied[idx] && ys[idx] !== undefined) {
@@ -609,22 +716,18 @@ export function renderScore(container: HTMLDivElement, model: ScoreModel, widthP
       }
       ctx.restore();
     }
-    layout.systems.push(sys);
-  });
-
-  for (const t of ties) {
-    try {
-      if (t.a.system === t.b.system) {
-        new StaveTie({ first_note: t.a.note, last_note: t.b.note, first_indices: [t.a.index], last_indices: [t.b.index] }).setContext(ctx).draw();
-      } else {
-        new StaveTie({ first_note: t.a.note, first_indices: [t.a.index], last_indices: [t.a.index] }).setContext(ctx).draw();
-        new StaveTie({ last_note: t.b.note, first_indices: [t.b.index], last_indices: [t.b.index] }).setContext(ctx).draw();
-      }
-    } catch {
-      /* noop */
-    }
+    layout.systems[li] = sys;
   }
-  return layout;
+
+  try {
+    for (const t of ties)
+      new StaveTie({ first_note: t.a.note, last_note: t.b.note, first_indices: [t.a.index], last_indices: [t.b.index] }).setContext(ctx).draw();
+    for (const t of tieIns) new StaveTie({ last_note: t.note, first_indices: [t.index], last_indices: [t.index] }).setContext(ctx).draw();
+    for (const [key, e] of lastSeen)
+      if (plan.crossOut.has(li + '|' + key)) new StaveTie({ first_note: e.note, first_indices: [e.index], last_indices: [e.index] }).setContext(ctx).draw();
+  } catch {
+    /* cosmetic */
+  }
 }
 
 /** Extra drop below the staff caused by low ledger notes in this system (so marks clear them). */

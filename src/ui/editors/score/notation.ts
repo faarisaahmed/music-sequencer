@@ -651,13 +651,25 @@ export function buildScore(inputs: PartInput[], bpb: number, totalBeats: number,
 
   const lastEnd = Math.max(totalBeats, ...parts.flatMap((p) => p.notes.map((n) => n.e)));
   const count = Math.max(1, Math.ceil(lastEnd / bpb - 1e-6)) + extraMeasures;
+  // Bucket every note into the measures it overlaps, per staff & voice (avoids rescanning all notes per measure).
+  const buckets = staves.map((ref) => {
+    const per: [QNote[][], QNote[][]] = [[], []];
+    for (const n of parts[ref.part].notes) {
+      if (n.staff !== ref.staff) continue;
+      const lists = per[n.voice === 2 ? 1 : 0];
+      const m0 = Math.max(0, Math.floor(n.s / bpb + 1e-9));
+      const m1 = Math.min(count - 1, Math.ceil(n.e / bpb - 1e-6) - 1);
+      for (let m = m0; m <= m1; m++) (lists[m] ??= []).push(n);
+    }
+    return per;
+  });
   const measures: MeasureModel[] = [];
   for (let m = 0; m < count; m++) {
     const ms = m * bpb;
-    const sm: StaffMeasure[] = staves.map((ref) => {
+    const sm: StaffMeasure[] = staves.map((ref, si) => {
       const part = parts[ref.part] as PartModel & { _win?: Map<string, Map<number, WinKind>> };
-      const v1 = part.notes.filter((n) => n.staff === ref.staff && n.voice === 1);
-      const v2 = part.notes.filter((n) => n.staff === ref.staff && n.voice === 2);
+      const v1 = buckets[si][0][m] ?? [];
+      const v2 = buckets[si][1][m] ?? [];
       const win1 = part._win?.get(`${ref.staff}:1`) ?? new Map();
       const win2 = part._win?.get(`${ref.staff}:2`) ?? new Map();
       const has2 = v2.some((n) => n.s < ms + bpb - 1e-6 && n.e > ms + 1e-6);

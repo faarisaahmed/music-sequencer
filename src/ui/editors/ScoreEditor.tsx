@@ -1,6 +1,6 @@
 // Sheet-music editor (MuseScore / Flat style) over the same MIDI notes the piano roll edits.
 // Works on one region, or on the whole song as a full multi-instrument score.
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { useToolbarSlot } from './useToolbarSlot';
 import { MousePointer2, PenLine, Plus, Minus, Printer, FileDown, ZoomIn, ZoomOut, ArrowUp, ArrowDown, Type, Hash, Eraser } from 'lucide-react';
@@ -28,7 +28,20 @@ import {
   type RawNote,
   type ScoreModel,
 } from './score/notation';
-import { beatToX, renderScore, topLineDiatonic, xToBeat, type ChordLabel, type HeadHit, type ScoreLayout } from './score/render';
+import {
+  beatToX,
+  emptyLayout,
+  planScore,
+  renderScore,
+  renderSystemInto,
+  systemBounds,
+  topLineDiatonic,
+  xToBeat,
+  type ChordLabel,
+  type HeadHit,
+  type ScoreLayout,
+  type ScorePlan,
+} from './score/render';
 import {
   addBars,
   addDynamic,
@@ -232,6 +245,9 @@ interface TextEntry {
   t?: number; // display beat (chords)
 }
 
+/** Last measured score width, so re-opened editors lay out once at the right size. */
+let lastScoreWidth: number | null = null;
+
 export default function ScoreEditor({ regionId, full = false }: { trackId?: string; regionId?: string; full?: boolean }) {
   const project = useStore((s) => s.project)!;
   const selectedIds = useStore((s) => s.selectedNoteIds);
@@ -250,8 +266,25 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
   const [showDyn, setShowDyn] = useState(true);
   const [cursor, setCursor] = useState<{ t: number; staff: number }>({ t: 0, staff: 0 });
   const [ghost, setGhost] = useState<Ghost | null>(null);
-  const [width, setWidth] = useState(900);
-  const [layout, setLayout] = useState<ScoreLayout | null>(null);
+  const [width, setWidth] = useState<number | null>(lastScoreWidth);
+  // Systems are drawn into the (mutable) layout outside React; this tiny store re-renders the overlays.
+  const drawnStore = useMemo(() => {
+    let version = 0;
+    const listeners = new Set<() => void>();
+    return {
+      get: () => version,
+      subscribe: (f: () => void) => {
+        listeners.add(f);
+        return () => listeners.delete(f);
+      },
+      bump: () => {
+        version++;
+        listeners.forEach((f) => f());
+      },
+    };
+  }, []);
+  useSyncExternalStore(drawnStore.subscribe, drawnStore.get);
+  const virt = useRef<{ plan: ScorePlan; layout: ScoreLayout; drawn: Set<number> } | null>(null);
   const slot = useToolbarSlot();
   const [entry, setEntry] = useState<TextEntry | null>(null);
   const entryRef = useRef<TextEntry | null>(null);
@@ -269,7 +302,10 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setWidth(Math.max(500, el.clientWidth - 48)));
+    const ro = new ResizeObserver(() => {
+      lastScoreWidth = Math.max(500, el.clientWidth - 48);
+      setWidth(lastScoreWidth);
+    });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
@@ -278,10 +314,67 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
   const model = src?.model ?? null;
   const partKeys = useMemo(() => src?.parts.map((p) => p.writtenKey) ?? [], [src]);
 
-  useLayoutEffect(() => {
-    if (!src || !svgRef.current) return;
+  /** Draw the systems inside (or next to) the visible part of the scroll area. */
+  const drawVisible = useCallback((withBuffer = true) => {
+    const v = virt.current;
+    const host = svgRef.current;
+    const el = scrollRef.current;
+    if (!v || !host || !el) return;
+    const hostTop = host.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
+    const viewTop = (el.scrollTop - hostTop) / v.plan.zoom;
+    const viewBottom = (el.scrollTop + el.clientHeight - hostTop) / v.plan.zoom;
+    const n = v.plan.lines.length;
+    let lo = n;
+    let hi = -1;
+    for (let li = 0; li < n; li++) {
+      const b = systemBounds(v.plan, li);
+      if (b.bottom >= viewTop && b.top <= viewBottom) {
+        lo = Math.min(lo, li);
+        hi = Math.max(hi, li);
+      }
+    }
+    if (hi < 0) return;
+    let added = false;
+    const pad = withBuffer ? 1 : 0;
+    for (let li = Math.max(0, lo - pad); li <= Math.min(n - 1, hi + pad); li++) {
+      if (v.drawn.has(li)) continue;
+      v.drawn.add(li);
+      const div = document.createElement('div');
+      div.className = 'score-system';
+      div.style.top = `${systemBounds(v.plan, li).top * v.plan.zoom}px`;
+      host.appendChild(div);
+      try {
+        renderSystemInto(div, v.plan, li, v.layout);
+      } catch (e) {
+        console.error('score system render failed', li, e);
+      }
+      added = true;
+    }
+    if (added) drawnStore.bump();
+  }, [drawnStore]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    let raf = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => drawVisible());
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      cancelAnimationFrame(raf);
+      el.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, [drawVisible]);
+
+  // Cheap layout pass (line breaks, system positions); systems are drawn lazily into it.
+  const plan = useMemo(() => {
+    if (!src || width === null) return null;
     try {
-      const l = renderScore(svgRef.current, src.model, width, zoom, {
+      return planScore(src.model, width, zoom, {
         partKeys,
         timeSig: project.timeSig,
         firstBarNumber: src.firstBar,
@@ -292,12 +385,35 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
         chords: src.chords,
         partLabels: src.labels,
       });
-      setLayout(l);
-      if (import.meta.env.DEV) (window as unknown as { __scoreLayout: ScoreLayout }).__scoreLayout = l;
     } catch (e) {
-      console.error('score render failed', e);
+      console.error('score layout failed', e);
+      return null;
     }
   }, [src, partKeys, width, zoom, project.timeSig, project.name, project.bpm, showDyn, full]);
+  const layout = useMemo(() => (plan ? emptyLayout(plan) : null), [plan]);
+
+  useLayoutEffect(() => {
+    const host = svgRef.current;
+    if (!host) return;
+    // Re-run with the same layout (e.g. StrictMode): its systems are already drawn into the host.
+    if (layout && virt.current?.layout === layout) {
+      drawVisible();
+      return;
+    }
+    host.innerHTML = '';
+    if (!plan || !layout) {
+      virt.current = null;
+      return;
+    }
+    host.style.width = `${layout.width}px`;
+    host.style.height = `${layout.height}px`;
+    virt.current = { plan, layout, drawn: new Set() };
+    // Paint what's on screen first; the neighbouring systems follow right after.
+    drawVisible(false);
+    const raf = requestAnimationFrame(() => setTimeout(() => drawVisible(), 0));
+    if (import.meta.env.DEV) (window as unknown as { __scoreLayout: ScoreLayout }).__scoreLayout = layout;
+    return () => cancelAnimationFrame(raf);
+  }, [plan, layout, drawVisible]);
 
   const staffRef = (gi: number) => model?.staves[Math.max(0, Math.min(model.staves.length - 1, gi))];
   const partOfStaff = (gi: number) => (model && src ? src.parts[staffRef(gi)!.part] : undefined);
