@@ -7,6 +7,19 @@ import { getBuffer } from './audioStore';
 import { DrumKitInstrument, SamplerInstrument, SynthInstrument, driveCurve, type Instrument } from './instruments';
 import { getPreset } from './presets';
 
+function softClipCurve(): Float32Array<ArrayBuffer> {
+  const n = 4096;
+  const c = new Float32Array(n);
+  const knee = 0.85;
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 4 - 2; // input range ±2
+    const a = Math.abs(x);
+    const y = a <= knee ? a : knee + (1 - knee) * Math.tanh((a - knee) / (1 - knee));
+    c[i] = Math.sign(x) * Math.min(y, 0.995);
+  }
+  return c;
+}
+
 export function faderGain(v: number): number {
   return Math.pow(Math.max(0, v) / 0.8, 2);
 }
@@ -230,15 +243,23 @@ export class Mixer {
     this.masterAuto.connect(glue);
     glue.connect(this.masterVol);
     this.masterVol.connect(limiter);
+    // Soft clipper after the limiter: transparent below ~-1 dBFS, rounds off overs.
+    const clipper = ctx.createWaveShaper();
+    clipper.curve = softClipCurve();
+    // The shaper's input domain is ±1, the curve spans ±2, so halve the signal going in.
+    const clipIn = ctx.createGain();
+    clipIn.gain.value = 0.5;
+    limiter.connect(clipIn);
+    clipIn.connect(clipper);
     const splitter = ctx.createChannelSplitter(2);
-    limiter.connect(splitter);
+    clipper.connect(splitter);
     this.analyserL = ctx.createAnalyser();
     this.analyserR = ctx.createAnalyser();
     this.analyserL.fftSize = 1024;
     this.analyserR.fftSize = 1024;
     splitter.connect(this.analyserL, 0);
     splitter.connect(this.analyserR, 1);
-    this.output = limiter;
+    this.output = clipper;
 
     // Reverb bus
     this.reverbIn = ctx.createGain();
