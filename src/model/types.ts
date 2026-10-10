@@ -62,8 +62,18 @@ export interface MidiRegion extends RegionBase {
    * (FL Studio-style): editing one edits them all. Only used while `loop` is on.
    */
   patternId?: string;
-  /** Pattern swing 0..1: delays every off-beat 16th by up to a 32nd note. */
-  swing?: number;
+  /** Swing for this region; undefined = follow the song's groove, null = straight. */
+  groove?: Groove | null;
+}
+
+/** Swing feel applied at playback. */
+export interface Groove {
+  /** Which off-beats swing: 16th notes or 8th notes. */
+  grid: 8 | 16;
+  /** 0 = straight … 2/3 = triplet … 1 = dotted (MPC 50%–75%). */
+  amount: number;
+  /** 0..1: notes drift slightly late, for a laid-back human feel. */
+  loose?: number;
 }
 
 export interface AudioRegion extends RegionBase {
@@ -216,6 +226,8 @@ export interface Project {
   chords: ChordSymbol[];
   /** Master-bus mastering chain settings. */
   mastering?: MasteringSettings;
+  /** Song-wide swing applied to every MIDI region that doesn't set its own. */
+  groove?: Groove | null;
   /** Arrangement markers (Intro, Verse, Chorus…). */
   sections?: Section[];
 }

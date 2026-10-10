@@ -27,6 +27,8 @@ import { closeProject, setBpm, setKey } from '../state/actions';
 import { getEngine } from '../audio/engine';
 import { formatPosition, formatTime, keyName as fullKeyName, keyUsesFlats, makeKey, pitchClassName, scaleType } from '../model/music';
 import type { KeySignature } from '../model/types';
+import GroovePanel from './groove/GroovePanel';
+import { grooveLabel, isStraight, swingPercent } from '../model/groove';
 import ScalePicker from './common/ScalePicker';
 import { saveListeners, type SaveStatus } from '../state/persistence';
 import { HSlider } from './common/controls';
@@ -65,6 +67,7 @@ function Lcd() {
   const countingIn = useStore((s) => s.countingIn);
   const [mode, setMode] = useState<'beats' | 'time'>('beats');
   const [keyOpen, setKeyOpen] = useState(false);
+  const [swingOpen, setSwingOpen] = useState(false);
   const [bpmEdit, setBpmEdit] = useState<string | null>(null);
   const pos = playing ? position : cursor;
   const spb = 60 / project.bpm;
@@ -129,6 +132,12 @@ function Lcd() {
         <div className="lcd-big">{shortKeyName(project.key)}</div>
         <div className="lcd-small">KEY</div>
         {keyOpen && <KeyPopover onClose={() => setKeyOpen(false)} />}
+      </div>
+      <div className="lcd-sep" />
+      <div className="lcd-cell" style={{ position: 'relative', cursor: 'pointer' }} onClick={() => setSwingOpen(!swingOpen)} title={`Song swing: ${grooveLabel(project.groove)}. Click to choose a swing feel for the whole song.`}>
+        <div className={'lcd-big' + (isStraight(project.groove) ? ' lcd-off' : '')}>{isStraight(project.groove) ? 'Off' : `${swingPercent(project.groove)}%`}</div>
+        <div className="lcd-small">{isStraight(project.groove) ? 'SWING' : `SWING ${project.groove!.grid}TH`}</div>
+        {swingOpen && <GroovePanel scope={{ kind: 'song' }} onClose={() => setSwingOpen(false)} />}
       </div>
       <div className="lcd-sep" />
       <div className="lcd-cell" style={{ cursor: 'pointer' }} onClick={() => openModal('settings')} title="Time signature">

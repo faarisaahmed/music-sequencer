@@ -706,3 +706,6 @@
   color: var(--accent-2);
   flex-shrink: 0;
 }
+.lcd-big.lcd-off {
+  color: #7f8aa0;
+}

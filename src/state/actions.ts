@@ -1,6 +1,7 @@
 // High-level editing operations shared across views.
 import { current, isDraft, type Draft } from 'immer';
-import type { MidiRegion, Note, Project, Region, ScaleType, Track, TrackType } from '../model/types';
+import type { Groove, MidiRegion, Note, Project, Region, ScaleType, Track, TrackType } from '../model/types';
+import { applyGroove, grooveFor } from '../model/groove';
 import { createAudioRegion, createMidiRegion, createProject, createTrack, uid } from '../model/defaults';
 import { beatsPerBar, snap } from '../model/music';
 import { getPreset } from '../audio/presets';
@@ -59,13 +60,20 @@ export function migrate(p: Project): Project {
         instrumentParams: t.instrumentParams ?? {},
         regions: (t.regions ?? []).map((r) =>
           r.kind === 'midi'
-            ? stripDrummer({ ...r, notes: r.notes ?? [], ...(t.type === 'drums' && r.loop && !r.patternId ? { patternId: uid('pat') } : {}) })
+            ? stripDrummer(oldSwing({ ...r, notes: r.notes ?? [], ...(t.type === 'drums' && r.loop && !r.patternId ? { patternId: uid('pat') } : {}) }))
             : r,
         ),
         automation: { ...{ volume: [], pan: [] }, ...t.automation },
       };
     }),
   };
+}
+
+/** Pattern swing from before grooves (a 0..1 number of 16th swing) → a region groove. */
+function oldSwing(r: MidiRegion): MidiRegion {
+  const { swing, ...rest } = r as MidiRegion & { swing?: number };
+  if (typeof swing !== 'number') return r;
+  return swing > 0 && rest.groove === undefined ? { ...rest, groove: { grid: 16, amount: swing } } : rest;
 }
 
 function stripDrummer<T extends object>(o: T): T {
@@ -276,7 +284,7 @@ export function setClipPattern(regionId: string, sourceId: string): void {
     r.notes = src.notes.map((n) => ({ ...n }));
     r.contentLength = src.contentLength;
     r.name = src.name;
-    r.swing = src.swing;
+    r.groove = src.groove;
     r.loop = true;
     r.offset = 0;
   });
@@ -320,6 +328,54 @@ export function loopPlaybackOver(ids: string[]): void {
   });
   const bars = Math.round((hi - lo) / bpb);
   toast(`Looping bar${bars > 1 ? 's' : ''} ${lo / bpb + 1}${bars > 1 ? `–${hi / bpb}` : ''}`);
+}
+
+// ------------------------------------------------------------------ groove / swing
+
+/** Set the song-wide swing (null = straight). */
+export function setSongGroove(g: Groove | null): void {
+  commit((d) => {
+    d.groove = g;
+  });
+}
+
+/** Give regions their own swing (null = straight), or `undefined` to follow the song again. */
+export function setRegionGroove(ids: string[], g: Groove | null | undefined): void {
+  commit((d) => {
+    for (const id of ids) {
+      const r = draftRegion(d, id);
+      if (r?.kind !== 'midi') continue;
+      if (g === undefined) delete r.groove;
+      else r.groove = g;
+    }
+  });
+}
+
+/**
+ * Write the swing a region plays with into its notes, so it can be seen and edited
+ * in the piano roll; the region is then set to straight so it isn't swung twice.
+ */
+export function bakeGroove(ids: string[]): number {
+  const p = useStore.getState().project;
+  if (!p) return 0;
+  let moved = 0;
+  commit((d) => {
+    for (const id of ids) {
+      const r = draftRegion(d, id);
+      if (r?.kind !== 'midi') continue;
+      const g = grooveFor(p, current(r) as MidiRegion);
+      if (!g) continue;
+      const origin = r.start - r.offset;
+      for (const n of r.notes) {
+        const at = applyGroove(n as Note, origin + n.start, n.duration, g);
+        n.start = Math.max(0, at.start - origin);
+        n.duration = at.duration;
+        moved++;
+      }
+      r.groove = null;
+    }
+  });
+  return moved;
 }
 
 export function growSong(d: Draft<Project>, endBeat: number): void {

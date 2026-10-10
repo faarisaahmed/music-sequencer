@@ -3,6 +3,7 @@ import { Mp3Encoder } from '@breezystack/lamejs';
 import { Midi } from '@tonejs/midi';
 import type { Project } from '../model/types';
 import { placedNotes } from '../model/regions';
+import { applyGroove, grooveFor } from '../model/groove';
 
 export async function encodeMp3(buf: AudioBuffer, kbps = 192, onProgress?: (f: number) => void): Promise<Blob> {
   const enc = new Mp3Encoder(2, buf.sampleRate, kbps);
@@ -47,11 +48,14 @@ export function projectToMidi(p: Project): Blob {
     if (t.type === 'drums') mt.channel = 9;
     for (const r of t.regions) {
       if (r.kind !== 'midi') continue;
+      const groove = grooveFor(p, r);
       for (const pn of placedNotes(r)) {
+        // Export what you hear: swing is written into the note timing.
+        const at = groove ? applyGroove(pn.note, pn.start, pn.duration, groove) : pn;
         mt.addNote({
           midi: Math.max(0, Math.min(127, pn.note.pitch + (t.type === 'drums' ? 0 : t.transpose))),
-          ticks: Math.round(pn.start * ppq),
-          durationTicks: Math.max(1, Math.round(pn.duration * ppq)),
+          ticks: Math.round(at.start * ppq),
+          durationTicks: Math.max(1, Math.round(at.duration * ppq)),
           velocity: pn.note.velocity,
         });
       }

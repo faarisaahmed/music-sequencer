@@ -1,6 +1,7 @@
 // Event scheduling shared by live playback and offline rendering.
 import type { AudioRegion, AutomationPoint, Project } from '../model/types';
 import { placedNotes, regionSegments } from '../model/regions';
+import { applyGroove, grooveFor } from '../model/groove';
 import { getBuffer } from './audioStore';
 import { automationValueAt, type Mixer } from './mixer';
 
@@ -19,16 +20,6 @@ export interface ScheduleOptions {
   sources?: ActiveSource[];
   /** Pattern preview: only this track plays. */
   onlyTrack?: string;
-}
-
-/** How far swing (0..1) pushes an off-beat 16th, in beats (max a 32nd note). */
-export const SWING_MAX = 0.125;
-
-/** Delay for a note at content position `start` in a pattern with `swing`. */
-export function swingDelay(start: number, swing: number | undefined): number {
-  if (!swing) return 0;
-  const inEighth = ((start % 0.5) + 0.5) % 0.5;
-  return Math.abs(inEighth - 0.25) < 1e-3 ? swing * SWING_MAX : 0;
 }
 
 /** Beat Sequencer rows that are muted (or not soloed while another row is). */
@@ -65,13 +56,17 @@ export function scheduleRange(p: Project, mixer: Mixer, b0: number, b1: number, 
         const inst = ch.instrument;
         if (!inst) continue;
         const transpose = t.type === 'drums' ? 0 : t.transpose;
+        const groove = grooveFor(p, r);
         for (const pn of placedNotes(r, b0, b1)) {
           const n = pn.note;
           if (silent?.has(n.pitch)) continue;
           if (n.chance !== undefined && n.chance < 1 && Math.random() > n.chance) continue;
-          const swung = pn.start + swingDelay(n.start, r.swing);
-          if (swung >= opts.limit) continue;
-          pn.start = swung;
+          if (groove) {
+            const g = applyGroove(n, pn.start, pn.duration, groove);
+            if (g.start >= opts.limit) continue;
+            pn.start = g.start;
+            pn.duration = g.duration;
+          }
           let dur = Math.max(0.01, Math.min(pn.duration, opts.limit - pn.start));
           let vel = n.velocity;
           if (n.artic) {

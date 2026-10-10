@@ -404,16 +404,17 @@
   flex-shrink: 0;
   color: var(--accent-2);
 }
-.ss-swing {
-  display: flex;
-  align-items: center;
-  gap: 7px;
+.ss-swing-wrap {
+  position: relative;
   flex-shrink: 0;
-  padding: 0 4px;
 }
-.ss-swing .mono {
-  width: 30px;
-  font-size: 11px;
+.ss-swing {
+  height: 34px;
+  border-radius: 8px;
+  background: #2e2e34;
+}
+.ss-swing.on {
+  color: var(--accent-2);
 }
 .ss-hint {
   min-width: 0;

@@ -61,7 +61,7 @@ check('patternPlayLoops', inside && (wrapped || Math.min(r0.len, r0.cl) > 6) && 
 check('songLoopUntouched', loopBefore === loopAfter);
 check('patternPlayClears', (await page.evaluate(() => window.__bf.store.useStore.getState().patternPlay)) === null);
 // Swing + row silence helpers.
-const sw = await page.evaluate(async () => { const m = await import('/src/audio/schedule.ts'); return [m.swingDelay(0.25, 0.5), m.swingDelay(0.5, 0.5), m.swingDelay(0.75, 1), [...m.silentRows({ mute36: 1 })], m.silentRows({ solo38: 1 }).has(36), m.silentRows({ solo38: 1 }).has(38)]; });
+const sw = await page.evaluate(async () => { const m = await import('/src/audio/schedule.ts'); const g = await import('/src/model/groove.ts'); return [g.warpBeat(0.25, { grid: 16, amount: 0.5 }) - 0.25, g.warpBeat(0.5, { grid: 16, amount: 0.5 }) - 0.5, g.warpBeat(0.75, { grid: 16, amount: 1 }) - 0.75, [...m.silentRows({ mute36: 1 })], m.silentRows({ solo38: 1 }).has(36), m.silentRows({ solo38: 1 }).has(38)]; });
 check('swing', sw[0] === 0.0625 && sw[1] === 0 && sw[2] === 0.125, sw);
 check('rowMuteSolo', sw[3].length === 1 && sw[3][0] === 36 && sw[4] === true && sw[5] === false, sw);
 // Own sound on a custom row renders in export; muted row is silent.

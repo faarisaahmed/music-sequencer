@@ -1,5 +1,6 @@
 // Context menus for regions, lanes and track headers.
-import { Copy, Scissors, Trash2, ClipboardPaste, Repeat, SquarePen, Plus, FileAudio, Palette, Pencil, Music, Play, Unlink, Repeat1 } from 'lucide-react';
+import { Copy, Scissors, Trash2, ClipboardPaste, Repeat, SquarePen, Plus, FileAudio, Palette, Pencil, Music, Play, Unlink, Repeat1, Shuffle } from 'lucide-react';
+import { GROOVE_PRESETS, grooveLabel, swingPercent } from '../../model/groove';
 import { isLinkedClip, patternUseCounts } from '../../model/patterns';
 import type { Track } from '../../model/types';
 import { commit, draftRegion, findRegion, openModal, useStore } from '../../state/store';
@@ -20,6 +21,8 @@ import {
   loopPlaybackOver,
   makePatternUnique,
   placePattern,
+  bakeGroove,
+  setRegionGroove,
   toggleLoopRegions,
   transposeRegions,
   updateTrack,
@@ -135,6 +138,17 @@ export function regionMenu(regionId: string, clickBeat: number): MenuItem[] {
           { label: 'Up a Semitone', onClick: () => transposeRegions(ids, 1) },
           { label: 'Down a Semitone', onClick: () => transposeRegions(ids, -1) },
           { label: 'Down an Octave', onClick: () => transposeRegions(ids, -12) },
+        ],
+      },
+      {
+        label: 'Swing',
+        icon: <Shuffle size={14} />,
+        submenu: [
+          { label: `Follow Song (${grooveLabel(p.groove)})`, onClick: () => setRegionGroove(ids, undefined) },
+          { separator: true },
+          ...GROOVE_PRESETS.map((pr) => ({ label: pr.name, shortcut: pr.groove ? `${pr.groove.grid}th ${swingPercent(pr.groove)}%` : '', onClick: () => setRegionGroove(ids, pr.groove ? { ...pr.groove } : null) })),
+          { separator: true },
+          { label: 'Write Swing into Notes', onClick: () => bakeGroove(ids) },
         ],
       },
       {

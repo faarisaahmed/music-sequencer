@@ -4,7 +4,7 @@ import { produce, type Draft } from 'immer';
 import type { MidiRegion, Project, Region } from './types';
 
 /** The fields that make up a pattern (everything else is per clip). */
-const PATTERN_FIELDS = ['notes', 'contentLength', 'name', 'swing'] as const;
+const PATTERN_FIELDS = ['notes', 'contentLength', 'name', 'groove'] as const;
 
 function midiRegions(p: Project): Map<string, MidiRegion> {
   const m = new Map<string, MidiRegion>();
@@ -61,7 +61,7 @@ export function syncLinkedPatterns(prev: Project, next: Project): Project {
         const oldCl = r.contentLength;
         r.notes = src.notes as Draft<MidiRegion>['notes'];
         r.name = src.name;
-        r.swing = src.swing;
+        r.groove = src.groove;
         r.contentLength = src.contentLength;
         // A clip that showed exactly one pass of the pattern follows its new length,
         // as long as that does not run into the next clip on the track.

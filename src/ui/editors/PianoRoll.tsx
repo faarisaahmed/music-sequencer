@@ -2,7 +2,9 @@
 // a velocity lane with dynamics tools, and a toolbar portalled into the editor header.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { MousePointer2, Pencil, ZoomIn, ZoomOut, Music, BarChart3, Repeat, Magnet, Waves } from 'lucide-react';
+import { MousePointer2, Pencil, ZoomIn, ZoomOut, Music, BarChart3, Repeat, Magnet, Waves, Shuffle } from 'lucide-react';
+import { grooveLabel } from '../../model/groove';
+import GroovePanel from '../groove/GroovePanel';
 import type { MidiRegion, Note, Track } from '../../model/types';
 import { uid } from '../../model/defaults';
 import { DRUM_NAMES, GRID_OPTIONS, beatsPerBar, inScale, isBlackKey, noteName, scaleOfKey, snap, snapFloor, snapToScale } from '../../model/music';
@@ -83,6 +85,7 @@ function PianoRollInner({ region, track, bpb, selectedIds }: { region: MidiRegio
   const [ppb, setPpb] = useState(64);
   const [rowH, setRowH] = useState(isDrums ? 18 : 14);
   const [tool, setTool] = useState<'pointer' | 'pencil'>('pointer');
+  const [swingOpen, setSwingOpen] = useState(false);
   const [grid, setGrid] = useState(0.25);
   const [lenSel, setLenSel] = useState(0);
   const lastLen = useRef(isDrums ? 0.25 : 0.5);
@@ -1055,6 +1058,12 @@ function PianoRollInner({ region, track, bpb, selectedIds }: { region: MidiRegio
       <button className="btn sm" onClick={dynMenu} title="Dynamics: crescendo, diminuendo, fades…">
         <Waves size={13} /> Dynamics
       </button>
+      <div style={{ position: 'relative' }}>
+        <button className={'btn sm' + (swingOpen ? ' active' : '')} title="Swing: shuffle the in-between notes for a groovier feel" onClick={() => setSwingOpen(!swingOpen)}>
+          <Shuffle size={13} /> Swing{region.groove !== undefined ? `: ${grooveLabel(region.groove)}` : project.groove ? `: Song (${grooveLabel(project.groove)})` : ''}
+        </button>
+        {swingOpen && <GroovePanel scope={{ kind: 'regions', ids: [regionId] }} placement="down-left" onClose={() => setSwingOpen(false)} />}
+      </div>
       {!isDrums && (
         <button className={'btn sm icon' + (scaleMode ? ' active' : '')} title={`Scale: highlight & snap to ${project.key.mode} key`} onClick={() => setScaleMode(!scaleMode)}>
           <Music size={13} />

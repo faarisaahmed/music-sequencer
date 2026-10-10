@@ -1,0 +1,117 @@
+.groove-pop {
+  position: fixed;
+  width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  z-index: 950;
+}
+.groove-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.groove-head .chip {
+  margin-left: auto;
+}
+.groove-scope {
+  width: 100%;
+}
+.groove-scope button {
+  flex: 1;
+  justify-content: center;
+}
+.groove-viz {
+  align-self: center;
+  background: var(--bg-2);
+  border-radius: 7px;
+}
+.gv-line {
+  stroke: var(--border);
+}
+.gv-tick {
+  stroke: #3a3a42;
+  stroke-width: 1;
+}
+.gv-tick.beat {
+  stroke: #5b5b66;
+  stroke-width: 2;
+}
+.gv-note {
+  fill: var(--text-faint);
+}
+.gv-note.moved {
+  fill: var(--accent-2);
+}
+.groove-presets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+.groove-preset {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: var(--panel-2);
+  cursor: pointer;
+  text-align: left;
+}
+.groove-preset:hover {
+  background: var(--panel-3);
+}
+.groove-preset.on {
+  border-color: rgba(47, 140, 255, 0.6);
+  background: rgba(47, 140, 255, 0.16);
+}
+.groove-preset b {
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.groove-preset span {
+  font-size: 10.5px;
+  color: var(--text-faint);
+  line-height: 1.25;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.groove-custom {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+}
+.groove-custom .label {
+  width: 58px;
+}
+.groove-val {
+  font-size: 11px;
+  color: var(--text-dim);
+  width: 34px;
+}
+.groove-follow {
+  opacity: 0.5;
+}
+.groove-follow:hover {
+  opacity: 1;
+}
+.groove-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  line-height: 1.35;
+}
+.groove-foot .btn {
+  flex-shrink: 0;
+}

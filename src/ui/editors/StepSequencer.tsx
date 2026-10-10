@@ -4,7 +4,7 @@
 // Loop Length editing modes.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AudioLines, ChevronLeft, ChevronRight, ChevronsRight, CopyPlus, Eraser, Link2, MoreHorizontal, Play, Plus, Square, Unlink } from 'lucide-react';
+import { AudioLines, Shuffle, ChevronLeft, ChevronRight, ChevronsRight, CopyPlus, Eraser, Link2, MoreHorizontal, Play, Plus, Square, Unlink } from 'lucide-react';
 import type { Draft } from 'immer';
 import type { MidiRegion, Note, Project } from '../../model/types';
 import { beginGesture, commit, draftRegion, endGesture, findRegion, live, toast, useStore, useTransport } from '../../state/store';
@@ -13,8 +13,10 @@ import { uid } from '../../model/defaults';
 import { PRESETS } from '../../audio/presets';
 import { makePatternUnique, newPatternClip, setClipPattern, setTrackInstrument, updateTrack } from '../../state/actions';
 import { patternUseCounts } from '../../model/patterns';
+import { grooveFor, grooveLabel } from '../../model/groove';
+import GroovePanel from '../groove/GroovePanel';
 import { addClip } from '../../audio/audioStore';
-import { Knob, HSlider } from '../common/controls';
+import { Knob } from '../common/controls';
 import { getEngine } from '../../audio/engine';
 import { showContextMenu, type MenuItem } from '../common/menus';
 import { clamp } from '../common/drag';
@@ -150,6 +152,7 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
   }, [notes, extra, hidden, customKey]);
 
   const patternPlaying = useStore((s) => s.patternPlay === regionId);
+  const [swingOpen, setSwingOpen] = useState(false);
   const useCounts = useMemo(() => patternUseCounts(project), [project]);
 
   if (!region || !track) return null;
@@ -645,10 +648,11 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
             <Link2 size={13} /> Used {linkCount}× <Unlink size={12} className="faint" />
           </button>
         )}
-        <div className="ss-swing" title="Swing: push every other 16th late for a shuffled groove">
-          <span className="label">Swing</span>
-          <HSlider value={region.swing ?? 0} min={0} max={1} width={80} defaultValue={0} onChange={(v) => editRegion((r) => void (r.swing = Math.round(v * 100) / 100 || undefined))} />
-          <span className="mono faint">{Math.round((region.swing ?? 0) * 100)}%</span>
+        <div className="ss-swing-wrap">
+          <button className={'btn sm ss-swing' + (grooveFor(project, region) ? ' on' : '')} title="Swing: shuffle the in-between notes for a groovier feel" onClick={() => setSwingOpen(!swingOpen)}>
+            <Shuffle size={13} /> Swing: {region.groove === undefined ? `Song (${grooveLabel(project.groove)})` : grooveLabel(region.groove)}
+          </button>
+          {swingOpen && <GroovePanel scope={{ kind: 'regions', ids: [regionId] }} placement="up" onClose={() => setSwingOpen(false)} />}
         </div>
         <div className="ss-hint faint">
           {mode === 'step' && 'Click or drag to paint · right-click a row for tune, copy & your own sounds · drop an audio file on a row'}
