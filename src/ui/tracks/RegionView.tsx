@@ -1,5 +1,5 @@
 import { drummerFor } from '../../model/drummer';
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Repeat } from 'lucide-react';
 import type { AudioRegion, MidiRegion, Region, TrackType } from '../../model/types';
 import { placedNotes, regionSegments } from '../../model/regions';
@@ -25,32 +25,44 @@ interface Props {
   bpm: number;
 }
 
-function MidiPreview({ r, ppb, h, drums }: { r: MidiRegion; ppb: number; h: number; drums: boolean }) {
-  const content = useMemo(() => {
+/** One shared observer: previews only redraw while (nearly) on screen. */
+const visibleCbs = new WeakMap<Element, (v: boolean) => void>();
+let observer: IntersectionObserver | null = null;
+function observe(el: Element, cb: (v: boolean) => void): () => void {
+  if (typeof IntersectionObserver === 'undefined') {
+    cb(true);
+    return () => {};
+  }
+  observer ??= new IntersectionObserver((entries) => entries.forEach((e) => visibleCbs.get(e.target)?.(e.isIntersecting)), { rootMargin: '300px' });
+  visibleCbs.set(el, cb);
+  observer.observe(el);
+  return () => {
+    observer?.unobserve(el);
+    visibleCbs.delete(el);
+  };
+}
+
+/** Resolved note colours, keyed by region colour + state (avoids a style recalc per canvas). */
+const fillCache = new Map<string, string>();
+const geoId = new WeakMap<object, number>();
+let geoSeq = 0;
+
+/** Canvas preview of a MIDI region's notes (thousands of notes stay cheap to redraw on zoom). */
+function MidiPreview({ r, ppb, h, drums, tone }: { r: MidiRegion; ppb: number; h: number; drums: boolean; tone: string }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  // Geometry in beats / normalised pitch rows — independent of zoom.
+  const geo = useMemo(() => {
     const notes = placedNotes(r);
     const segs = regionSegments(r);
-    const w = r.length * ppb;
-    const bodyH = Math.max(6, h - 6);
-    const out: React.ReactNode[] = [];
+    const rects: number[] = []; // [beatX, row0..1, beatW, rowH, alpha] per note
     if (drums) {
       const lanes = [...DRUM_LANES];
       for (const n of r.notes) if (!lanes.includes(n.pitch)) lanes.push(n.pitch);
-      const rowH = bodyH / lanes.length;
-      const hitW = Math.max(2, Math.min(ppb * 0.18, 6));
-      notes.forEach((pn, i) => {
+      const rowH = 1 / lanes.length;
+      for (const pn of notes) {
         const li = lanes.indexOf(pn.note.pitch);
-        out.push(
-          <rect
-            key={i}
-            x={(pn.start - r.start) * ppb}
-            y={3 + li * rowH + rowH * 0.1}
-            width={hitW}
-            height={Math.max(1.5, rowH * 0.8)}
-            rx={1}
-            opacity={(pn.iteration > 0 ? 0.6 : 1) * (0.45 + pn.note.velocity * 0.55)}
-          />,
-        );
-      });
+        rects.push(pn.start - r.start, li * rowH + rowH * 0.1, -1, rowH * 0.8, (pn.iteration > 0 ? 0.6 : 1) * (0.45 + pn.note.velocity * 0.55));
+      }
     } else {
       let lo = 127;
       let hi = 0;
@@ -65,35 +77,78 @@ function MidiPreview({ r, ppb, h, drums }: { r: MidiRegion; ppb: number; h: numb
       lo -= 1;
       hi += 1;
       const span = Math.max(8, hi - lo);
-      const mid = (lo + hi) / 2;
-      lo = mid - span / 2;
-      const noteH = Math.max(1.5, Math.min(5, bodyH / span));
-      notes.forEach((pn, i) => {
-        const y = 3 + ((lo + span - pn.note.pitch) / span) * (bodyH - noteH);
-        out.push(
-          <rect
-            key={i}
-            x={(pn.start - r.start) * ppb}
-            y={y}
-            width={Math.max(1.5, pn.duration * ppb - 0.6)}
-            height={noteH}
-            rx={Math.min(1.5, noteH / 2)}
-            opacity={pn.iteration > 0 ? 0.62 : 1}
-          />,
-        );
-      });
+      lo = (lo + hi) / 2 - span / 2;
+      for (const pn of notes) rects.push(pn.start - r.start, (lo + span - pn.note.pitch) / span, pn.duration, span, pn.iteration > 0 ? 0.62 : 1);
     }
-    segs.slice(1).forEach((s, i) => {
-      const x = (s.start - r.start) * ppb;
-      out.push(<line key={'l' + i} x1={x} x2={x} y1={0} y2={bodyH + 6} className="loop-notch" />);
+    return { rects, notches: segs.slice(1).map((sg) => sg.start - r.start), length: r.length };
+  }, [r, drums]);
+
+  const cssW = Math.max(1, geo.length * ppb);
+  const visible = useRef(false);
+  const draw = useRef<() => void>(() => {});
+  const drawn = useRef('');
+  useEffect(() => {
+    const cv = ref.current;
+    if (!cv) return;
+    return observe(cv, (v) => {
+      visible.current = v;
+      if (v) draw.current();
     });
-    return { out, w };
-  }, [r, ppb, h, drums]);
-  return (
-    <svg className="region-notes" width={content.w} height={h}>
-      {content.out}
-    </svg>
-  );
+  }, []);
+  useLayoutEffect(() => {
+    draw.current = () => {
+    const cv = ref.current;
+    if (!cv) return;
+    const key = cssW + '|' + h + '|' + tone;
+    if (drawn.current === key && cv.dataset.geo === String(geoId.get(geo))) return;
+    drawn.current = key;
+    cv.dataset.geo = String(geoId.get(geo));
+    const dpr = window.devicePixelRatio || 1;
+    // Browsers cap canvas size; very long regions get a slightly softer backing store.
+    const sx = Math.min(dpr, 16000 / cssW);
+    const W = Math.max(1, Math.floor(cssW * sx));
+    const H = Math.max(1, Math.floor(h * dpr));
+    cv.width = W;
+    cv.height = H;
+    const g = cv.getContext('2d')!;
+    g.setTransform(sx, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, cssW, h);
+    const ck = (cv.parentElement?.parentElement?.className ?? '') + '|' + tone + '|' + (cv.parentElement?.parentElement?.style.getPropertyValue('--c') ?? '');
+    let fill = fillCache.get(ck);
+    if (!fill) {
+      fill = getComputedStyle(cv).fill || '#fff';
+      fillCache.set(ck, fill);
+    }
+    g.fillStyle = fill;
+    const bodyH = Math.max(6, h - 6);
+    const R = geo.rects;
+    if (drums) {
+      const hitW = Math.max(2, Math.min(ppb * 0.18, 6));
+      for (let i = 0; i < R.length; i += 5) {
+        g.globalAlpha = R[i + 4];
+        g.fillRect(R[i] * ppb, 3 + R[i + 1] * bodyH, hitW, Math.max(1.5, R[i + 3] * bodyH));
+      }
+    } else {
+      for (let i = 0; i < R.length; i += 5) {
+        const noteH = Math.max(1.5, Math.min(5, bodyH / R[i + 3]));
+        g.globalAlpha = R[i + 4];
+        g.fillRect(R[i] * ppb, 3 + R[i + 1] * (bodyH - noteH), Math.max(1.5, R[i + 2] * ppb - 0.6), noteH);
+      }
+    }
+    g.globalAlpha = 1;
+    g.strokeStyle = 'rgba(0,0,0,0.45)';
+    g.lineWidth = 1.5;
+    for (const nx of geo.notches) {
+      g.beginPath();
+      g.moveTo(nx * ppb, 0);
+      g.lineTo(nx * ppb, h);
+      g.stroke();
+    }
+    };
+    if (!geoId.has(geo)) geoId.set(geo, ++geoSeq);
+    if (visible.current) draw.current();
+  }, [geo, ppb, h, drums, cssW, tone]);
+  return <canvas ref={ref} className="region-notes" style={{ width: cssW, height: h }} />;
 }
 
 function AudioWave({ r, ppb, h, bpm }: { r: AudioRegion; ppb: number; h: number; bpm: number }) {
@@ -268,7 +323,7 @@ function RegionView({ region: r, trackId, trackType, color, ppb, height, bpm }: 
         )}
       </div>
       <div className="region-body" style={{ height: bodyH }}>
-        {r.kind === 'midi' ? <MidiPreview r={r} ppb={ppb} h={bodyH} drums={trackType === 'drums'} /> : <AudioWave r={r} ppb={ppb} h={bodyH} bpm={bpm} />}
+        {r.kind === 'midi' ? <MidiPreview r={r} ppb={ppb} h={bodyH} drums={trackType === 'drums'} tone={selected ? 'sel' : editing ? 'edit' : ''} /> : <AudioWave r={r} ppb={ppb} h={bodyH} bpm={bpm} />}
       </div>
       {/* Edge handles */}
       <div className="rh rh-left" onPointerDown={handle(dragResizeLeft)} title="Trim start" />
