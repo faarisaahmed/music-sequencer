@@ -345,6 +345,7 @@
   left: 50%;
   transform: translateX(-50%);
   display: flex;
+  z-index: 1;
   align-items: center;
   gap: 10px;
 }
@@ -488,7 +489,7 @@
   margin: 0 4px;
 }
 
-@media (max-width: 1380px) {
+@media (max-width: 1500px) {
   .tb-title,
   .save-ind span,
   .tb-back span {
@@ -496,6 +497,38 @@
   }
   .master-vol .hslider {
     width: 60px !important;
+  }
+}
+/* Narrow windows: stop absolutely centring the transport so nothing overlaps. */
+@media (max-width: 1500px) {
+  .tb-center {
+    position: static;
+    transform: none;
+    margin: 0 auto;
+    gap: 6px;
+  }
+  .tb-group.right {
+    margin-left: 0;
+  }
+  .topbar {
+    gap: 8px;
+  }
+}
+@media (max-width: 1360px) {
+  .master-vol .hslider,
+  .master-vol .mini-meter {
+    display: none !important;
+  }
+  .tb-export span,
+  .btn.tb.icon {
+    width: 30px;
+  }
+  .lcd-cell {
+    padding: 0 8px;
+    min-width: 48px;
+  }
+  .lcd-pos {
+    min-width: 96px;
   }
 }
 
