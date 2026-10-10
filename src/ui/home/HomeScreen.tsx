@@ -5,11 +5,15 @@ import { listProjects, loadProject, saveProject } from '../../state/persistence'
 import { duplicateProjectById, exportProjectFile, importMidiFile, importProjectFile, openProjectById, removeProject, createNewProject } from '../../state/actions';
 import { openModal, toast } from '../../state/store';
 import { keyName } from '../../model/music';
-import { formatTime } from '../../model/music';
 import { showContextMenu } from '../common/menus';
 import { download, safeFileName } from '../../audio/export';
 import { TEMPLATES } from '../../model/templates';
 import { resumeAudio } from '../../audio/context';
+
+function formatDuration(sec: number): string {
+  const t = Math.round(sec);
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+}
 
 function timeAgo(ts: number): string {
   const s = (Date.now() - ts) / 1000;
@@ -205,7 +209,7 @@ export default function HomeScreen() {
                     </div>
                   )}
                   <div className="song-meta">
-                    {timeAgo(s.updatedAt)} · {formatTime((s.lengthBeats * 60) / s.bpm)}
+                    {timeAgo(s.updatedAt)} · {formatDuration((s.lengthBeats * 60) / s.bpm)}
                   </div>
                   <div className="song-meta">
                     {s.bpm} BPM · {keyName(s.key)} · {s.trackCount} track{s.trackCount === 1 ? '' : 's'}

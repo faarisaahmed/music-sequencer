@@ -1,5 +1,5 @@
 // High-level editing operations shared across views.
-import type { Draft } from 'immer';
+import { current, isDraft, type Draft } from 'immer';
 import type { MidiRegion, Note, Project, Region, Track, TrackType } from '../model/types';
 import { createAudioRegion, createMidiRegion, createProject, createTrack, uid } from '../model/defaults';
 import { beatsPerBar, snap } from '../model/music';
@@ -154,7 +154,7 @@ export function setTrackInstrument(id: string, instrument: string): void {
 // ------------------------------------------------------------------ regions
 
 export function cloneRegion(r: Region, patch: Partial<Region> = {}): Region {
-  const c = structuredClone(r) as Region;
+  const c = structuredClone(isDraft(r) ? current(r) : r) as Region;
   c.id = uid('r');
   if (c.kind === 'midi') c.notes = c.notes.map((n) => ({ ...n, id: uid('n') }));
   return { ...c, ...patch } as Region;
@@ -246,6 +246,7 @@ export function splitRegionsAt(ids: string[], beat: number): void {
 
 /** Join adjacent MIDI regions on the same track into one. */
 export function joinRegions(ids: string[]): void {
+  const mergedIds: string[] = [];
   commit((d) => {
     for (const t of d.tracks) {
       const sel = t.regions.filter((r) => ids.includes(r.id) && r.kind === 'midi') as Draft<MidiRegion>[];
@@ -261,8 +262,10 @@ export function joinRegions(ids: string[]): void {
       const merged = createMidiRegion(start, end - start, notes, sel[0].name);
       t.regions = t.regions.filter((r) => !sel.includes(r as Draft<MidiRegion>));
       t.regions.push(merged);
+      mergedIds.push(merged.id);
     }
   });
+  if (mergedIds.length) useStore.setState({ selectedRegionIds: mergedIds, editingRegionId: mergedIds[0] });
   pruneSelection();
 }
 
