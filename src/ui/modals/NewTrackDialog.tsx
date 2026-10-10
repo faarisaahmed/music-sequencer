@@ -4,11 +4,14 @@ import { addTrack, createEmptyRegion } from '../../state/actions';
 import { CATEGORIES, PRESETS, type InstrumentCategory } from '../../audio/presets';
 import { IconFor } from '../common/icons';
 import Modal from './Modal';
+import { DRUMMERS } from '../../model/drummer';
+import { createDrummerTrack } from '../../state/drummerActions';
 
-type Kind = 'instrument' | 'drums' | 'audio' | 'sampler';
+type Kind = 'instrument' | 'drummer' | 'drums' | 'audio' | 'sampler';
 
 const KINDS: { kind: Kind; title: string; desc: string; icon: string; color: string }[] = [
   { kind: 'instrument', title: 'Software Instrument', desc: 'Play keyboards, guitars, strings, synths & more with your keyboard or MIDI controller', icon: 'piano', color: 'var(--midi)' },
+  { kind: 'drummer', title: 'Drummer', desc: 'A virtual session drummer that plays realistic grooves and fills in your style', icon: 'drums', color: '#ff9f0a' },
   { kind: 'drums', title: 'Drums', desc: 'Program beats in the step sequencer or play the drum pads', icon: 'drums', color: 'var(--drums)' },
   { kind: 'audio', title: 'Audio Recorder', desc: 'Record your voice or any instrument with a microphone, or import audio files', icon: 'mic', color: 'var(--audio)' },
   { kind: 'sampler', title: 'Sampler', desc: 'Record or import a sound and play it chromatically across the keyboard', icon: 'sampler', color: 'var(--purple)' },
@@ -32,9 +35,9 @@ export default function NewTrackDialog() {
 
   const cats = CATEGORIES.filter((c) => c !== 'Drums' && c !== 'Sampler');
   return (
-    <Modal title={kind === 'instrument' ? 'Choose an Instrument' : kind === 'drums' ? 'Choose a Drum Kit' : 'Add a New Track'} width={kind ? 760 : 680}>
+    <Modal title={kind === 'instrument' ? 'Choose an Instrument' : kind === 'drums' ? 'Choose a Drum Kit' : kind === 'drummer' ? 'Choose a Drummer' : 'Add a New Track'} width={kind ? 760 : 680}>
       {!kind && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
           {KINDS.map((k) => (
             <button
               key={k.kind}
@@ -75,6 +78,36 @@ export default function NewTrackDialog() {
                 <div className="preset-desc">{p.description}</div>
               </button>
             ))}
+          </div>
+        </div>
+      )}
+      {kind === 'drummer' && (
+        <div className="col">
+          <div className="preset-grid">
+            {DRUMMERS.map((d) => (
+              <button
+                key={d.style}
+                className="preset-card"
+                style={{ color: d.color }}
+                onClick={() => {
+                  closeModal();
+                  createDrummerTrack(d.style);
+                }}
+              >
+                <div className="dr-mini-avatar" style={{ ['--c' as string]: d.color, width: 30, height: 30, fontSize: 14 }}>
+                  {d.name[0]}
+                </div>
+                <div className="preset-name">
+                  {d.genre} <span className="faint">· {d.name}</span>
+                </div>
+                <div className="preset-desc">{d.bio}</div>
+              </button>
+            ))}
+          </div>
+          <div>
+            <button className="btn ghost" onClick={() => setKind(null)}>
+              ← Back
+            </button>
           </div>
         </div>
       )}

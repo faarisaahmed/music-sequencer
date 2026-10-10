@@ -5,6 +5,7 @@ import PianoRoll from './PianoRoll';
 import ScoreEditor from './ScoreEditor';
 import StepSequencer from './StepSequencer';
 import AudioEditor from './AudioEditor';
+import DrummerEditor from './drummer/DrummerEditor';
 import { TrackIcon } from '../common/icons';
 
 /** Hosts the editor for the region being edited, with a mode switch. */
@@ -42,7 +43,13 @@ export default function EditorPanel() {
   const modes: { id: EditorMode; label: string }[] =
     r.kind === 'audio'
       ? [{ id: 'audio', label: 'Audio' }]
-      : t.type === 'drums'
+      : r.drummer
+        ? [
+            { id: 'drummer', label: 'Drummer' },
+            { id: 'steps', label: 'Step Sequencer' },
+            { id: 'pianoroll', label: 'Piano Roll' },
+          ]
+        : t.type === 'drums'
         ? [
             { id: 'steps', label: 'Step Sequencer' },
             { id: 'pianoroll', label: 'Piano Roll' },
@@ -77,6 +84,7 @@ export default function EditorPanel() {
         {active === 'pianoroll' && r.kind === 'midi' && <PianoRoll key={r.id} trackId={t.id} regionId={r.id} />}
         {active === 'score' && r.kind === 'midi' && <ScoreEditor key={r.id} trackId={t.id} regionId={r.id} />}
         {active === 'steps' && r.kind === 'midi' && <StepSequencer key={r.id} trackId={t.id} regionId={r.id} />}
+        {active === 'drummer' && r.kind === 'midi' && <DrummerEditor key={r.id} trackId={t.id} regionId={r.id} />}
         {active === 'audio' && r.kind === 'audio' && <AudioEditor key={r.id} trackId={t.id} regionId={r.id} />}
       </div>
     </div>

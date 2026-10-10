@@ -34,6 +34,8 @@ interface RegionBase {
 export interface MidiRegion extends RegionBase {
   kind: 'midi';
   notes: Note[];
+  /** Present on Drummer regions: notes are generated from these settings. */
+  drummer?: DrummerSettings;
 }
 
 export interface AudioRegion extends RegionBase {
@@ -93,6 +95,8 @@ export interface Track {
   /** Transpose applied at playback for MIDI tracks (semitones). */
   transpose: number;
   height?: number;
+  /** Drummer track: the virtual drummer playing it. */
+  drummer?: { style: DrummerStyle };
 }
 
 export interface KeySignature {
@@ -121,6 +125,39 @@ export interface Project {
   updatedAt: number;
   /** Data-URL thumbnail colour stripe for the song browser. */
   coverHue?: number;
+  /** Arrangement markers (Intro, Verse, Chorus…). */
+  sections?: Section[];
+}
+
+export interface Section {
+  id: string;
+  name: string;
+  start: number; // beats
+  length: number; // beats
+  color: string;
+}
+
+export type DrummerStyle = 'rock' | 'pop' | 'hiphop' | 'trap' | 'funk' | 'jazz' | 'house' | 'lofi' | 'songwriter' | 'rnb' | 'reggae' | 'latin';
+
+/** Settings of a Drummer region — its notes are regenerated from these. */
+export interface DrummerSettings {
+  style: DrummerStyle;
+  complexity: number; // 0..1 (Simple ↔ Complex)
+  loudness: number; // 0..1 (Soft ↔ Loud)
+  fills: number; // 0..1
+  swing: number; // 0..1
+  pieces: { kit: boolean; hats: boolean; cymbals: boolean; toms: boolean; perc: boolean };
+  /** Variation per piece (0..1): kick/snare pattern, hi-hat openness → ride, percussion density. */
+  kickVar: number;
+  hatVar: number;
+  percVar: number;
+  /** Kick follows the rhythm of this track (bass etc.). */
+  followTrackId?: string | null;
+  seed: number;
+  /** Region length the notes were generated for (regenerated when it changes). */
+  generatedFor?: number;
+  /** Context signature (position, length, sections, followed track) of the last generation. */
+  sig?: string;
 }
 
 export interface ProjectMeta {

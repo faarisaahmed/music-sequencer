@@ -668,3 +668,18 @@
 .region.recording .region-notes {
   fill: #ffd2cf;
 }
+
+/* Drummer regions: striped amber with a drummer badge */
+.region.drummer {
+  background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0 6px, transparent 6px 12px);
+}
+.drummer-badge {
+  flex-shrink: 0;
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 0 5px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  color: #ffe9a8;
+  letter-spacing: 0.02em;
+}

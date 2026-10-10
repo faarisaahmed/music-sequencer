@@ -1,3 +1,4 @@
+import { drummerFor } from '../../model/drummer';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Repeat } from 'lucide-react';
 import type { AudioRegion, MidiRegion, Region, TrackType } from '../../model/types';
@@ -216,7 +217,7 @@ function RegionView({ region: r, trackId, trackType, color, ppb, height, bpm }: 
     fn(e, r.id);
   };
 
-  const cls = ['region', r.kind, trackType === 'drums' ? 'drums' : '', selected ? 'selected' : '', editing ? 'editing' : '', r.muted ? 'muted' : '', r.loop ? 'looped' : '']
+  const cls = ['region', r.kind, trackType === 'drums' ? 'drums' : '', r.kind === 'midi' && r.drummer ? 'drummer' : '', selected ? 'selected' : '', editing ? 'editing' : '', r.muted ? 'muted' : '', r.loop ? 'looped' : '']
     .filter(Boolean)
     .join(' ');
 
@@ -240,6 +241,7 @@ function RegionView({ region: r, trackId, trackType, color, ppb, height, bpm }: 
     >
       <div className="region-name">
         {r.loop && <Repeat size={10} style={{ flexShrink: 0 }} />}
+        {r.kind === 'midi' && r.drummer && <span className="drummer-badge">{drummerFor(r.drummer.style).name}</span>}
         {renaming ? (
           <input
             autoFocus

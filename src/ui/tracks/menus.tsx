@@ -28,7 +28,7 @@ export function openRegionEditor(regionId: string): void {
   const p = useStore.getState().project;
   const f = findRegion(p, regionId);
   if (!f) return;
-  const mode = f.region.kind === 'audio' ? 'audio' : f.track.type === 'drums' ? 'steps' : useStore.getState().editorMode === 'score' ? 'score' : 'pianoroll';
+  const mode = f.region.kind === 'audio' ? 'audio' : f.region.drummer ? 'drummer' : f.track.type === 'drums' ? 'steps' : useStore.getState().editorMode === 'score' ? 'score' : 'pianoroll';
   useStore.setState({
     editingRegionId: regionId,
     selectedRegionIds: [regionId],

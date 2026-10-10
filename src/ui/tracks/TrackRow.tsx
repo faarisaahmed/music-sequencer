@@ -1,3 +1,4 @@
+import { addDrummerRegion } from '../../state/drummerActions';
 import { addLoopToSong } from '../library/loops';
 import { memo, useEffect, useRef, useState } from 'react';
 import { Circle } from 'lucide-react';
@@ -263,6 +264,11 @@ function TrackLane({ track, width, ppb, height, bpm, selected, onMarquee }: Lane
       }}
       onDoubleClick={(e) => {
         if (e.target !== e.currentTarget || track.type === 'audio') return;
+        if (track.drummer) {
+          addDrummerRegion(track.id, beatAt(e.clientX));
+          useStore.setState({ dockTab: 'editor', editorMode: 'drummer' });
+          return;
+        }
         createEmptyRegion(track.id, beatAt(e.clientX));
       }}
       onContextMenu={(e) => {
