@@ -66,10 +66,13 @@ const SECTIONS: { title: string; rows: Row[] }[] = [
   {
     title: 'Score editor',
     rows: [
-      ['Note input mode', ['N']],
-      ['Durations (64th → whole)', ['1', '…', '7']],
+      ['Write / Select mode', ['N']],
+      ['Durations: 32nd, 16th, 8th, quarter, half, whole', ['2', '…', '7']],
+      ['Dotted duration', ['.']],
       ['Enter note by name', ['A', '…', 'G']],
-      ['Move note up / down', ['↑', '↓']],
+      ['Add note to chord', ['⇧', 'A', '…', 'G']],
+      ['Tie to next note', ['+']],
+      ['Move note up / down (⌥ = scale step)', ['↑', '↓']],
       ['Up / down an octave', [`${CMD} ↑`, `${CMD} ↓`]],
       ['Previous / next note', ['←', '→']],
       ['Rest', ['0']],
