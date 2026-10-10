@@ -7,6 +7,7 @@ import { getAudioContext, resumeAudio } from './context';
 import { Mixer } from './mixer';
 import { scheduleRange, type ActiveSource } from './schedule';
 import { addBuffer, ensureClips } from './audioStore';
+import { PcmRecorder } from './pcmRecorder';
 import { projectAudioIds } from '../state/persistence';
 
 const LOOKAHEAD = 0.12; // seconds scheduled ahead
@@ -25,9 +26,7 @@ interface RecordingState {
   pending: Map<number, { start: number; velocity: number }>;
   cycle: boolean;
   // audio
-  mediaRecorder?: MediaRecorder;
-  chunks?: Blob[];
-  recStartCtx?: number;
+  recorder?: PcmRecorder;
 }
 
 type LiveListener = (pitch: number, on: boolean, trackId: string) => void;
@@ -47,6 +46,7 @@ class Engine {
   private stream: MediaStream | null = null;
   private micAnalyser: AnalyserNode | null = null;
   private monitorGain: GainNode | null = null;
+  private micSource: MediaStreamAudioSourceNode | null = null;
   private countInUntil = -Infinity;
   private liveListeners = new Set<LiveListener>();
   /** Notes currently held by the user, per track (for UI highlighting). */
@@ -376,14 +376,9 @@ class Engine {
         this.rec = null;
         return;
       }
-      const mr = new MediaRecorder(this.stream);
-      this.rec.mediaRecorder = mr;
-      this.rec.chunks = [];
-      mr.ondataavailable = (e) => e.data.size && this.rec?.chunks?.push(e.data);
-      mr.onstart = () => {
-        if (this.rec) this.rec.recStartCtx = this.ctx.currentTime;
-      };
-      mr.start();
+      const recorder = new PcmRecorder(this.ctx);
+      await recorder.start(this.micSource!);
+      this.rec.recorder = recorder;
     }
     this.countInUntil = preroll ? startBeat : -Infinity;
     useStore.setState({ recording: true, countingIn: preroll > 0, selectedTrackId: track.id });
@@ -435,16 +430,16 @@ class Engine {
       });
       toast(`Recorded ${notes.length} notes`, 'success');
     } else {
-      const mr = rec.mediaRecorder;
-      if (!mr) return;
-      const stopped = new Promise<void>((res) => (mr.onstop = () => res()));
-      mr.stop();
-      await stopped;
-      const blob = new Blob(rec.chunks ?? [], { type: mr.mimeType });
+      const recorder = rec.recorder;
+      if (!recorder) return;
       try {
-        const raw = await this.ctx.decodeAudioData(await blob.arrayBuffer());
+        const raw = await recorder.stop();
+        if (!raw) {
+          toast('Nothing was recorded — check your microphone', 'error');
+          return;
+        }
         const spb = 60 / p.bpm;
-        const recStartCtx = rec.recStartCtx ?? this.ctx.currentTime;
+        const recStartCtx = recorder.startTime >= 0 ? recorder.startTime : this.ctx.currentTime;
         const beatAtRecStart = this.beatAtSafe(recStartCtx);
         const latency = (this.ctx.baseLatency || 0) + (this.ctx.outputLatency || 0);
         // Seconds of the recording to discard so that audio lines up with startBeat.
@@ -485,6 +480,7 @@ class Engine {
         audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
       });
       const srcNode = this.ctx.createMediaStreamSource(this.stream);
+      this.micSource = srcNode;
       this.micAnalyser = this.ctx.createAnalyser();
       this.micAnalyser.fftSize = 512;
       srcNode.connect(this.micAnalyser);
@@ -512,25 +508,15 @@ class Engine {
   async recordSample(maxSeconds = 10): Promise<{ stop: () => Promise<AudioBuffer | null> } | null> {
     await resumeAudio();
     if (!(await this.startMic()) || !this.stream) return null;
-    const mr = new MediaRecorder(this.stream);
-    const chunks: Blob[] = [];
-    mr.ondataavailable = (e) => e.data.size && chunks.push(e.data);
-    mr.start();
-    const timeout = setTimeout(() => mr.state === 'recording' && mr.stop(), maxSeconds * 1000);
+    const recorder = new PcmRecorder(this.ctx);
+    await recorder.start(this.micSource!);
+    let result: Promise<AudioBuffer | null> | null = null;
+    const finish = () => (result ??= recorder.stop().then((buf) => (buf ? trimSilence(this.ctx, buf) : null)));
+    const timeout = setTimeout(() => void finish(), maxSeconds * 1000);
     return {
       stop: async () => {
         clearTimeout(timeout);
-        if (mr.state === 'recording') {
-          const done = new Promise<void>((r) => (mr.onstop = () => r()));
-          mr.stop();
-          await done;
-        }
-        try {
-          const buf = await this.ctx.decodeAudioData(await new Blob(chunks, { type: mr.mimeType }).arrayBuffer());
-          return trimSilence(this.ctx, buf);
-        } catch {
-          return null;
-        }
+        return finish();
       },
     };
   }
@@ -541,6 +527,7 @@ export function trimSilence(ctx: BaseAudioContext, buf: AudioBuffer, threshold =
   const d = buf.getChannelData(0);
   let s = 0;
   while (s < d.length && Math.abs(d[s]) < threshold) s++;
+  if (s >= d.length) return buf; // all quiet: keep as-is rather than returning nothing
   let e = d.length - 1;
   while (e > s && Math.abs(d[e]) < threshold) e--;
   s = Math.max(0, s - Math.floor(buf.sampleRate * 0.005));
