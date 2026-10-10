@@ -725,29 +725,55 @@ export class InsertChain {
     this.input.connect(this.output);
   }
 
+  private rewireTimer: ReturnType<typeof setTimeout> | null = null;
+  private latest: InsertFx | undefined;
+
   update(inserts: InsertFx | undefined): void {
+    this.latest = inserts;
     const enabled = this.order.filter((k) => inserts?.[k]?.on);
     const sig = enabled.join(',');
     if (sig !== this.signature) {
       this.signature = sig;
-      for (const [k, fx] of this.active) {
-        if (!enabled.includes(k)) {
-          fx.dispose();
-          this.active.delete(k);
-        }
+      const live = typeof AudioContext !== 'undefined' && this.ctx instanceof AudioContext && this.ctx.state === 'running';
+      if (live) {
+        // Duck briefly around the rewire so toggling an effect mid-playback doesn't click.
+        const g = this.output.gain;
+        const now = this.ctx.currentTime;
+        g.cancelScheduledValues(now);
+        g.setTargetAtTime(0, now, 0.003);
+        if (this.rewireTimer) clearTimeout(this.rewireTimer);
+        this.rewireTimer = setTimeout(() => {
+          this.rewireTimer = null;
+          this.rewire(this.order.filter((k) => this.latest?.[k]?.on));
+          const t = this.ctx.currentTime;
+          g.cancelScheduledValues(t);
+          g.setTargetAtTime(1, t, 0.006);
+        }, 18);
+      } else {
+        this.rewire(enabled);
       }
-      for (const k of enabled) if (!this.active.has(k)) this.active.set(k, createEffect(this.ctx, k));
-      this.input.disconnect();
-      for (const fx of this.active.values()) fx.output.disconnect();
-      let last: AudioNode = this.input;
-      for (const k of enabled) {
-        const fx = this.active.get(k)!;
-        last.connect(fx.input);
-        last = fx.output;
-      }
-      last.connect(this.output);
     }
-    for (const k of enabled) this.active.get(k)!.update(inserts![k]);
+    for (const k of enabled) this.active.get(k)?.update(inserts![k]);
+  }
+
+  private rewire(enabled: InsertKey[]): void {
+    for (const [k, fx] of this.active) {
+      if (!enabled.includes(k)) {
+        fx.dispose();
+        this.active.delete(k);
+      }
+    }
+    for (const k of enabled) if (!this.active.has(k)) this.active.set(k, createEffect(this.ctx, k));
+    this.input.disconnect();
+    for (const fx of this.active.values()) fx.output.disconnect();
+    let last: AudioNode = this.input;
+    for (const k of enabled) {
+      const fx = this.active.get(k)!;
+      last.connect(fx.input);
+      last = fx.output;
+    }
+    last.connect(this.output);
+    for (const k of enabled) this.active.get(k)!.update(this.latest![k]);
   }
 
   get activeCount(): number {
@@ -755,6 +781,7 @@ export class InsertChain {
   }
 
   dispose(): void {
+    if (this.rewireTimer) clearTimeout(this.rewireTimer);
     for (const fx of this.active.values()) fx.dispose();
     this.active.clear();
     this.input.disconnect();
