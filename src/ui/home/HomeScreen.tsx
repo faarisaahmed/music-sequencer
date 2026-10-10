@@ -9,6 +9,7 @@ import { showContextMenu } from '../common/menus';
 import { download, safeFileName } from '../../audio/export';
 import { TEMPLATES } from '../../model/templates';
 import { resumeAudio } from '../../audio/context';
+import { maybeAutoStart } from '../onboarding/tourState';
 
 function formatDuration(sec: number): string {
   const t = Math.round(sec);
@@ -55,6 +56,8 @@ export default function HomeScreen() {
   const refresh = () => listProjects().then(setSongs);
   useEffect(() => {
     void refresh();
+    const t = setTimeout(() => maybeAutoStart('home'), 600);
+    return () => clearTimeout(t);
   }, []);
 
   const filtered = (songs ?? []).filter((s) => s.name.toLowerCase().includes(query.toLowerCase()));

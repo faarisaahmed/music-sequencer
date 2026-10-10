@@ -1,3 +1,7 @@
+import { Compass } from 'lucide-react';
+import { closeModal, useStore } from '../../state/store';
+import { startTour } from '../onboarding/tourState';
+import '../onboarding/onboarding.css';
 import Modal from './Modal';
 import '../mixer/mixer.css';
 
@@ -90,6 +94,20 @@ const SECTIONS: { title: string; rows: Row[] }[] = [
 export default function HelpDialog() {
   return (
     <Modal title="BandForge Help" width={820}>
+      <div className="help-tour">
+        <div>
+          <b>New here?</b> Take a one-minute guided tour of the studio.
+        </div>
+        <button
+          className="btn primary sm"
+          onClick={() => {
+            closeModal();
+            startTour(useStore.getState().screen === 'project' ? 'project' : 'home');
+          }}
+        >
+          <Compass size={14} /> Take the tour
+        </button>
+      </div>
       <div className="form-section">Getting started</div>
       <ol className="help-steps">
         <li>

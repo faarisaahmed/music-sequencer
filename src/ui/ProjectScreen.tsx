@@ -10,6 +10,9 @@ import { addLoopToSong } from './library/loops';
 import { useGlobalShortcuts } from './shortcuts';
 import { useMusicalTyping } from './instruments/musicalTyping';
 import { startDrag } from './common/drag';
+import EmptyHint from './onboarding/EmptyHint';
+import LoadingPill from './onboarding/LoadingPill';
+import { maybeAutoStart } from './onboarding/tourState';
 
 export default function ProjectScreen() {
   const libraryOpen = useStore((s) => s.libraryOpen);
@@ -19,6 +22,11 @@ export default function ProjectScreen() {
   const mainRef = useRef<HTMLDivElement>(null);
   useGlobalShortcuts();
   useMusicalTyping();
+
+  useEffect(() => {
+    const t = setTimeout(() => maybeAutoStart('project'), 700);
+    return () => clearTimeout(t);
+  }, []);
 
   // Level meters polling (~30fps) while the project is open.
   useEffect(() => {
@@ -52,11 +60,13 @@ export default function ProjectScreen() {
       }}
     >
       <TopBar />
+      <LoadingPill />
       <div className="workspace">
         {libraryOpen && <LibraryPanel />}
         <div className="main-col" ref={mainRef}>
           <div className="tracks-area" style={{ display: dockTab && dockMax ? 'none' : undefined }}>
             <TracksView />
+            <EmptyHint />
           </div>
           {dockTab && (
             <>

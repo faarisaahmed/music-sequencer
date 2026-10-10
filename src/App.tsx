@@ -6,6 +6,7 @@ import ProjectScreen from './ui/ProjectScreen';
 import { MenuHost } from './ui/common/menus';
 import Toasts from './ui/common/Toasts';
 import ModalHost from './ui/modals/ModalHost';
+import Tour from './ui/onboarding/Tour';
 import { enableMidi } from './audio/midiInput';
 import './App.css';
 
@@ -33,6 +34,7 @@ export default function App() {
       {screen === 'home' ? <HomeScreen /> : <ProjectScreen />}
       <ModalHost />
       <MenuHost />
+      <Tour />
       <Toasts />
     </>
   );
