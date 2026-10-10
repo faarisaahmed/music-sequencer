@@ -1,7 +1,8 @@
 // New-song templates and demo songs.
 import type { Note, Project } from './types';
 import { createMidiRegion, createProject, createTrack, note, uid } from './defaults';
-import { SCALES, chordPitches, diatonicChords } from './music';
+import { SCALES, beatsPerBar, chordPitches, diatonicChords } from './music';
+import { sectionsFromBars } from './sections';
 
 /** Build drum notes from step strings, e.g. { 36: 'x...x...x...x...' }. 'X' = accent, 'x' = normal, 'o' = ghost. */
 export function drumPattern(lanes: Record<number, string>, stepBeats = 0.25): Note[] {
@@ -277,6 +278,7 @@ function buildDemo(): Project {
     { beat: 116, value: 1 },
     { beat: 128, value: 0 },
   ];
+  p.sections = sectionsFromBars([['Intro', 8], ['Verse', 8], ['Chorus', 8], ['Outro', 8]], beatsPerBar(p.timeSig));
   p.lengthBars = 36;
   p.loop = { enabled: false, start: 32, end: 48 };
   return p;
@@ -360,6 +362,7 @@ function buildLofi(): Project {
     { beat: 112, value: 1 },
     { beat: 128, value: 0 },
   ];
+  p.sections = sectionsFromBars([['Intro', 4], ['Verse', 8], ['Chorus', 8], ['Verse 2', 8], ['Outro', 4]], beatsPerBar(p.timeSig));
   p.lengthBars = 34;
   return p;
 }
@@ -421,6 +424,7 @@ function buildPop(): Project {
     { beat: 124, value: 1 },
     { beat: 144, value: 0 },
   ];
+  p.sections = sectionsFromBars([['Intro', 4], ['Verse', 8], ['Pre-Chorus', 4], ['Chorus', 8], ['Chorus 2', 8], ['Outro', 4]], beatsPerBar(p.timeSig));
   p.lengthBars = 38;
   p.loop = { enabled: false, start: 64, end: 96 };
   return p;
@@ -480,6 +484,7 @@ function buildCinematic(): Project {
   perc.regions.push(createMidiRegion(64, 4, drumPattern({ 49: 'X' }), 'Crash'));
   perc.fx.reverb = 0.5;
   p.tracks.push(strings, cello, harp, horn, perc);
+  p.sections = sectionsFromBars([['Intro', 4], ['Build', 12], ['Climax', 8], ['Outro', 4]], beatsPerBar(p.timeSig));
   p.lengthBars = 28;
   return p;
 }
@@ -546,6 +551,7 @@ function buildSynthwave(): Project {
   ];
   p.reverbType = 'plate';
   p.delayTime = '1/8d';
+  p.sections = sectionsFromBars([['Intro', 4], ['Verse', 8], ['Chorus', 8], ['Verse 2', 8], ['Outro', 4]], beatsPerBar(p.timeSig));
   p.lengthBars = 34;
   return p;
 }

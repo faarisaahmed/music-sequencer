@@ -70,7 +70,7 @@ function PieceRow({
       {onValue && value !== undefined ? (
         <div className="dr-piece-slider">
           <span className="faint">{left}</span>
-          <HSlider value={value} min={0} max={1} width={130} onChange={onValue} undoable={false} />
+          <HSlider value={value} min={0} max={1} width={110} onChange={onValue} undoable={false} />
           <span className="faint">{right}</span>
         </div>
       ) : (

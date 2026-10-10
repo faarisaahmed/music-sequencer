@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Plus, ZoomIn, ZoomOut, Maximize, Magnet, Crown } from 'lucide-react';
+import { Plus, ZoomIn, ZoomOut, Maximize, Magnet, Crown, LayoutList } from 'lucide-react';
 import { beginGesture, endGesture, live, openModal, useStore, useTransport } from '../../state/store';
 import { beatsPerBar, GRID_OPTIONS, snap } from '../../model/music';
 import { contentEndBeat } from '../../model/defaults';
@@ -7,6 +7,7 @@ import { getEngine } from '../../audio/engine';
 import { startDrag } from '../common/drag';
 import TrackRow, { useArmedMic } from './TrackRow';
 import AutomationLane from './AutomationLane';
+import ArrangementLane from './ArrangementLane';
 import { HEADER_W, RULER_H, useTracksUi } from './tracksUi';
 import './tracks.css';
 
@@ -181,6 +182,7 @@ function Toolbar({ viewW }: { viewW: number }) {
   const grid = useStore((s) => s.snapGrid);
   const th = useStore((s) => s.trackHeight);
   const showMaster = useTracksUi((s) => s.showMaster);
+  const showArrangement = useTracksUi((s) => s.showArrangement);
   const zoomTo = (v: number) => useStore.setState({ pxPerBeat: Math.max(3, Math.min(240, v)) });
   const fit = () => {
     const p = useStore.getState().project!;
@@ -234,6 +236,9 @@ function Toolbar({ viewW }: { viewW: number }) {
       <button className={'btn sm' + (showMaster ? ' active' : '')} onClick={() => useTracksUi.setState({ showMaster: !showMaster })} title="Show the master track (song volume automation, fade-outs)">
         <Crown size={13} /> Master Track
       </button>
+      <button className={'btn sm' + (showArrangement ? ' active' : '')} onClick={() => useTracksUi.setState({ showArrangement: !showArrangement })} title="Show the arrangement track (song sections)">
+        <LayoutList size={13} /> Arrangement
+      </button>
       <div className="spacer" />
       <div className="tv-hint faint">
         Double-click empty space for a new region · <kbd>⌥</kbd> drag copies · drag the top-right corner to loop · <kbd>⌘T</kbd> split
@@ -247,6 +252,7 @@ export default function TracksView() {
   const ppb = useStore((s) => s.pxPerBeat);
   const trackHeight = useStore((s) => s.trackHeight);
   const showMaster = useTracksUi((s) => s.showMaster);
+  const showArrangement = useTracksUi((s) => s.showArrangement);
   const marquee = useTracksUi((s) => s.marquee);
   const dropIndicator = useTracksUi((s) => s.dropIndicator);
   const snapLine = useTracksUi((s) => s.snapLine);
@@ -360,6 +366,8 @@ export default function TracksView() {
             </div>
             <Ruler width={width} ppb={ppb} />
           </div>
+
+          {showArrangement && <ArrangementLane width={width} ppb={ppb} />}
 
           {showMaster && (
             <div className="track-block master-block">

@@ -14,6 +14,7 @@ export interface Marquee {
 
 export const useTracksUi = create<{
   showMaster: boolean;
+  showArrangement: boolean;
   renamingRegionId: string | null;
   renamingTrackId: string | null;
   marquee: Marquee | null;
@@ -21,6 +22,7 @@ export const useTracksUi = create<{
   snapLine: number | null; // beat of current snap guide during drags
 }>(() => ({
   showMaster: false,
+  showArrangement: true,
   renamingRegionId: null,
   renamingTrackId: null,
   marquee: null,
