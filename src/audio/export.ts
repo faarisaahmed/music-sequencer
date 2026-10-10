@@ -24,27 +24,43 @@ export async function renderProject(p: Project, opts: RenderOptions = {}): Promi
   const sr = opts.sampleRate ?? 44100;
   const tail = opts.tail ?? 2.5;
   const seconds = (end - start) * spb + tail;
+  // Only build and schedule tracks that can actually be heard (muted/un-soloed tracks
+  // cost render time but contribute nothing).
+  const anySolo = p.tracks.some((t) => t.solo);
   const proj: Project = opts.onlyTrackId
-    ? { ...p, tracks: p.tracks.map((t) => (t.id === opts.onlyTrackId ? { ...t, mute: false, solo: false } : { ...t, mute: true, solo: false })) }
-    : p;
+    ? { ...p, tracks: p.tracks.filter((t) => t.id === opts.onlyTrackId).map((t) => ({ ...t, mute: false, solo: false })) }
+    : { ...p, tracks: p.tracks.filter((t) => !t.mute && (!anySolo || t.solo)) };
   const oc = new OfflineAudioContext(2, Math.ceil(seconds * sr), sr);
   const mixer = new Mixer(oc);
   mixer.output.connect(oc.destination);
   mixer.sync(proj);
   await mixer.ready();
   const offset = 0.05;
-  scheduleRange(proj, mixer, start, end, (b) => offset + (b - start) * spb, { fresh: true, limit: end });
-  if (opts.onProgress) {
-    // Report progress via suspend points.
-    const steps = 20;
-    for (let i = 1; i < steps; i++) {
-      const t = (seconds * i) / steps;
-      oc.suspend(t).then(() => {
-        opts.onProgress!(i / steps);
-        void oc.resume();
-      });
-    }
+  const toTime = (b: number) => offset + (b - start) * spb;
+  const beatAt = (t: number) => Math.min(end, Math.max(start, start + (t - offset) / spb));
+  // Schedule incrementally (like live playback) instead of all at once: Chrome's offline
+  // renderer pays for every pending node on every render quantum, so pre-scheduling a
+  // whole song makes long exports many times slower.
+  const CHUNK = 1.5; // seconds
+  let scheduledTo = start;
+  const scheduleUntil = (t: number) => {
+    const b1 = beatAt(t);
+    if (b1 <= scheduledTo) return;
+    scheduleRange(proj, mixer, scheduledTo, b1, toTime, { fresh: scheduledTo === start, limit: end });
+    scheduledTo = b1;
+  };
+  scheduleUntil(CHUNK * 2);
+  const chunks = Math.floor(seconds / CHUNK);
+  for (let k = 1; k <= chunks; k++) {
+    const t = k * CHUNK;
+    if (t >= seconds) break;
+    oc.suspend(t).then(() => {
+      scheduleUntil(t + CHUNK * 2);
+      opts.onProgress?.(Math.min(1, t / seconds));
+      void oc.resume();
+    });
   }
+  if (chunks < 1) scheduleUntil(Infinity);
   const out = await oc.startRendering();
   // Fade the tail gently to avoid a cut-off.
   const fadeLen = Math.floor(sr * Math.min(tail, 1));

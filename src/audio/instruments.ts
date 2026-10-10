@@ -749,7 +749,8 @@ const CHOKES: Record<number, number[]> = { 42: [46], 44: [46] };
 export class DrumKitInstrument extends BaseInstrument {
   private buffers = new Map<number, AudioBuffer>();
   private def: DrumKitDef;
-  private openVoices = new Map<number, Voice>();
+  /** Ringing voices that can be choked (open hats), with their start times. */
+  private chokeable: { pitch: number; start: number; voice: Voice }[] = [];
 
   constructor(ctx: BaseAudioContext, def: DrumKitDef, pitches: number[]) {
     super(ctx);
@@ -774,9 +775,15 @@ export class DrumKitInstrument extends BaseInstrument {
       synthDrum(this.def.synth, pitch).then((b) => this.buffers.set(pitch, b));
       return null;
     }
-    for (const victim of CHOKES[pitch] ?? []) {
-      const v = this.openVoices.get(victim);
-      if (v) v.stopHard(time);
+    const victims = CHOKES[pitch];
+    if (victims) {
+      // Notes may be scheduled out of time order (offline export), so only choke
+      // voices that have actually started and are still ringing at `time`.
+      for (const c of this.chokeable)
+        if (victims.includes(c.pitch) && c.start < time && c.voice.endTime > time) {
+          c.voice.stopHard(time);
+          c.voice.endTime = time + 0.06;
+        }
     }
     const ctx = this.ctx;
     const src = ctx.createBufferSource();
@@ -804,7 +811,11 @@ export class DrumKitInstrument extends BaseInstrument {
         }
       },
     };
-    if (pitch === 46) this.openVoices.set(46, voice);
+    if (pitch === 46) {
+      const now = ctx.currentTime;
+      this.chokeable = this.chokeable.filter((c) => c.voice.endTime > now);
+      this.chokeable.push({ pitch, start: time, voice });
+    }
     return voice;
   }
 }
