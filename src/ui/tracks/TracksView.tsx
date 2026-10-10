@@ -8,6 +8,7 @@ import { startDrag } from '../common/drag';
 import TrackRow, { useArmedMic } from './TrackRow';
 import AutomationLane from './AutomationLane';
 import ArrangementLane from './ArrangementLane';
+import ChordLane, { ChordToggleButton } from '../assistant/ChordLane';
 import { HEADER_W, RULER_H, useTracksUi } from './tracksUi';
 import './tracks.css';
 
@@ -239,6 +240,7 @@ function Toolbar({ viewW }: { viewW: number }) {
       <button className={'btn sm' + (showArrangement ? ' active' : '')} onClick={() => useTracksUi.setState({ showArrangement: !showArrangement })} title="Show the arrangement track (song sections)">
         <LayoutList size={13} /> Arrangement
       </button>
+      <ChordToggleButton />
       <div className="spacer" />
       <div className="tv-hint faint">
         Double-click empty space for a new region · <kbd>⌥</kbd> drag copies · drag the top-right corner to loop · <kbd>⌘T</kbd> split
@@ -368,6 +370,7 @@ export default function TracksView() {
           </div>
 
           {showArrangement && <ArrangementLane width={width} ppb={ppb} />}
+          <ChordLane width={width} ppb={ppb} />
 
           {showMaster && (
             <div className="track-block master-block">

@@ -68,7 +68,7 @@ export const QUALITY_LABEL: Record<ChordQuality, string> = {
   '9': '9',
 };
 
-export const ALL_QUALITIES = Object.keys(QUALITY_INTERVALS) as ChordQuality[];
+export const ALL_QUALITIES: ChordQuality[] = ['', 'm', '7', 'maj7', 'm7', 'sus2', 'sus4', 'dim', 'aug', 'add9', '6', 'm6', '9', 'm9'];
 
 /** Spell a chord root sensibly for the key (flats for flat keys and borrowed ♭ chords). */
 export function rootName(pc: number, key: KeySignature): string {

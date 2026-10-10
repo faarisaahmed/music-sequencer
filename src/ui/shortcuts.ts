@@ -147,6 +147,9 @@ export function useGlobalShortcuts(): void {
         case 'x':
           useStore.setState({ dockTab: s.dockTab === 'mixer' ? null : 'mixer', dockMaximized: false });
           break;
+        case 'w':
+          useStore.setState({ dockTab: s.dockTab === 'assistant' ? null : 'assistant', dockMaximized: false });
+          break;
         case 'b':
           useStore.setState({ dockTab: s.dockTab === 'fx' ? null : 'fx', dockMaximized: false });
           break;

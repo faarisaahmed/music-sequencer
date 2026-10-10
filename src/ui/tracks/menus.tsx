@@ -276,6 +276,11 @@ export function trackMenu(t: Track): MenuItem[] {
             icon: <Music size={14} />,
             onClick: () => useStore.setState({ libraryOpen: true, selectedTrackId: t.id }),
           },
+          {
+            label: 'Generate Part…',
+            icon: <Music size={14} />,
+            onClick: () => useStore.setState({ dockTab: 'assistant', dockMaximized: false, selectedTrackId: t.id }),
+          },
         ]
       : []),
     {

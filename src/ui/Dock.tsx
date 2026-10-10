@@ -4,12 +4,14 @@ import EditorPanel from './editors/EditorPanel';
 import InstrumentPanel from './instruments/InstrumentPanel';
 import MixerPanel from './mixer/MixerPanel';
 import FxPanel from './mixer/FxPanel';
+import AssistantPanel from './assistant/AssistantPanel';
 
 const TABS: { id: DockTab; label: string }[] = [
   { id: 'fx', label: 'Smart Controls' },
   { id: 'editor', label: 'Editor' },
   { id: 'instrument', label: 'Instrument' },
   { id: 'mixer', label: 'Mixer' },
+  { id: 'assistant', label: 'Songwriter' },
 ];
 
 export default function Dock() {
@@ -36,6 +38,7 @@ export default function Dock() {
         {tab === 'instrument' && <InstrumentPanel />}
         {tab === 'mixer' && <MixerPanel />}
         {tab === 'fx' && <FxPanel />}
+        {tab === 'assistant' && <AssistantPanel />}
       </div>
     </div>
   );

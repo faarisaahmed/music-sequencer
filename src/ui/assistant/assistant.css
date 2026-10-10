@@ -1,0 +1,386 @@
+/* ---------------------------------------------------------- chord track */
+.chord-row {
+  background: #15151a;
+  border-bottom: 1px solid #0d0d10;
+}
+.chord-header {
+  --c: var(--cycle);
+  justify-content: center;
+}
+.chord-header .th-name {
+  font-weight: 600;
+  font-size: 12px;
+}
+.chord-lane {
+  position: relative;
+  height: 100%;
+  cursor: copy;
+}
+.chord-empty {
+  position: sticky;
+  left: 8px;
+  display: inline-block;
+  padding: 9px 10px;
+  color: var(--text-faint);
+  font-size: 11.5px;
+  pointer-events: none;
+}
+.chord-block {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  border-radius: 5px;
+  background: linear-gradient(#3a3320, #2d2818);
+  border: 1px solid #6b5a22;
+  color: #ffe9a3;
+  font-weight: 650;
+  font-size: 12.5px;
+  display: flex;
+  align-items: center;
+  padding: 0 7px;
+  cursor: grab;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.chord-block:hover {
+  border-color: var(--cycle);
+}
+.chord-block span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+.chord-edge {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 7px;
+  cursor: ew-resize;
+}
+
+/* ---------------------------------------------------------- chord picker */
+.chord-picker {
+  position: fixed;
+  z-index: 950;
+  width: 400px;
+  background: rgba(36, 36, 42, 0.98);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 12px;
+  animation: pop-in 0.14s ease;
+}
+.cp-title {
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin: 8px 0 5px;
+}
+.cp-title:first-child {
+  margin-top: 0;
+}
+.cp-diatonic {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.cp-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.cp-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  border: 1px solid var(--border-soft);
+  background: var(--panel-2);
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.cp-chip b {
+  font-size: 13px;
+}
+.cp-chip span {
+  font-size: 9.5px;
+  color: var(--text-faint);
+}
+.cp-chip.big {
+  padding: 6px 2px;
+}
+.cp-chip:hover {
+  border-color: var(--cycle);
+  background: #3a3320;
+}
+.cp-chip.on {
+  border-color: var(--cycle);
+  background: #4a3e14;
+}
+.cp-roots,
+.cp-quals {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 3px;
+}
+.cp-quals {
+  grid-template-columns: repeat(7, 1fr);
+  margin-top: 4px;
+}
+.cp-root {
+  border: 1px solid var(--border-soft);
+  background: var(--bg-2);
+  border-radius: 4px;
+  height: 24px;
+  font-size: 11.5px;
+  cursor: pointer;
+  padding: 0;
+}
+.cp-root:hover {
+  background: var(--panel-3);
+}
+.cp-root.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+/* ---------------------------------------------------------- assistant panel */
+.assistant {
+  height: 100%;
+  overflow: auto;
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  align-items: stretch;
+}
+.as-card {
+  background: var(--panel-2);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 340px;
+  flex-shrink: 0;
+  min-height: 0;
+  overflow: auto;
+}
+.as-card.wide {
+  flex: 1;
+  width: auto;
+  min-width: 420px;
+}
+.as-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.as-head h4 {
+  margin: 0;
+  font-size: 13.5px;
+}
+.as-sub {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+.as-progs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+.as-prog {
+  text-align: left;
+  border: 1px solid var(--border-soft);
+  background: var(--bg-2);
+  border-radius: 6px;
+  padding: 5px 8px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+}
+.as-prog:hover {
+  border-color: var(--cycle);
+}
+.as-prog b {
+  font-size: 12px;
+}
+.as-prog span {
+  font-size: 10.5px;
+  color: var(--text-faint);
+  font-family: var(--mono);
+}
+.as-track {
+  gap: 6px;
+}
+.as-styles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 5px;
+}
+.as-style {
+  text-align: left;
+  border: 1px solid var(--border-soft);
+  background: var(--bg-2);
+  border-radius: 7px;
+  padding: 6px 9px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.as-style b {
+  font-size: 12.5px;
+}
+.as-style span {
+  font-size: 10.5px;
+  color: var(--text-faint);
+}
+.as-style.other {
+  opacity: 0.6;
+}
+.as-style:hover {
+  border-color: var(--accent);
+  opacity: 1;
+}
+.as-style.on {
+  border-color: var(--accent);
+  background: rgba(47, 140, 255, 0.18);
+  opacity: 1;
+}
+.as-controls {
+  flex-wrap: wrap;
+}
+.as-big {
+  height: 34px;
+  justify-content: flex-start;
+}
+.as-note {
+  font-size: 11.5px;
+  margin-top: -2px;
+}
+.cp-chip b svg {
+  vertical-align: -1px;
+}
+
+/* ---------------------------------------------------------- song wizard */
+.wiz {
+  display: flex;
+  gap: 18px;
+}
+.wiz-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.wiz-col.narrow {
+  flex: 0 0 290px;
+}
+.wiz-label {
+  font-size: 10.5px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  margin-top: 8px;
+}
+.wiz-genres {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 5px;
+}
+.wiz-genre {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--border-soft);
+  background: var(--panel-2);
+  border-radius: 8px;
+  padding: 7px 9px;
+  cursor: pointer;
+  font-weight: 550;
+  text-align: left;
+}
+.wiz-genre:hover {
+  border-color: var(--accent);
+}
+.wiz-genre.on {
+  border-color: var(--pink);
+  background: rgba(255, 45, 146, 0.16);
+}
+.wiz-emoji {
+  font-size: 16px;
+}
+.wiz-pill {
+  border: 1px solid var(--border-soft);
+  background: var(--panel-2);
+  border-radius: 99px;
+  padding: 4px 12px;
+  cursor: pointer;
+  font-size: 12.5px;
+}
+.wiz-pill.on {
+  border-color: var(--accent);
+  background: rgba(47, 140, 255, 0.2);
+  color: var(--accent-2);
+}
+.wiz-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1.3fr 1fr;
+  gap: 10px;
+}
+.wiz-chords {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--bg-2);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+}
+.wiz-sec-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.wiz-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 340px;
+  overflow: auto;
+}
+.wiz-sec {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--panel-2);
+  border-radius: 6px;
+  border-left: 4px solid;
+  padding: 3px 4px 3px 6px;
+}
+.wiz-sec select {
+  padding: 2px 4px;
+}
+
+.quick-card.wizard {
+  background: linear-gradient(150deg, #3a1236, #1d1a44);
+  border-color: #6a2a6a;
+}
+.quick-card.wizard .quick-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #ffb8e0;
+}

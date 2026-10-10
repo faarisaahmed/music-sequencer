@@ -107,7 +107,7 @@ function startArp(trackId: string) {
     const rate = usePlayer.getState().arpRate;
     const pos = engine.position;
     const nextStep = Math.ceil(pos / rate - 0.05) * rate;
-    arpNextTime = Math.max(now, engine.ctx.currentTime + ((nextStep - pos) * 60) / p.bpm);
+    arpNextTime = Math.max(engine.ctx.currentTime + 0.002, engine.ctx.currentTime + ((nextStep - pos) * 60) / p.bpm);
   }
   arpTick();
   arpTimer = setInterval(arpTick, ARP_TICK_MS);

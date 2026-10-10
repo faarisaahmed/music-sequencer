@@ -341,9 +341,8 @@
   background: rgba(47, 140, 255, 0.22);
 }
 .tb-center {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  /* Centred in the free space between the side groups (never overlaps them). */
+  margin: 0 auto;
   display: flex;
   z-index: 1;
   align-items: center;

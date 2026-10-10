@@ -20,6 +20,7 @@ import {
   Volume2,
   Check,
   Loader2,
+  Wand2,
 } from 'lucide-react';
 import { beginGesture, commit, endGesture, live, openModal, redo, undo, useStore, useTransport, type DockTab } from '../state/store';
 import { closeProject, setBpm, setKey } from '../state/actions';
@@ -241,6 +242,7 @@ export default function TopBar() {
         <DockButton tab="editor" icon={<SquarePen size={17} />} label="Editor" shortcut="E" />
         <DockButton tab="instrument" icon={<Piano size={17} />} label="Instrument / Keyboard" shortcut="P" />
         <DockButton tab="mixer" icon={<SlidersVertical size={17} />} label="Mixer" shortcut="X" />
+        <DockButton tab="assistant" icon={<Wand2 size={17} />} label="Songwriter: chords, auto-accompaniment & Song Wizard" shortcut="W" />
         <FullScoreButton />
         <button className="btn icon tb" title="New Track (⌥⌘N)" onClick={() => openModal('newTrack')}>
           <Plus size={18} />
