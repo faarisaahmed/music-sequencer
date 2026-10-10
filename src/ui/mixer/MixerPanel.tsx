@@ -169,15 +169,19 @@ export default function MixerPanel() {
   const sel = useStore((s) => s.selectedTrackId);
   return (
     <div className="mixer">
-      {p.tracks.map((t) => (
-        <Strip key={t.id} t={t} selected={t.id === sel} />
-      ))}
-      <button className="mixer-add" title="New Track" onClick={() => openModal('newTrack')}>
-        <Plus size={20} />
-      </button>
-      <div className="spacer" style={{ minWidth: 8 }} />
-      <MasteringCard p={p} />
-      <MasterStrip p={p} />
+      <div className="mixer-strips">
+        {p.tracks.map((t) => (
+          <Strip key={t.id} t={t} selected={t.id === sel} />
+        ))}
+        <button className="mixer-add" title="New Track" onClick={() => openModal('newTrack')}>
+          <Plus size={20} />
+        </button>
+      </div>
+      {/* Mastering and the master strip stay pinned while track strips scroll. */}
+      <div className="mixer-pinned">
+        <MasteringCard p={p} />
+        <MasterStrip p={p} />
+      </div>
     </div>
   );
 }

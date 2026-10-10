@@ -2,11 +2,25 @@
 .mixer {
   height: 100%;
   display: flex;
+  overflow: hidden;
+  background: linear-gradient(#26262b, #1c1c20);
+}
+.mixer-strips {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 6px;
+  padding: 8px;
   overflow-x: auto;
   overflow-y: hidden;
-  background: linear-gradient(#26262b, #1c1c20);
-  padding: 8px;
+}
+.mixer-pinned {
+  display: flex;
   gap: 6px;
+  padding: 8px 8px 8px 10px;
+  flex-shrink: 0;
+  border-left: 1px solid #111114;
+  box-shadow: -8px 0 16px rgba(0, 0, 0, 0.35);
 }
 .strip {
   width: 150px;
