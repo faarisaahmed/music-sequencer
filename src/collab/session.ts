@@ -16,7 +16,7 @@ import { useStore, toast, pruneSelection } from '../state/store';
 import { openProject, migrate } from '../state/actions';
 import { getEngine } from '../audio/engine';
 import { addClip, getBuffer, getClipBlob, ensureClips } from '../audio/audioStore';
-import { projectAudioIds, saveProject } from '../state/persistence';
+import { flushSave, projectAudioIds, saveProject } from '../state/persistence';
 import { applyDelta, computeDelta, deltaKeys, filterDelta, hashProject, type Delta } from './sync';
 import { useCollab, loadIdentity, type Peer } from './state';
 
@@ -95,6 +95,8 @@ let lostPeerAt: number | null = null;
 let lostPeerName = '';
 let lastReconnectAt = 0;
 let reconnectBackoff = 8000;
+/** When we started trying to join (to retry if nobody has answered yet). */
+let joinStartedAt = 0;
 let lastHashSent: { project: Project | null; hash: string } = { project: null, hash: '' };
 let ignoreTransportUntil = 0;
 let gapTimer: ReturnType<typeof setTimeout> | null = null;
@@ -368,6 +370,7 @@ async function receiveSnapshot(msg: SnapshotMsg, from: string): Promise<void> {
   for (const op of pendingOps) project = applyDelta(project, op.d);
   const first = !synced;
   projectId = incoming.id;
+  if (code) joinedHere.set(code, incoming.id);
   seq = msg.seq;
   awaitingSnapshot = false;
   synced = true;
@@ -840,6 +843,18 @@ function connect(roomCode: string, reconnecting = false): void {
         return;
       }
     }
+    // Still trying to join and nobody has answered: re-enter the room so fresh announcements go
+    // out (the host may have still been tearing down an old connection to us, after which the
+    // relays only re-announce once a minute).
+    if (!synced && !hostId && !Object.keys(peersState()).length && joinStartedAt) {
+      const now = Date.now();
+      if (now - joinStartedAt > 7000 && now - lastReconnectAt > reconnectBackoff) {
+        lastReconnectAt = now;
+        reconnectBackoff = Math.min(60000, reconnectBackoff * 2);
+        void reconnectRoom();
+        return;
+      }
+    }
     // A snapshot download that stalled (e.g. the connection hiccupped mid-transfer): ask again.
     if (awaitingSnapshot && hostId && !isHost) {
       const now = Date.now();
@@ -940,6 +955,7 @@ export async function startSession(roomCode: string): Promise<void> {
   const p = useStore.getState().project;
   if (!p) return;
   projectId = p.id;
+  joinedHere.set(roomCode, p.id);
   isHost = true;
   hostId = selfId;
   synced = true;
@@ -960,8 +976,36 @@ export async function startSession(roomCode: string): Promise<void> {
  * Join an existing session. If nobody answers and we already have this session's song
  * locally (e.g. after a page reload), we continue the session as host.
  */
+/**
+ * Sessions this tab has already been part of, with the song id we had for each.
+ * Trystero's peer id is fixed for the life of the page, and the other peers keep handshake
+ * state about that id for a while after we leave — so re-entering the same room from this tab
+ * can stall for 20s+. Rejoining instead reloads the page (fresh identity) and resumes through
+ * the normal reload-rejoin path, which reopens our saved copy of the song.
+ */
+const joinedHere = new Map<string, string>();
+
+async function rejoinViaReload(roomCode: string, songId: string): Promise<void> {
+  await flushSave();
+  try {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ code: roomCode, projectId: songId }));
+  } catch {
+    /* ignore */
+  }
+  setStatus('connecting', 'Rejoining the session…');
+  location.hash = 'jam=' + roomCode;
+  location.reload();
+}
+
 export async function joinSession(roomCode: string, localProjectId?: string): Promise<void> {
+  if (room && code === roomCode) return; // already in this session
+  const previous = joinedHere.get(roomCode);
+  if (previous !== undefined && !room) {
+    await rejoinViaReload(roomCode, localProjectId ?? previous);
+    return;
+  }
   if (room) await leaveSession(true);
+  joinedHere.set(roomCode, localProjectId ?? '');
   isHost = false;
   hostId = null;
   synced = false;
@@ -973,6 +1017,9 @@ export async function joinSession(roomCode: string, localProjectId?: string): Pr
   awaitingSnapshot = false;
   useCollab.setState({ hostId: null, joinProgress: null });
   setStatus('connecting', 'Looking for the session…');
+  joinStartedAt = Date.now();
+  lastReconnectAt = 0;
+  reconnectBackoff = 7000;
   connect(roomCode);
   setUrlCode(roomCode);
   if (aloneTimer) clearTimeout(aloneTimer);
@@ -1018,6 +1065,7 @@ export async function leaveSession(silent = false, why?: string): Promise<void> 
   splitLog = [];
   lostPeerAt = null;
   reconnectBackoff = 8000;
+  joinStartedAt = 0;
   isHost = false;
   hostId = null;
   hostChanged = false;

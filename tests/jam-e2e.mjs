@@ -190,7 +190,7 @@ try {
   await C.page.click('.home-section-head button').catch(() => {});
   await ev(C, async () => (window.__bf.store).openModal('collab'));
   await C.page.fill('input[placeholder="ABCD-EFGH"]', code.toLowerCase().replace('-', ' '));
-  await C.page.click('button:has-text("Join")');
+  await C.page.click('.jam-card button:has-text("Join")');
   await converged([A, B, C], 60000, 'C join');
   results.joinC_ms = Date.now() - tC;
   log('C joined in', results.joinC_ms);

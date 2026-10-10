@@ -39,7 +39,9 @@ try {
     await A.page.waitForSelector('.jam-code');
     await shot(A, `${tag}-2-started`);
     const code = (await A.page.textContent('.jam-code')).trim();
-    const roomsA = await ev(A, () => window.__qa.pcs.length);
+    await new Promise((r) => setTimeout(r, 1200));
+    // A double-click must start exactly one session: the code shown stays the session's code.
+    const single = (await A.page.textContent('.jam-code')).trim() === code && (await collab(A)).code === code;
     await A.page.click('text=Done');
     await shot(A, `${tag}-3-waiting-bar`);
 
@@ -71,7 +73,7 @@ try {
     await A.page.click('.jam-bar-main');
     await shot(A, `${tag}-10-session-dialog`);
     await A.page.keyboard.press('Escape');
-    check(`ui-${tag}`, roomsA <= 1 && !errors.length, { code, peerConnectionsAfterDoubleClick: roomsA });
+    check(`ui-${tag}`, single && !errors.length, { code, singleSessionAfterDoubleClick: single });
     await A.ctx.close();
     await B.ctx.close();
   }
@@ -80,7 +82,7 @@ try {
   const E = await newPeer('E');
   await ev(E, () => window.__bf.store.openModal('collab'));
   await E.page.fill('input[placeholder="ABCD-EFGH"]', 'hello');
-  await E.page.click('button:has-text("Join")');
+  await E.page.click('.jam-card button:has-text("Join")');
   await sleep(300);
   const badToast = await T.toastsOf(E);
   await shot(E, 'err-bad-code');
@@ -88,7 +90,7 @@ try {
 
   // ---- Error: valid code but nobody there.
   await E.page.fill('input[placeholder="ABCD-EFGH"]', 'ZZZZ-ZZZZ');
-  await E.page.click('button:has-text("Join")');
+  await E.page.click('.jam-card button:has-text("Join")');
   await sleep(11000);
   const nobody = await collab(E);
   await shot(E, 'err-nobody');
@@ -166,7 +168,9 @@ try {
 
   // ---- Leave & rejoin 10 times: no leaked intervals / window listeners.
   const L = await newPeer('L');
-  const base = await ev(L, () => ({ intervals: window.__qa.intervals.size, listeners: window.__qa.listeners }));
+  // online/offline listeners are removed by trystero via AbortSignal (invisible to our counter).
+  const count = () => ev(L, () => ({ intervals: window.__qa.intervals.size, listeners: Object.entries(window.__qa.types).filter(([k]) => k !== 'online' && k !== 'offline').reduce((n, [, v]) => n + v, 0) }));
+  const base = await count();
   for (let i = 0; i < 10; i++) {
     await join(L, code4);
     await converged([W1, L], 30000, 'rejoin ' + i);
@@ -174,8 +178,8 @@ try {
     await ev(L, async () => window.__bf.actions.closeProject());
   }
   await sleep(1500);
-  const end = await ev(L, () => ({ intervals: window.__qa.intervals.size, listeners: window.__qa.listeners }));
-  check('noLeaksAfter10Rejoins', end.intervals - base.intervals <= 2 && end.listeners - base.listeners <= 4, { base, end });
+  const end = await count();
+  check('noLeaksAfter10Rejoins', end.intervals - base.intervals <= 1 && end.listeners - base.listeners <= 1, { base, end });
 } catch (e) {
   results.error = String(e.stack || e);
 }
