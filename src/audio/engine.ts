@@ -323,6 +323,26 @@ class Engine {
     }
   }
 
+  /**
+   * Play a note at a precise future audio-context time (arpeggiator etc.).
+   * Recorded like a live note when recording on this track.
+   */
+  playScheduled(trackId: string, pitch: number, velocity: number, time: number, seconds: number): void {
+    const ch = this.mixer.channels.get(trackId);
+    const t = findTrack(this.project, trackId);
+    if (!ch?.instrument || !t) return;
+    const transpose = t.type === 'drums' ? 0 : t.transpose;
+    ch.instrument.playNote(pitch + transpose, velocity, time, seconds);
+    const delayMs = Math.max(0, (time - this.ctx.currentTime) * 1000);
+    setTimeout(() => this.liveListeners.forEach((f) => f(pitch, true, trackId)), delayMs);
+    setTimeout(() => this.liveListeners.forEach((f) => f(pitch, false, trackId)), delayMs + seconds * 1000);
+    const rec = this.rec;
+    if (rec && rec.kind === 'midi' && rec.trackId === trackId && this.playing) {
+      const start = this.beatAt(time);
+      if (start >= rec.startBeat - 1e-6) this.pushRecordedNote(pitch, start, start + seconds / this.spb, velocity);
+    }
+  }
+
   private pushRecordedNote(pitch: number, start: number, end: number, velocity: number): void {
     const rec = this.rec;
     const p = this.project;

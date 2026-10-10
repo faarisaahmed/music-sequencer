@@ -35,13 +35,16 @@ interface ArpNote {
 }
 let arpPool: ArpNote[] = [];
 let arpTrack: string | null = null;
-let arpTimer: ReturnType<typeof setTimeout> | null = null;
+let arpTimer: ReturnType<typeof setInterval> | null = null;
 let arpIndex = 0;
 let arpDir = 1;
 let arpOrder = 0;
-let arpLast: number | null = null;
-let arpNext = 0;
+/** Audio-context time of the next arpeggiator step. */
+let arpNextTime = 0;
 let arpVelocity = 0.8;
+
+const ARP_LOOKAHEAD = 0.1; // seconds scheduled ahead of the audio clock
+const ARP_TICK_MS = 20;
 
 function arpSequence(): number[] {
   const st = usePlayer.getState();
@@ -51,48 +54,43 @@ function arpSequence(): number[] {
   return seq;
 }
 
-function arpStep() {
-  const engine = getEngine();
+function nextArpPitch(seq: number[]): number {
   const st = usePlayer.getState();
-  const p = useStore.getState().project;
-  if (!arpTrack || !p) return stopArp();
-  const seq = arpSequence();
-  if (!seq.length) return stopArp();
-  let pitch: number;
-  if (st.arp === 'random') pitch = seq[Math.floor(Math.random() * seq.length)];
-  else if (st.arp === 'down') {
+  if (st.arp === 'random') return seq[Math.floor(Math.random() * seq.length)];
+  if (st.arp === 'down') {
     arpIndex = ((arpIndex % seq.length) + seq.length) % seq.length;
-    pitch = seq[seq.length - 1 - arpIndex];
-    arpIndex++;
-  } else if (st.arp === 'updown') {
+    return seq[seq.length - 1 - arpIndex++];
+  }
+  if (st.arp === 'updown') {
     if (seq.length === 1) arpIndex = 0;
     else {
       if (arpIndex >= seq.length - 1) arpDir = -1;
       if (arpIndex <= 0) arpDir = 1;
     }
     arpIndex = Math.max(0, Math.min(seq.length - 1, arpIndex));
-    pitch = seq[arpIndex];
+    const p = seq[arpIndex];
     arpIndex += arpDir;
-  } else {
-    arpIndex = arpIndex % seq.length;
-    pitch = seq[arpIndex];
-    arpIndex++;
+    return p;
   }
-  const stepMs = ((st.arpRate * 60) / p.bpm) * 1000;
-  const track = arpTrack;
-  if (arpLast !== null) engine.noteOff(track, arpLast);
-  engine.noteOn(track, pitch, arpVelocity);
-  arpLast = pitch;
-  const played = pitch;
-  setTimeout(() => {
-    if (arpLast === played) {
-      engine.noteOff(track, played);
-      arpLast = null;
-    }
-  }, stepMs * st.arpGate);
-  // Drift-free scheduling against performance.now().
-  arpNext += stepMs;
-  arpTimer = setTimeout(arpStep, Math.max(0, arpNext - performance.now()));
+  arpIndex = arpIndex % seq.length;
+  return seq[arpIndex++];
+}
+
+/** Lookahead scheduler: queue every step that falls inside the next ARP_LOOKAHEAD seconds. */
+function arpTick() {
+  const engine = getEngine();
+  const st = usePlayer.getState();
+  const p = useStore.getState().project;
+  if (!arpTrack || !p) return stopArp();
+  const seq = arpSequence();
+  if (!seq.length) return stopArp();
+  const stepSec = (st.arpRate * 60) / p.bpm;
+  const now = engine.ctx.currentTime;
+  if (arpNextTime < now - stepSec) arpNextTime = now; // fell behind (tab hidden) — resync
+  while (arpNextTime < now + ARP_LOOKAHEAD) {
+    engine.playScheduled(arpTrack, nextArpPitch(seq), arpVelocity, Math.max(arpNextTime, now), stepSec * st.arpGate);
+    arpNextTime += stepSec;
+  }
 }
 
 function startArp(trackId: string) {
@@ -100,15 +98,24 @@ function startArp(trackId: string) {
   if (arpTimer) return;
   arpIndex = 0;
   arpDir = 1;
-  arpNext = performance.now();
-  arpStep();
+  const engine = getEngine();
+  const now = engine.ctx.currentTime + 0.01;
+  arpNextTime = now;
+  // While the song plays, lock the pattern to the beat grid.
+  const p = useStore.getState().project;
+  if (engine.isPlaying && p) {
+    const rate = usePlayer.getState().arpRate;
+    const pos = engine.position;
+    const nextStep = Math.ceil(pos / rate - 0.05) * rate;
+    arpNextTime = Math.max(now, engine.ctx.currentTime + ((nextStep - pos) * 60) / p.bpm);
+  }
+  arpTick();
+  arpTimer = setInterval(arpTick, ARP_TICK_MS);
 }
 
 function stopArp() {
-  if (arpTimer) clearTimeout(arpTimer);
+  if (arpTimer) clearInterval(arpTimer);
   arpTimer = null;
-  if (arpLast !== null && arpTrack) getEngine().noteOff(arpTrack, arpLast);
-  arpLast = null;
   arpPool = [];
 }
 
