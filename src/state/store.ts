@@ -72,7 +72,7 @@ export const useStore = create<AppState>(() => ({
   editingRegionId: null,
   selectedNoteIds: [],
   dockTab: null,
-  dockHeight: 340,
+  dockHeight: typeof window !== 'undefined' ? Math.max(300, Math.round(window.innerHeight * 0.46)) : 380,
   dockMaximized: false,
   editorMode: 'pianoroll',
   libraryOpen: false,

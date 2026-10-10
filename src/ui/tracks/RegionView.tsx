@@ -5,7 +5,9 @@ import { placedNotes, regionSegments } from '../../model/regions';
 import { DRUM_LANES } from '../../model/music';
 import { commit, draftRegion, useStore } from '../../state/store';
 import { getPeaks, getBuffer, onAudioChange } from '../../audio/audioStore';
-import { showContextMenu, showPillMenu } from '../common/menus';
+import { closeMenus, showContextMenu, showPillMenu } from '../common/menus';
+
+let pillTimer: ReturnType<typeof setTimeout> | null = null;
 import { dragFade, dragLoop, dragMove, dragResizeLeft, dragResizeRight } from './regionOps';
 import { openRegionEditor, regionMenu, regionPillItems } from './menus';
 import { useTracksUi } from './tracksUi';
@@ -199,7 +201,10 @@ function RegionView({ region: r, trackId, trackType, color, ppb, height, bpm }: 
     dragMove(e, r.id, () => {
       if (wasSelected && !additive) {
         const rect = target.getBoundingClientRect();
-        showPillMenu(e.clientX, rect.top, regionPillItems(r.id));
+        const x = e.clientX;
+        // Delay so a double-click (open editor) can cancel the pill menu.
+        if (pillTimer) clearTimeout(pillTimer);
+        pillTimer = setTimeout(() => showPillMenu(x, rect.top, regionPillItems(r.id)), 260);
       }
     });
   };
@@ -223,6 +228,9 @@ function RegionView({ region: r, trackId, trackType, color, ppb, height, bpm }: 
       onPointerDown={onPointerDown}
       onDoubleClick={(e) => {
         e.stopPropagation();
+        if (pillTimer) clearTimeout(pillTimer);
+        pillTimer = null;
+        closeMenus();
         openRegionEditor(r.id);
       }}
       onContextMenu={(e) => {

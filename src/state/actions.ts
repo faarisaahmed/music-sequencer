@@ -171,7 +171,14 @@ export function createEmptyRegion(trackId: string, start: number, length?: numbe
     d.tracks.find((x) => x.id === trackId)?.regions.push(r);
     growSong(d, r.start + r.length);
   });
-  useStore.setState({ selectedRegionIds: [r.id], editingRegionId: r.id, selectedTrackId: trackId });
+  const st = useStore.getState();
+  useStore.setState({
+    selectedRegionIds: [r.id],
+    editingRegionId: r.id,
+    selectedTrackId: trackId,
+    // Open the editor so the new region can be filled straight away.
+    ...(st.dockTab === null || st.dockTab === 'mixer' ? { dockTab: 'editor' as const, editorMode: t.type === 'drums' ? ('steps' as const) : st.editorMode === 'score' ? ('score' as const) : ('pianoroll' as const) } : {}),
+  });
   return r.id;
 }
 

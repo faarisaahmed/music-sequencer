@@ -89,7 +89,7 @@ function PianoRollInner({ region, track, bpb, selectedIds }: { region: MidiRegio
   const [qStrength, setQStrength] = useState(1);
   const [scaleMode, setScaleMode] = useState(false);
   const [velLane, setVelLane] = useState(true);
-  const [velH, setVelH] = useState(84);
+  const [velH, setVelH] = useState(64);
   const [scroll, setScroll] = useState({ x: 0, y: 0 });
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);

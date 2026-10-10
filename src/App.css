@@ -503,6 +503,10 @@
   flex: 1;
   display: flex;
   min-height: 0;
+  /* Keep the panels' internal z-indexes below the top bar's popovers. */
+  position: relative;
+  isolation: isolate;
+  z-index: 0;
 }
 .main-col {
   flex: 1;
