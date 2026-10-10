@@ -18,6 +18,7 @@ A full music studio in the browser, inspired by GarageBand, with a MuseScore-sty
 - **Mix:** mixer, smart controls, EQ, compressor, drive, chorus, reverb and delay; volume/pan automation and master fades.
 - **Song settings:** tempo, key (with transpose) and time signature.
 - **Export:** MP3, WAV, MIDI and per-track stems.
+- **Jam Sessions:** make music with friends in real time. Click the people icon, start a session and share the link; everyone edits the same song live, with presence, chat and optional synced playback. Browsers connect peer-to-peer (no account or server).
 
 Press `?` in a song for keyboard shortcuts.
 
