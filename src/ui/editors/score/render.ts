@@ -448,6 +448,8 @@ function drawSystem(ctx: DrawCtx, plan: ScorePlan, li: number, layout: ScoreLayo
                 sn.addModifier(art, 0);
               }
             }
+            // Voice-2 filler rests are hidden (as MuseScore does for a second voice) so held notes read cleanly.
+            if (piece.rest && vi === 1) sn.setStyle({ fillStyle: 'transparent', strokeStyle: 'transparent' });
             if (/d/.test(code) && !piece.wholeMeasure) Dot.buildAndAttach([sn], { all: true });
             sn.setStave(staves[si]);
             notes.push(sn);

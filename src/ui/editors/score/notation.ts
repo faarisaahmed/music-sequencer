@@ -580,6 +580,61 @@ function buildVoice(list: QNote[], ms: number, bpb: number, win: Map<number, Win
   return pieces;
 }
 
+/**
+ * Long notes that stop a little early (a typical played or sequenced release) are written
+ * as lasting up to the next note in their voice, or to the next beat — so a chord held for
+ * two bars reads as two tied whole notes rather than "whole + dotted half + eighth + 16th rest".
+ */
+function closeLegatoGaps(notes: QNote[]): void {
+  const groups = new Map<string, QNote[]>();
+  for (const n of notes) {
+    const k = `${n.staff}:${n.voice}`;
+    groups.set(k, [...(groups.get(k) ?? []), n]);
+  }
+  for (const list of groups.values()) {
+    const onsets = [...new Set(list.map((n) => n.s))].sort((a, b) => a - b);
+    for (const n of list) {
+      const len = n.e - n.s;
+      if (len < 1 - 1e-6) continue;
+      const maxGap = Math.min(0.5, len * 0.125) + 1e-6;
+      const next = onsets.find((o) => o >= n.e - 1e-6);
+      const target = next !== undefined && next - n.e <= maxGap ? next : Math.ceil(n.e - 1e-6);
+      if (target > n.e + 1e-6 && target - n.e <= maxGap && (next === undefined || target <= next + 1e-6)) n.e = target;
+    }
+  }
+}
+
+/**
+ * Split overlapping notes on one staff into two voices, like MuseScore/Flat do on import:
+ * a note held while other notes start and stop above or below it goes into its own voice
+ * instead of being chopped into tied pieces. The lower line takes voice 2 (stems down).
+ * Only notes without an explicit voice are moved.
+ */
+function autoVoices(list: { n: RawNote; wpitch: number; staff: number; voice: 1 | 2 }[], grid: number): void {
+  const tol = Math.max(0.06, grid * 0.6);
+  const byStaff = new Map<number, typeof list>();
+  for (const p of list) if (!p.n.voice) byStaff.set(p.staff, [...(byStaff.get(p.staff) ?? []), p]);
+  for (const notes of byStaff.values()) {
+    if (notes.length < 2) continue;
+    // Chords: notes that start and end together.
+    notes.sort((a, b) => a.n.s - b.n.s || a.n.e - b.n.e);
+    const chords: { s: number; e: number; mean: number; members: typeof list }[] = [];
+    for (const p of notes) {
+      const c = chords.find((x) => Math.abs(x.s - p.n.s) < tol && Math.abs(x.e - p.n.e) < tol);
+      if (c) c.members.push(p);
+      else chords.push({ s: p.n.s, e: p.n.e, mean: 0, members: [p] });
+    }
+    if (chords.length < 2) continue;
+    for (const c of chords) c.mean = c.members.reduce((a, p) => a + p.wpitch, 0) / c.members.length;
+    const overlaps = (a: (typeof chords)[number], b: (typeof chords)[number]) => a.s < b.e - tol && b.s < a.e - tol;
+    for (const c of chords) {
+      // Lower than something it overlaps with (or equal height but longer) → the lower voice.
+      const lower = chords.some((o) => o !== c && overlaps(c, o) && (o.mean > c.mean + 0.01 || (Math.abs(o.mean - c.mean) <= 0.01 && c.e - c.s > o.e - o.s + tol)));
+      if (lower) for (const p of c.members) p.voice = 2;
+    }
+  }
+}
+
 export function buildScore(inputs: PartInput[], bpb: number, totalBeats: number, extraMeasures: number, grid: number): ScoreModel {
   const parts: PartModel[] = [];
   const staves: StaffRef[] = [];
@@ -594,6 +649,7 @@ export function buildScore(inputs: PartInput[], bpb: number, totalBeats: number,
       const voice: 1 | 2 = inp.drums ? (n.pitch === 35 || n.pitch === 36 || n.pitch === 44 ? 2 : 1) : (n.voice ?? 1);
       return { n, wpitch, staff, voice, head: (drum?.[1] ?? '') as '' | 'x' };
     });
+    if (!inp.drums) autoVoices(prelim, grid);
     const notes: QNote[] = [];
     const groups = new Map<string, typeof prelim>();
     for (const p of prelim) {
@@ -630,6 +686,7 @@ export function buildScore(inputs: PartInput[], bpb: number, totalBeats: number,
       }
     }
     notes.sort((a, b) => a.s - b.s || a.wpitch - b.wpitch);
+    if (!inp.drums) closeLegatoGaps(notes);
     if (inp.drums) {
       // Drum hits are notated as lasting until the next hit in the same voice (max one beat, within the bar).
       for (const v of [1, 2] as const) {

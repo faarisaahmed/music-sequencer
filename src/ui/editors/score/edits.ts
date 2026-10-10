@@ -90,9 +90,10 @@ function resolve(d: Draft<Project>, pl: Placement, t: number, dur: number): { r:
   return { r: track.regions[track.regions.length - 1] as DRegion, cT: t - barStart };
 }
 
-function clearSpan(r: DRegion, cT: number, dur: number, staff: number, voice: 1 | 2, staffOf: (p: number) => number): void {
+function clearSpan(r: DRegion, cT: number, dur: number, staff: number, voice: 1 | 2, staffOf: (p: number) => number, protect?: Set<string>): void {
   const eps = 1e-3;
-  const same = (n: Note) => staffOf(n.pitch) === staff && (n.voice ?? 1) === voice;
+  // `protect`: notes shown in the other voice (e.g. a held note split off automatically) stay untouched.
+  const same = (n: Note) => staffOf(n.pitch) === staff && (n.voice ?? 1) === voice && !protect?.has(n.id);
   r.notes = r.notes.filter((n) => !same(n) || !(n.start >= cT - eps && n.start < cT + dur - eps));
   for (const n of r.notes) {
     if (!same(n)) continue;
@@ -101,13 +102,13 @@ function clearSpan(r: DRegion, cT: number, dur: number, staff: number, voice: 1 
 }
 
 /** Insert a note at display beat t. Unless `chord`, notes in the same staff & voice overlapping the span are replaced. */
-export function insertNote(pl: Placement, t: number, dur: number, pitch: number, velocity: number, voice: 1 | 2, chord: boolean): string {
+export function insertNote(pl: Placement, t: number, dur: number, pitch: number, velocity: number, voice: 1 | 2, chord: boolean, protect?: Set<string>): string {
   const id = uid('n');
   commit((d) => {
     const res = resolve(d, pl, t, dur);
     if (!res) return;
     const { r, cT } = res;
-    if (!chord) clearSpan(r, cT, dur, pl.staffOf(pitch), voice, pl.staffOf);
+    if (!chord) clearSpan(r, cT, dur, pl.staffOf(pitch), voice, pl.staffOf, protect);
     const n: Note = { id, pitch, start: cT, duration: dur, velocity };
     if (voice === 2) n.voice = 2;
     r.notes.push(n);
@@ -117,10 +118,10 @@ export function insertNote(pl: Placement, t: number, dur: number, pitch: number,
 }
 
 /** Replace a span with silence (a rest). */
-export function insertRest(pl: Placement, t: number, dur: number, staff: number, voice: 1 | 2): void {
+export function insertRest(pl: Placement, t: number, dur: number, staff: number, voice: 1 | 2, protect?: Set<string>): void {
   commit((d) => {
     const res = resolve(d, pl, t, dur);
-    if (res) clearSpan(res.r, res.cT, dur, staff, voice, pl.staffOf);
+    if (res) clearSpan(res.r, res.cT, dur, staff, voice, pl.staffOf, protect);
   });
 }
 
@@ -141,13 +142,67 @@ export function mapNotes(ids: string[], fn: (n: Draft<Note>) => void): void {
   commit((d) => eachNote(d, new Set(ids), (n) => fn(n)));
 }
 
-export function setDuration(ids: string[], dur: number): void {
-  commit((d) =>
-    eachNote(d, new Set(ids), (n, r) => {
-      n.duration = dur;
-      if (!r.loop) ensureLength(d, r, n.start - viewOf(r).viewStart + dur);
-    }),
-  );
+/**
+ * Change note values like Flat/MuseScore: the selected notes (and the rest of their chords)
+ * get the new duration; making a note longer writes over the notes that follow it in the
+ * same voice, making it shorter leaves a rest. `sameVoice` = ids of the notes shown in the
+ * same staff & voice as each selected note (keyed by selected id).
+ */
+export function setDuration(ids: string[], dur: number, sameVoice?: Map<string, Set<string>>): void {
+  const eps = 1e-3;
+  commit((d) => {
+    for (const t of d.tracks)
+      for (const reg of t.regions) {
+        if (reg.kind !== 'midi') continue;
+        const r = reg as DRegion;
+        const sel = r.notes.filter((n) => ids.includes(n.id));
+        if (!sel.length) continue;
+        const remove = new Set<string>();
+        for (const n of sel) {
+          const voiceIds = sameVoice?.get(n.id);
+          const inVoice = (x: Note) => (voiceIds ? voiceIds.has(x.id) : (x.voice ?? 1) === (n.voice ?? 1));
+          const oldDur = n.duration;
+          // Chord-mates (same onset & value, same voice) change with it.
+          const chord = r.notes.filter((x) => x.id === n.id || (inVoice(x) && Math.abs(x.start - n.start) < eps && Math.abs(x.duration - oldDur) < 0.05));
+          for (const c of chord) c.duration = dur;
+          const end = n.start + dur;
+          for (const x of r.notes) {
+            if (!inVoice(x) || chord.includes(x) || ids.includes(x.id)) continue;
+            if (x.start > n.start + eps && x.start < end - eps) {
+              // Starts inside the longer note: overwritten, unless it rings on past the end — then it's shortened.
+              if (x.start + x.duration > end + eps) {
+                x.duration = x.start + x.duration - end;
+                x.start = end;
+              } else remove.add(x.id);
+            }
+          }
+          if (!r.loop) ensureLength(d, r, n.start - viewOf(r).viewStart + dur);
+        }
+        if (remove.size) r.notes = r.notes.filter((x) => !remove.has(x.id));
+      }
+  });
+}
+
+/** Add a note to each selected note's chord at `pitchOf(note)` (skips pitches already there). Returns the new ids. */
+export function addToChords(ids: string[], pitchOf: (n: Note) => number): string[] {
+  const out: string[] = [];
+  commit((d) => {
+    for (const t of d.tracks)
+      for (const reg of t.regions) {
+        if (reg.kind !== 'midi') continue;
+        const r = reg as DRegion;
+        for (const n of r.notes.filter((x) => ids.includes(x.id))) {
+          const p = Math.max(0, Math.min(127, pitchOf(n as Note)));
+          if (r.notes.some((x) => x.pitch === p && Math.abs(x.start - n.start) < 1e-3)) continue;
+          const id = uid('n');
+          const c: Note = { id, pitch: p, start: n.start, duration: n.duration, velocity: n.velocity };
+          if (n.voice) c.voice = n.voice;
+          r.notes.push(c);
+          out.push(id);
+        }
+      }
+  });
+  return out;
 }
 
 export function setVoice(ids: string[], voice: 1 | 2): void {

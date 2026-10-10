@@ -16,6 +16,7 @@ import {
   abbreviate,
   buildScore,
   diatonicShift,
+  spell,
   drumAtPosition,
   notationFor,
   pitchFromDiatonic,
@@ -50,6 +51,7 @@ import {
   deleteNotes,
   insertNote,
   insertRest,
+  addToChords,
   mapNotes,
   pasteNotes,
   setDuration,
@@ -262,10 +264,12 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
   const [grid, setGrid] = useState(0.25);
   const [clefMode, setClefMode] = useState<ClefMode>('auto');
   const [concert, setConcert] = useState(false);
-  const [zoom, setZoom] = useState(full ? 0.85 : 1);
+  const [zoom, setZoom] = useState(full ? 0.85 : 1.15);
   const [showDyn, setShowDyn] = useState(true);
   const [cursor, setCursor] = useState<{ t: number; staff: number }>({ t: 0, staff: 0 });
   const [ghost, setGhost] = useState<Ghost | null>(null);
+  const [box, setBox] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+  const [overNote, setOverNote] = useState(false);
   const [width, setWidth] = useState<number | null>(lastScoreWidth);
   // Systems are drawn into the (mutable) layout outside React; this tiny store re-renders the overlays.
   const drawnStore = useMemo(() => {
@@ -451,10 +455,11 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
     [layout, model, zoom, bpb],
   );
 
+  /** Nearest rhythmic position for the chosen value; long notes may run over the barline (shown tied). */
   const snapInput = (tm: number) => {
     const g = triplet ? effDur : Math.min(effDur, 1);
-    let t = Math.floor(tm / g + 0.3) * g;
-    t = Math.max(0, Math.min(t, bpb - Math.min(effDur, bpb)));
+    let t = Math.round(tm / g) * g;
+    t = Math.max(0, Math.min(t, bpb - g));
     return Math.round(t * 1e6) / 1e6;
   };
 
@@ -463,9 +468,9 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
     let best: HeadHit | null = null;
     let bd = Infinity;
     for (const h of layout.heads) {
-      if (lx < h.x0 - 4 || lx > h.x1 + 4) continue;
+      if (lx < h.x0 - 6 || lx > h.x1 + 6) continue;
       const d = Math.abs(ly - h.y);
-      if (d < 6 && d < bd) {
+      if (d < 7 && d < bd) {
         bd = d;
         best = h;
       }
@@ -484,11 +489,31 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
 
   const placementFor = (gi: number): Placement | null => partOfStaff(gi)?.placement ?? null;
 
+  /** Notes on staff `gi` shown in the other voice: edits in voice `v` leave them alone. */
+  const protectFor = (gi: number, v: 1 | 2): Set<string> => {
+    const ref = staffRef(gi);
+    if (!model || !ref) return new Set();
+    return new Set(model.parts[ref.part].notes.filter((n) => n.staff === ref.staff && n.voice !== v).map((n) => n.id));
+  };
+  /** For each note id: the ids shown in the same staff & voice (what a longer value may write over). */
+  const voiceMates = (ids: string[]): Map<string, Set<string>> => {
+    const out = new Map<string, Set<string>>();
+    if (!model) return out;
+    for (const part of model.parts)
+      for (const q of part.notes) {
+        if (!ids.includes(q.id) || out.has(q.id)) continue;
+        out.set(q.id, new Set(part.notes.filter((n) => n.staff === q.staff && n.voice === q.voice).map((n) => n.id)));
+      }
+    return out;
+  };
+
+
   const doInsert = (t: number, pitch: number, gi: number, chord: boolean, d = effDur) => {
     const pl = placementFor(gi);
     const part = partOfStaff(gi);
     if (!pl || !part) return;
-    const id = insertNote(pl, t, d, pitch, velocity, part.drums ? (pitch === 35 || pitch === 36 || pitch === 44 ? 2 : 1) : voice, chord);
+    const v: 1 | 2 = part.drums ? (pitch === 35 || pitch === 36 || pitch === 44 ? 2 : 1) : voice;
+    const id = insertNote(pl, t, d, pitch, velocity, v, chord, part.drums ? undefined : protectFor(gi, v));
     getEngine().preview(part.track.id, pitch, velocity, d);
     useStore.setState({ selectedNoteIds: [id] });
     lastInsert.current = { t, dur: d, pitch, staff: gi };
@@ -540,6 +565,56 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
     transposeSel((p) => diatonicShift(p + part.transpose, dir, part.writtenKey) - part.transpose);
   };
 
+  /** Add a diatonic interval above (steps > 0) or below each selected note — 2 = a 3rd, 4 = a 5th, 7 = an octave. */
+  const addInterval = (steps: number) => {
+    const ids = useStore.getState().selectedNoteIds;
+    if (!ids.length) {
+      toast('Select a note first, then add a 3rd, 5th… to build a chord');
+      return;
+    }
+    const h = layout?.heads.find((x) => ids.includes(x.noteId));
+    const part = h ? partOfStaff(h.staff) : src?.parts[0];
+    if (!part || part.drums) return;
+    const newIds = addToChords(ids, (n) => diatonicShift(n.pitch + part.transpose, steps, part.writtenKey) - part.transpose);
+    if (newIds.length) {
+      useStore.setState({ selectedNoteIds: newIds });
+      setTimeout(() => {
+        for (const id of [...ids, ...newIds]) preview(id);
+      }, 0);
+    }
+  };
+
+  /** Toggle a dot on the selection (or for the next notes). */
+  const toggleDot = () => {
+    const ids = useStore.getState().selectedNoteIds;
+    const sel = selectedNotes();
+    if (!sel.length) {
+      setDotted((d) => !d);
+      return;
+    }
+    const d0 = sel[0].duration;
+    const isDotted = [3, 1.5, 0.75, 0.375, 0.1875].some((x) => Math.abs(d0 - x) < 1e-3);
+    setDuration(ids, isDotted ? d0 / 1.5 : d0 * 1.5, voiceMates(ids));
+  };
+
+  /** Sharp / flat / natural on the selection: ♯ raises, ♭ lowers, ♮ removes the accidental. */
+  const accidental = (a: number) => {
+    const ids = useStore.getState().selectedNoteIds;
+    if (!ids.length) {
+      setAcc(acc === a ? null : a);
+      return;
+    }
+    const h = layout?.heads.find((x) => ids.includes(x.noteId));
+    const part = h ? partOfStaff(h.staff) : src?.parts[0];
+    if (!part) return;
+    if (a !== 0) transposeSel((p) => p + a);
+    else
+      transposeSel((p) => {
+        const w = p + part.transpose;
+        return w - spell(w, part.writtenKey).alter - part.transpose;
+      });
+  };
+
   const applyDynamic = (mark: string) => {
     setDyn(mark);
     const ids = useStore.getState().selectedNoteIds;
@@ -549,7 +624,7 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
   const chooseDuration = (v: number) => {
     setDur(v);
     const ids = useStore.getState().selectedNoteIds;
-    if (mode === 'select' && ids.length) setDuration(ids, v * (dotted ? 1.5 : 1) * (triplet ? 2 / 3 : 1));
+    if (ids.length) setDuration(ids, v * (dotted ? 1.5 : 1) * (triplet ? 2 / 3 : 1), voiceMates(ids));
   };
 
   const seekTo = (t: number) => {
@@ -685,6 +760,10 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
         transposeSel((p) => p + (key === 'ArrowUp' ? 12 : -12));
       } else if (mod) {
         handled = false;
+      } else if (e.altKey && /^Digit[3-8]$/.test(e.code)) {
+        // MuseScore-style: ⌥3 adds a 3rd above, ⌥5 a 5th … ⌥8 an octave (⇧ for below).
+        const n = Number(e.code.slice(5));
+        addInterval((n - 1) * (e.shiftKey ? -1 : 1));
       } else if (e.altKey && (e.code === 'Digit1' || e.code === 'Digit2')) {
         const v = e.code === 'Digit1' ? 1 : 2;
         setVoiceNo(v);
@@ -700,7 +779,7 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
       } else if (DURATIONS.some((d) => d.key === key)) {
         chooseDuration(DURATIONS.find((d) => d.key === key)!.v);
       } else if (key === '.') {
-        setDotted((d) => !d);
+        toggleDot();
       } else if (key === '0') {
         const pl = placementFor(cursor.staff);
         if (mode === 'input' && pl) {
@@ -815,11 +894,17 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
   // ------------------------------------------------------------ mouse
 
   const onPointerMove = (e: React.PointerEvent) => {
-    if (mode !== 'input' || e.buttons || entry) {
+    if (e.buttons || entry) {
       if (ghost) setGhost(null);
       return;
     }
     const loc = locate(e.clientX, e.clientY, true);
+    const over = !!(loc && headAt(loc.lx, loc.ly));
+    if (over !== overNote) setOverNote(over);
+    if (mode !== 'input' || over) {
+      if (ghost) setGhost(null);
+      return;
+    }
     if (!loc) return setGhost(null);
     const t = snapInput(loc.tm);
     const pitch = soundingAt(loc.staff, loc.dIdx);
@@ -830,7 +915,8 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
     if (loc.step < 0) for (let s = -2; s >= loc.step; s -= 2) ledger.push(loc.sg.topLineY + s * (loc.sg.spacing / 2));
     if (loc.step > 8) for (let s = 10; s <= loc.step; s += 2) ledger.push(loc.sg.topLineY + s * (loc.sg.spacing / 2));
     const label = part.drums ? (({ 36: 'Kick', 35: 'Kick 2', 38: 'Snare', 42: 'Hi-hat', 49: 'Crash', 51: 'Ride', 48: 'High Tom', 45: 'Mid Tom', 41: 'Low Tom', 43: 'Floor Tom', 44: 'Pedal Hat', 70: 'Shaker' }) as Record<number, string>)[pitch] ?? 'Drum' : noteName(pitch + part.transpose, acc === -1);
-    setGhost({ x, y, ledger, label });
+    const chordHit = !part.drums && !e.altKey ? chordAtClick(loc.staff, loc.mg.index * bpb + t) : null;
+    setGhost({ x, y, ledger, label: chordHit && !chordHit.pitches.includes(pitch + part.transpose) ? `+ ${label} (add to chord)` : label });
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -839,13 +925,14 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
       commitEntry('none');
       return;
     }
-    const loc = locate(e.clientX, e.clientY, mode === 'input');
+    const loc = locate(e.clientX, e.clientY, false);
     if (!loc) {
       if (!e.shiftKey) useStore.setState({ selectedNoteIds: [] });
       return;
     }
     const head = headAt(loc.lx, loc.ly);
-    if (head && (mode === 'select' || e.altKey || selectedIds.includes(head.noteId))) {
+    // Clicking a note always selects it (and dragging it changes its pitch), in either mode.
+    if (head && !(mode === 'input' && e.altKey)) {
       // Select / drag pitch
       let ids = selectedIds;
       if (e.shiftKey) ids = ids.includes(head.noteId) ? ids.filter((i) => i !== head.noteId) : [...ids, head.noteId];
@@ -891,13 +978,66 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
       );
       return;
     }
-    if (mode === 'input') {
-      const t = loc.mg.index * bpb + snapInput(loc.tm);
-      doInsert(t, soundingAt(loc.staff, loc.dIdx), loc.staff, e.shiftKey);
-    } else {
-      if (!e.shiftKey) useStore.setState({ selectedNoteIds: [] });
-      setCursor({ t: loc.mg.index * bpb + snapInput(loc.tm), staff: loc.staff });
-    }
+    // Empty space: drag = box-select notes; click = write a note (Write) or place the cursor (Select).
+    const host = svgRef.current!.getBoundingClientRect();
+    const toLocal = (cx: number, cy: number) => ({ x: (cx - host.left) / zoom, y: (cy - host.top) / zoom });
+    const p0 = toLocal(e.clientX, e.clientY);
+    const before = e.shiftKey ? selectedIds : [];
+    startDrag(
+      e,
+      ({ x, y }) => {
+        const p1 = toLocal(x, y);
+        const r = { x0: Math.min(p0.x, p1.x), y0: Math.min(p0.y, p1.y), x1: Math.max(p0.x, p1.x), y1: Math.max(p0.y, p1.y) };
+        setGhost(null);
+        setBox(r);
+        const inside = (layout?.heads ?? []).filter((h) => h.x1 >= r.x0 && h.x0 <= r.x1 && h.y >= r.y0 - 3 && h.y <= r.y1 + 3).map((h) => h.noteId);
+        useStore.setState({ selectedNoteIds: [...new Set([...before, ...inside])] });
+      },
+      ({ moved }) => {
+        setBox(null);
+        if (moved) {
+          const sel = useStore.getState().selectedNoteIds;
+          const h = layout?.heads.find((x) => x.noteId === sel[sel.length - 1]);
+          if (h) setCursor({ t: h.t1, staff: h.staff });
+          return;
+        }
+        const loc2 = loc;
+        const t = loc2.mg.index * bpb + snapInput(loc2.tm);
+        if (mode !== 'input') {
+          if (!e.shiftKey) useStore.setState({ selectedNoteIds: [] });
+          setCursor({ t, staff: loc2.staff });
+          if (!useStore.getState().playing) seekTo(t);
+          return;
+        }
+        const pitch = soundingAt(loc2.staff, loc2.dIdx);
+        const part = partOfStaff(loc2.staff)!;
+        // Clicking above/below a note or chord adds to it (Flat-style), unless Alt replaces it.
+        const at = chordAtClick(loc2.staff, t);
+        if (at && !e.altKey && !part.drums) {
+          const n = allNotes().find((x) => x.id === at.noteId);
+          if (n && !at.pitches.includes(pitch + part.transpose)) {
+            const pl = placementFor(loc2.staff)!;
+            const id = insertNote(pl, at.t, n.duration, pitch, n.velocity, (n.voice ?? 1) as 1 | 2, true);
+            getEngine().preview(part.track.id, pitch, n.velocity, Math.min(1, n.duration));
+            useStore.setState({ selectedNoteIds: [id] });
+            lastInsert.current = { t: at.t, dur: n.duration, pitch, staff: loc2.staff };
+            setCursor({ t: at.t + n.duration, staff: loc2.staff });
+            setAcc(null);
+            return;
+          }
+        }
+        doInsert(t, pitch, loc2.staff, e.shiftKey);
+      },
+      { threshold: 5 },
+    );
+  };
+
+  /** The note/chord in the current voice that starts at display beat `t` on staff `gi`. */
+  const chordAtClick = (gi: number, t: number) => {
+    if (!layout) return null;
+    const hs = layout.heads.filter((h) => h.staff === gi && Math.abs(h.t - t) < 1e-3 && (partOfStaff(gi)?.drums || h.voice === voice || !layout.heads.some((o) => o.staff === gi && Math.abs(o.t - t) < 1e-3 && o.voice === voice)));
+    if (!hs.length) return null;
+    return { t: hs[0].t, noteId: hs[0].noteId, pitches: hs.map((h) => h.pitch) };
   };
 
   // ------------------------------------------------------------ cursor geometry
@@ -1008,7 +1148,7 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
         <button title="Zoom out" onClick={() => setZoom((z) => Math.max(0.4, +(z - 0.1).toFixed(2)))}>
           <ZoomOut size={14} />
         </button>
-        <button title="Reset zoom" onClick={() => setZoom(1)}>
+        <button title="Reset zoom" onClick={() => setZoom(full ? 0.85 : 1.15)}>
           {Math.round(zoom * 100)}%
         </button>
         <button title="Zoom in" onClick={() => setZoom((z) => Math.min(2, +(z + 0.1).toFixed(2)))}>
@@ -1047,7 +1187,7 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
               <NoteIcon v={d.v} />
             </button>
           ))}
-          <button className={'pal-btn' + (dotted ? ' on' : '')} title="Dotted (.)" onClick={() => setDotted(!dotted)}>
+          <button className={'pal-btn' + (dotted ? ' on' : '')} title="Dotted (.) — adds or removes the dot on selected notes" onClick={toggleDot}>
             <span style={{ fontSize: 22, lineHeight: 0.5 }}>•</span>
           </button>
           <button className={'pal-btn txt' + (triplet ? ' on' : '')} title="Triplet (⌘3) — next notes are written as triplets" onClick={() => setTriplet(!triplet)}>
@@ -1091,11 +1231,7 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
               key={x.a}
               className={'pal-btn acc' + (acc === x.a ? ' on' : '')}
               title={`${x.t} — next note (or raise/lower selected)`}
-              onClick={() => {
-                const ids = useStore.getState().selectedNoteIds;
-                if (ids.length && x.a !== 0) transposeSel((p) => p + x.a);
-                else setAcc(acc === x.a ? null : x.a);
-              }}
+              onClick={() => accidental(x.a)}
             >
               {x.s}
             </button>
@@ -1105,6 +1241,19 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
               <path d="M2 4 Q10 12 18 4" stroke="currentColor" strokeWidth="1.8" fill="none" />
             </svg>
           </button>
+        </div>
+        <div className="pal-group" title="Build chords: add a note above each selected note">
+          {[
+            { st: 2, l: '+3', t: 'Add a 3rd above (⌥3)' },
+            { st: 4, l: '+5', t: 'Add a 5th above (⌥5)' },
+            { st: 5, l: '+6', t: 'Add a 6th above (⌥6)' },
+            { st: 7, l: '+8', t: 'Add an octave above (⌥8)' },
+            { st: -2, l: '−3', t: 'Add a 3rd below (⇧⌥3)' },
+          ].map((x) => (
+            <button key={x.l} className="pal-btn txt chord-btn" title={x.t} onClick={() => addInterval(x.st)}>
+              {x.l}
+            </button>
+          ))}
         </div>
         <div className="pal-group">
           {ARTICS.map((x) => (
@@ -1159,14 +1308,16 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
           </button>
         </div>
         <div className="score-hint faint">
-          {mode === 'input' ? 'Click the staff or type A–G · ⇧+letter adds to chord · 2–7 durations · ⌘3 triplet · ⌥1/⌥2 voice' : 'Click a note to select & jump there · drag to change pitch · ⌘L lyrics · ⌘K chords'}
+          {mode === 'input'
+            ? 'Click to write · click above/below a note to make a chord · click a note to select it · drag empty space to select several · 2–7 note values · ⌥3/⌥5 add 3rd/5th'
+            : 'Click a note to select · drag across notes to select several · drag a note up/down to change pitch · 2–7 change the value · ⌘L lyrics · ⌘K chords'}
         </div>
       </div>
       <div className="score-scroll" ref={scrollRef}>
         <div className="score-page" style={{ width: layout?.width, minHeight: layout?.height }}>
           <div
             ref={svgRef}
-            className={'score-svg' + (mode === 'input' ? ' input' : '')}
+            className={'score-svg' + (mode === 'input' ? ' input' : '') + (overNote ? ' over-note' : '')}
             onPointerMove={onPointerMove}
             onPointerLeave={() => setGhost(null)}
             onPointerDown={onPointerDown}
@@ -1177,7 +1328,8 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
               .map((h) => (
                 <div key={'sel' + h.key + h.t} className="score-sel" style={{ left: h.x0 - 2, top: h.y - 6, width: h.x1 - h.x0 + 4 }} />
               ))}
-            {cursorGeom && <div className="score-cursor" style={{ left: cursorGeom.x - 3, top: cursorGeom.top, height: cursorGeom.h }} />}
+            {box && <div className="score-box" style={{ left: box.x0, top: box.y0, width: box.x1 - box.x0, height: box.y1 - box.y0 }} />}
+            {cursorGeom && <div className="score-cursor" style={{ left: cursorGeom.x - 7, top: cursorGeom.top, height: cursorGeom.h }} />}
             {ghost && (
               <>
                 {ghost.ledger.map((y, i) => (

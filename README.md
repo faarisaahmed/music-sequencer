@@ -14,7 +14,7 @@ Built for writing original music: there are no loop libraries, auto-generated pa
   - Piano roll with a velocity lane and crescendo/fade tools.
   - Beat Sequencer with Velocity, Note Repeat and Chance modes and a channel rack: per-row mute/solo, volume, pan and tune, plus your own sounds on any row (drop an audio file on it).
   - FL Studio-style patterns: place a pattern anywhere (double-click a drum lane) and copies stay linked, so editing one edits them all; **Make Unique** separates one. **Play Pattern** loops just that pattern without touching the song.
-  - Score editor (sheet music) with key-aware engraving and note input by mouse or letters; print and MusicXML export.
+  - Score editor (sheet music, Flat-style): click to write, click above or below a note to build a chord (or +3/+5/+8 buttons, ⌥3/⌥5), click any note to select it, drag across notes to select several, drag a note up/down to change its pitch, and pick a note value to change selected notes (longer values write over what follows, shorter leave a rest). Held notes under moving parts are shown in their own voice and long notes tie cleanly across barlines. Letters A–G, print and MusicXML export.
   - Audio editor with fades, gain, reverse and conversion to a sampler instrument.
 - **Playing:** on-screen keyboard, chord strips, arpeggiator, scale lock, musical typing on the computer keyboard, drum pads and Web MIDI controllers.
 - **Swing:** one click in the top bar swings the whole song (MPC 16th, Boom Bap, Triplet, Laid Back, Jazz 8th, Shuffle, Hard Shuffle, Human Feel, or your own amount and looseness). Any region can follow the song or have its own swing (Beat Sequencer, Piano Roll or right-click › Swing), and swing can be written into the notes. Exported MIDI includes it.

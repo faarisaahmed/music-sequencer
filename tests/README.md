@@ -13,6 +13,7 @@ node tests/jam-qa-split.mjs <chromium-executable>       # network split & heal k
 node tests/jam-qa-leave.mjs <chromium-executable>       # edit-then-leave, same-tab rejoin, chat right after joining
 node tests/beat-patterns.mjs <chromium-executable> http://localhost:5391/ /tmp   # linked patterns, pattern play, swing, row mix, own sounds
 node tests/groove.mjs <chromium-executable> http://localhost:5391/ /tmp        # swing: maths, render timing, song vs region, bake, MIDI, pickers
+node tests/score-editing.mjs <chromium-executable> http://localhost:5391/ /tmp # score: write, chords, select, values, voices
 node tests/jam-qa-long.mjs <chromium-executable> http://localhost:5391/ 300   # frozen tab, recording, big join, soak
 ```
 
