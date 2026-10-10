@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Search, FolderOpen, FileMusic, MoreHorizontal, Music2, Trash2, Copy, Pencil, Download, Play, Wand2, ChevronDown, ChevronRight, Users } from 'lucide-react';
+import { Plus, Search, FolderOpen, FileMusic, MoreHorizontal, Music2, Trash2, Copy, Pencil, Download, Play, ChevronDown, ChevronRight, Users } from 'lucide-react';
 import type { ProjectMeta } from '../../model/types';
 import { listProjects, loadProject, saveProject } from '../../state/persistence';
 import { duplicateProjectById, exportProjectFile, importMidiFile, importProjectFile, openProjectById, removeProject, createNewProject } from '../../state/actions';
@@ -180,12 +180,6 @@ export default function HomeScreen() {
           </div>
           {showTemplates && (
           <div className="quick-row">
-            <button className="quick-card wizard" onClick={() => openModal('songWizard')}>
-              <div className="quick-title">
-                <Wand2 size={14} /> Song Wizard
-              </div>
-              <div className="quick-desc">Pick a genre and mood to get a fully arranged song</div>
-            </button>
             {TEMPLATES.map((t) => (
               <button
                 key={t.id}

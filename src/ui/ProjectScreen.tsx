@@ -4,10 +4,8 @@ import { getEngine } from '../audio/engine';
 import { importAudioFile, importMidiFile } from '../state/actions';
 import TopBar from './TopBar';
 import TracksView from './tracks/TracksView';
-import LiveLoopsView from './liveloops/LiveLoopsView';
 import Dock from './Dock';
 import LibraryPanel from './library/LibraryPanel';
-import { addLoopToSong } from './library/loops';
 import { useGlobalShortcuts } from './shortcuts';
 import { useMusicalTyping } from './instruments/musicalTyping';
 import { startDrag } from './common/drag';
@@ -20,7 +18,6 @@ export default function ProjectScreen() {
   const dockTab = useStore((s) => s.dockTab);
   const dockHeight = useStore((s) => s.dockHeight);
   const dockMax = useStore((s) => s.dockMaximized);
-  const mainView = useStore((s) => s.mainView);
   const mainRef = useRef<HTMLDivElement>(null);
   useGlobalShortcuts();
   useMusicalTyping();
@@ -53,8 +50,6 @@ export default function ProjectScreen() {
       onDrop={(e) => {
         // Files dropped anywhere not handled by a more specific target.
         e.preventDefault();
-        const loopId = e.dataTransfer.getData('application/x-bandforge-loop');
-        if (loopId) return addLoopToSong(loopId);
         for (const f of Array.from(e.dataTransfer.files)) {
           if (/\.midi?$/i.test(f.name)) void importMidiFile(f, true);
           else if (f.type.startsWith('audio') || /\.(wav|mp3|ogg|m4a|aac|flac|webm)$/i.test(f.name)) void importAudioFile(f);
@@ -67,14 +62,8 @@ export default function ProjectScreen() {
         {libraryOpen && <LibraryPanel />}
         <div className="main-col" ref={mainRef}>
           <div className="tracks-area" style={{ display: dockTab && dockMax ? 'none' : undefined }}>
-            {mainView === 'liveloops' ? (
-              <LiveLoopsView />
-            ) : (
-              <>
-                <TracksView />
-                <EmptyHint />
-              </>
-            )}
+            <TracksView />
+            <EmptyHint />
           </div>
           {dockTab && (
             <>

@@ -23,12 +23,6 @@ export const TOURS: Record<TourId, TourStep[]> = {
       body: 'A complete music studio in your browser. Make beats, record, write sheet music and export MP3s. This quick tour shows you around (about a minute).',
     },
     {
-      target: '.quick-card.wizard',
-      title: 'Song Wizard',
-      body: 'The fastest way to start: pick a genre and mood, and BandForge writes a full arranged song — drums, bass, chords and a melody — that you can then edit.',
-      placement: 'bottom',
-    },
-    {
       target: '.quick-row',
       title: 'Templates & demo songs',
       body: 'Start from an empty song, a beat, a band or orchestra setup — or open a demo song to hear what is possible.',
@@ -68,7 +62,7 @@ export const TOURS: Record<TourId, TourStep[]> = {
     {
       target: 'button[title^="New Track"]',
       title: 'Add instruments',
-      body: 'Add a software instrument, a Drummer, drums, a microphone recorder or a Sampler.',
+      body: 'Add a software instrument, drums, a microphone recorder or a Sampler.',
       placement: 'bottom',
     },
     {
@@ -105,9 +99,9 @@ export const TOURS: Record<TourId, TourStep[]> = {
       before: () => useStore.setState({ dockTab: null }),
     },
     {
-      target: 'button[title^="Songwriter"]',
-      title: 'Songwriter',
-      body: 'Add a chord track and let BandForge generate bass, piano, guitar or string parts that follow it.',
+      target: 'button[title^="Chord Track"]',
+      title: 'Chord Track',
+      body: 'Sketch your harmony: write chords on the timeline, try common progressions and get ideas for the next chord. You write every note yourself.',
       placement: 'bottom',
     },
     {
@@ -117,9 +111,9 @@ export const TOURS: Record<TourId, TourStep[]> = {
       placement: 'bottom',
     },
     {
-      target: 'button[title="Library (Y)"]',
-      title: 'Sounds & loops',
-      body: 'Swap instruments and drag ready-made loops into your song.',
+      target: 'button[title="Sounds (Y)"]',
+      title: 'Sounds',
+      body: 'Browse and swap instruments and drum kits for the selected track.',
       placement: 'bottom',
     },
     {

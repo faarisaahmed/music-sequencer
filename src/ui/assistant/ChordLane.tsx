@@ -18,7 +18,7 @@ export function ChordToggleButton() {
   const show = useAssistantUi((s) => s.showChords);
   const on = chordsVisible(project, show);
   return (
-    <button className={'btn sm' + (on ? ' active' : '')} onClick={() => useAssistantUi.setState({ showChords: !on })} title="Show the chord track (drives auto-accompaniment & melody generation)">
+    <button className={'btn sm' + (on ? ' active' : '')} onClick={() => useAssistantUi.setState({ showChords: !on })} title="Show the chord track">
       <Music4 size={13} /> Chords
     </button>
   );

@@ -27,8 +27,6 @@ export async function openProject(p: Project): Promise<void> {
     selectedNoteIds: [],
     cursor: 0,
     dockTab: null,
-    // Grid-only songs (Live Loops templates) open in the Live Loops view.
-    mainView: p.liveLoops?.cells.length && !p.tracks.some((t) => t.regions.length) ? 'liveloops' : 'tracks',
   });
   await getEngine().loadProjectAudio(p);
 }
@@ -45,22 +43,30 @@ export async function openProjectById(id: string): Promise<void> {
 /** Fill in fields added in later versions. */
 export function migrate(p: Project): Project {
   const base = createProject(p.name);
+  // Songs saved before Live Loops and the Drummer were removed: drop the grid and
+  // keep drummer regions as ordinary MIDI regions (their notes were already written out).
+  const { liveLoops: _ll, ...rest } = p as Project & { liveLoops?: unknown };
   return {
     ...base,
-    ...p,
+    ...rest,
     chords: p.chords ?? [],
     tracks: (p.tracks ?? []).map((t) => {
       const fresh = createTrack(t.type, t.instrument, t.name);
       return {
         ...fresh,
-        ...t,
+        ...stripDrummer(t),
         fx: { ...fresh.fx, ...t.fx },
         instrumentParams: t.instrumentParams ?? {},
-        regions: (t.regions ?? []).map((r) => (r.kind === 'midi' ? { ...r, notes: r.notes ?? [] } : r)),
+        regions: (t.regions ?? []).map((r) => (r.kind === 'midi' ? stripDrummer({ ...r, notes: r.notes ?? [] }) : r)),
         automation: { ...{ volume: [], pan: [] }, ...t.automation },
       };
     }),
   };
+}
+
+function stripDrummer<T extends object>(o: T): T {
+  const { drummer: _d, ...rest } = o as T & { drummer?: unknown };
+  return rest as T;
 }
 
 export async function createNewProject(p: Project): Promise<void> {

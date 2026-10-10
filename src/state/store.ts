@@ -3,7 +3,7 @@ import { produce, type Draft } from 'immer';
 import type { Note, Project, Region, Track } from '../model/types';
 
 export type DockTab = 'editor' | 'instrument' | 'mixer' | 'fx' | 'assistant';
-export type EditorMode = 'pianoroll' | 'score' | 'steps' | 'audio' | 'drummer' | 'fullscore';
+export type EditorMode = 'pianoroll' | 'score' | 'steps' | 'audio' | 'fullscore';
 
 export interface Clipboard {
   kind: 'regions' | 'notes' | 'track';
@@ -59,8 +59,6 @@ export interface AppState {
   countingIn: boolean;
   /** Where playback starts from / returns to (beats). */
   cursor: number;
-  /** Main area: linear Tracks arrangement or the Live Loops grid. */
-  mainView: 'tracks' | 'liveloops';
 }
 
 export const useStore = create<AppState>(() => ({
@@ -92,7 +90,6 @@ export const useStore = create<AppState>(() => ({
   recording: false,
   countingIn: false,
   cursor: 0,
-  mainView: 'tracks',
 }));
 
 const HISTORY_LIMIT = 200;
@@ -165,10 +162,6 @@ export function pruneSelection(): void {
       regionIds.add(r.id);
       if (r.kind === 'midi') for (const n of r.notes) noteIds.add(n.id);
     }
-  for (const c of p.liveLoops?.cells ?? []) {
-    regionIds.add(c.region.id);
-    if (c.region.kind === 'midi') for (const n of c.region.notes) noteIds.add(n.id);
-  }
   useStore.setState({
     selectedTrackId: p.tracks.some((t) => t.id === s.selectedTrackId) ? s.selectedTrackId : p.tracks[0]?.id ?? null,
     selectedRegionIds: s.selectedRegionIds.filter((id) => regionIds.has(id)),
@@ -204,12 +197,6 @@ export function findRegion(p: Project | null, regionId: string | null): { track:
     const region = track.regions.find((r) => r.id === regionId);
     if (region) return { track, region };
   }
-  // Live Loops cells hold regions too, so the editors can open them.
-  for (const c of p.liveLoops?.cells ?? []) {
-    if (c.region.id !== regionId) continue;
-    const track = p.tracks.find((t) => t.id === c.trackId);
-    if (track) return { track, region: c.region };
-  }
   return undefined;
 }
 
@@ -219,7 +206,6 @@ export function draftRegion(p: Draft<Project>, regionId: string): Draft<Region> 
     const r = t.regions.find((r) => r.id === regionId);
     if (r) return r;
   }
-  for (const c of p.liveLoops?.cells ?? []) if (c.region.id === regionId) return c.region;
   return undefined;
 }
 

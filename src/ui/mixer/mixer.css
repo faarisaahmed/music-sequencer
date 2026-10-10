@@ -321,19 +321,6 @@
   flex-direction: column;
   min-height: 0;
 }
-.lib-tabs {
-  display: flex;
-  padding: 8px;
-  gap: 6px;
-  border-bottom: 1px solid var(--border-soft);
-}
-.lib-tabs .seg {
-  flex: 1;
-}
-.lib-tabs .seg button {
-  flex: 1;
-  justify-content: center;
-}
 .lib-current {
   display: flex;
   align-items: center;
@@ -435,38 +422,6 @@
 }
 .lib-item.on .lib-item-sub {
   color: rgba(255, 255, 255, 0.75);
-}
-.lib-item .lib-add {
-  opacity: 0;
-}
-.lib-item:hover .lib-add {
-  opacity: 1;
-}
-.lib-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 0 8px 6px;
-}
-.lib-tag {
-  border: 1px solid var(--border-soft);
-  background: var(--panel-2);
-  color: var(--text-dim);
-  border-radius: 99px;
-  padding: 2px 9px;
-  font-size: 11px;
-  cursor: pointer;
-}
-.lib-tag.on {
-  background: var(--accent);
-  color: white;
-  border-color: var(--accent);
-}
-.lib-foot {
-  padding: 8px 12px;
-  font-size: 11px;
-  color: var(--text-faint);
-  border-top: 1px solid var(--border-soft);
 }
 
 /* ================================================================ DIALOGS */

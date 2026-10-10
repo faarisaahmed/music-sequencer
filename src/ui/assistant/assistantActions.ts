@@ -1,30 +1,15 @@
-// Editing actions for the chord track and generated parts.
+// Editing actions for the chord track.
 import { create } from 'zustand';
-import type { ChordQuality, ChordSymbol, Project, Track } from '../../model/types';
-import { createMidiRegion, contentEndBeat, uid } from '../../model/defaults';
+import type { ChordQuality, ChordSymbol, Project } from '../../model/types';
+import { contentEndBeat, uid } from '../../model/defaults';
 import { beatsPerBar } from '../../model/music';
-import {
-  chordPcs,
-  defaultStyleFor,
-  familyOf,
-  generateDrums,
-  generateMelody,
-  generatePart,
-  layChords,
-  parseProgression,
-  STYLES,
-  type DrumStyle,
-  type StyleId,
-} from '../../model/accompaniment';
-import { getPreset } from '../../audio/presets';
+import { chordPcs, layChords, parseProgression } from '../../model/accompaniment';
 import { getEngine } from '../../audio/engine';
-import { commit, toast, useStore } from '../../state/store';
+import { commit, useStore } from '../../state/store';
 import { growSong } from '../../state/actions';
 
-export const useAssistantUi = create<{ showChords: boolean | null; style: Record<string, StyleId>; seed: number }>(() => ({
+export const useAssistantUi = create<{ showChords: boolean | null }>(() => ({
   showChords: null, // null = automatic (shown when the song has chords)
-  style: {},
-  seed: 1,
 }));
 
 export function chordsVisible(p: Project, show: boolean | null): boolean {
@@ -105,133 +90,20 @@ export function auditionChord(c: { root: number; quality: ChordQuality }): void 
 
 // ------------------------------------------------------------------ ranges
 
-export interface GenRange {
+export interface ChordRange {
   id: string;
   label: string;
   start: number;
   end: number;
 }
 
-/** Ranges the user can generate into: whole song, cycle area and each section. */
-export function rangesFor(p: Project): GenRange[] {
+/** Ranges a progression can fill: whole song, cycle area and each section. */
+export function rangesFor(p: Project): ChordRange[] {
   const bpb = beatsPerBar(p.timeSig);
   const chordEnd = Math.max(0, ...(p.chords ?? []).map((c) => c.beat + c.length));
   const songEnd = Math.max(chordEnd, contentEndBeat(p), bpb * 8);
-  const out: GenRange[] = [{ id: 'song', label: `Whole song (bars 1–${Math.ceil(songEnd / bpb)})`, start: 0, end: songEnd }];
+  const out: ChordRange[] = [{ id: 'song', label: `Whole song (bars 1–${Math.ceil(songEnd / bpb)})`, start: 0, end: songEnd }];
   if (p.loop.end > p.loop.start) out.push({ id: 'cycle', label: `Cycle area (bars ${Math.floor(p.loop.start / bpb) + 1}–${Math.ceil(p.loop.end / bpb)})`, start: p.loop.start, end: p.loop.end });
   for (const s of p.sections ?? []) out.push({ id: 's:' + s.id, label: `${s.name} (bar ${Math.floor(s.start / bpb) + 1})`, start: s.start, end: s.start + s.length });
   return out;
-}
-
-// ------------------------------------------------------------------ generation
-
-export function familyOfTrack(t: Track) {
-  const pr = getPreset(t.instrument);
-  return familyOf(t.instrument, pr.category, t.type);
-}
-
-export function styleForTrack(t: Track): StyleId {
-  return useAssistantUi.getState().style[t.id] ?? defaultStyleFor(familyOfTrack(t));
-}
-
-const DRUM_STYLE_BY_KIT: Record<string, DrumStyle> = {
-  'kit-808': 'hiphop',
-  'kit-909': 'house',
-  'kit-techno': 'house',
-  'kit-lofi': 'lofi',
-  'kit-linn': 'synthwave',
-  'kit-cr78': 'funk',
-};
-
-/**
- * Generate a part for a track over a range, splitting into one region per section
- * when the song has sections. Replaces regions that lie entirely inside the range.
- */
-export function generateForTrack(trackId: string, style: StyleId | DrumStyle, start: number, end: number, opts: { energy?: number; seed?: number; density?: number } = {}): number {
-  const p = useStore.getState().project!;
-  const t = p.tracks.find((x) => x.id === trackId);
-  if (!t || t.type === 'audio') return 0;
-  const chords = p.chords ?? [];
-  if (t.type !== 'drums' && !chords.some((c) => c.beat < end && c.beat + c.length > start)) {
-    toast('Add chords to the chord track first (or use “Fill with progression”)', 'error');
-    return 0;
-  }
-  const bpb = beatsPerBar(p.timeSig);
-  const seed = opts.seed ?? Math.floor(Math.random() * 1e6);
-  const preset = getPreset(t.instrument);
-  const range = preset.range ?? [36, 96];
-  // Split the range at section boundaries.
-  const cuts = new Set<number>([start, end]);
-  for (const s of p.sections ?? []) {
-    if (s.start > start && s.start < end) cuts.add(s.start);
-  }
-  const bounds = [...cuts].sort((a, b) => a - b);
-  const regions: ReturnType<typeof createMidiRegion>[] = [];
-  for (let i = 0; i < bounds.length - 1; i++) {
-    const s = bounds[i];
-    const e = bounds[i + 1];
-    if (e - s < 0.25) continue;
-    const sec = (p.sections ?? []).find((x) => x.start <= s + 1e-6 && x.start + x.length > s + 1e-6);
-    let notes;
-    if (t.type === 'drums') {
-      notes = generateDrums(style as DrumStyle, 0, Math.max(1, Math.round((e - s) / bpb)), p.timeSig, opts.energy ?? 0.6, seed + i, { fillAtEnd: i < bounds.length - 2 || bounds.length === 2, crashAtStart: !!sec && /chorus|drop/i.test(sec.name) });
-      notes = notes.filter((n) => n.start < e - s);
-    } else {
-      const base = { chords, start: s, end: e, timeSig: p.timeSig, key: p.key, range, energy: opts.energy ?? 0.6, seed: seed + (sec ? hash(sec.name) : i) };
-      notes = style === 'melody' ? generateMelody({ ...base, density: opts.density }) : generatePart(style as StyleId, base);
-      notes = notes.map((n) => ({ ...n, start: n.start - s }));
-    }
-    if (!notes.length) continue;
-    const r = createMidiRegion(s, e - s, notes, sec?.name ?? styleLabel(style));
-    regions.push(r);
-  }
-  if (!regions.length) return 0;
-  commit((d) => {
-    const dt = d.tracks.find((x) => x.id === trackId);
-    if (!dt) return;
-    dt.regions = dt.regions.filter((r) => !(r.start >= start - 1e-6 && r.start + r.length <= end + 1e-6));
-    dt.regions.push(...regions);
-    growSong(d, end);
-  });
-  useStore.setState({ selectedTrackId: trackId, selectedRegionIds: regions.map((r) => r.id), editingRegionId: regions[0].id });
-  return regions.reduce((a, r) => a + r.notes.length, 0);
-}
-
-function hash(s: string): number {
-  let h = 0;
-  for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return h % 100000;
-}
-
-function styleLabel(s: string): string {
-  if (s === 'melody') return 'Melody';
-  return STYLES.find((x) => x.id === s)?.name ?? s.replace(/^[a-z]+-/, '').replace(/^\w/, (c) => c.toUpperCase());
-}
-
-export function drumStyleForKit(kit: string): DrumStyle {
-  return DRUM_STYLE_BY_KIT[kit] ?? 'pop';
-}
-
-/** Replace the notes of an existing MIDI region with a fresh melody over its chords. */
-export function regenerateMelodyInRegion(regionId: string, density = 0.55, seed = Math.floor(Math.random() * 1e6)): boolean {
-  const p = useStore.getState().project!;
-  for (const t of p.tracks) {
-    const r = t.regions.find((x) => x.id === regionId);
-    if (!r || r.kind !== 'midi') continue;
-    if (!(p.chords ?? []).some((c) => c.beat < r.start + r.length && c.beat + c.length > r.start)) {
-      toast('Add chords under this region first', 'error');
-      return false;
-    }
-    const notes = generateMelody({ chords: p.chords, start: r.start, end: r.start + r.length, timeSig: p.timeSig, key: p.key, range: getPreset(t.instrument).range ?? [55, 84], density, seed });
-    commit((d) => {
-      const dt = d.tracks.find((x) => x.id === t.id);
-      const dr = dt?.regions.find((x) => x.id === regionId);
-      if (dr && dr.kind === 'midi') {
-        dr.notes = notes.map((n) => ({ ...n, start: n.start - r.start + r.offset }));
-        dr.loop = false;
-      }
-    });
-    return true;
-  }
-  return false;
 }

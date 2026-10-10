@@ -1,6 +1,6 @@
 // Friendly "what now?" card shown over an empty song.
 import { useState } from 'react';
-import { Piano, Wand2, Library, Plus, Circle, MousePointerClick, X, Lightbulb } from 'lucide-react';
+import { Piano, Plus, Circle, MousePointerClick, X, Lightbulb } from 'lucide-react';
 import { openModal, useStore } from '../../state/store';
 import { getEngine } from '../../audio/engine';
 import { useTour } from './tourState';
@@ -16,8 +16,6 @@ export default function EmptyHint() {
 
   const items: { icon: React.ReactNode; label: string; k: string; run: () => void }[] = [
     { icon: <Piano size={16} />, label: 'Play the keyboard', k: 'P', run: () => useStore.setState({ dockTab: 'instrument', dockMaximized: false }) },
-    { icon: <Wand2 size={16} />, label: 'Let the Song Wizard write a song', k: 'W', run: () => openModal('songWizard') },
-    { icon: <Library size={16} />, label: 'Drag in ready-made loops', k: 'Y', run: () => useStore.setState({ libraryOpen: true }) },
     { icon: <Plus size={16} />, label: 'Add an instrument or mic track', k: '⌥⌘N', run: () => openModal('newTrack') },
     { icon: <Circle size={16} />, label: 'Record what you play', k: 'R', run: () => void getEngine().record() },
     {

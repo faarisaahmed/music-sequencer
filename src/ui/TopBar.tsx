@@ -20,7 +20,7 @@ import {
   Volume2,
   Check,
   Loader2,
-  Wand2,
+  Music4,
 } from 'lucide-react';
 import { beginGesture, commit, endGesture, live, openModal, redo, undo, useStore, useTransport, type DockTab } from '../state/store';
 import { closeProject, setBpm, setKey } from '../state/actions';
@@ -32,7 +32,6 @@ import { saveListeners, type SaveStatus } from '../state/persistence';
 import { HSlider } from './common/controls';
 import { startDrag } from './common/drag';
 import FullScoreButton from './editors/score/FullScoreButton';
-import ViewSwitch from './liveloops/ViewSwitch';
 import { CollabBar } from './collab/CollabUI';
 
 function MetronomeIcon({ size = 17 }: { size?: number }) {
@@ -259,15 +258,14 @@ export default function TopBar() {
       </div>
 
       <div className="tb-group">
-        <ViewSwitch />
-        <button className={'btn icon tb' + (libraryOpen ? ' active' : '')} title="Library (Y)" onClick={() => useStore.setState({ libraryOpen: !libraryOpen })}>
+        <button className={'btn icon tb' + (libraryOpen ? ' active' : '')} title="Sounds (Y)" onClick={() => useStore.setState({ libraryOpen: !libraryOpen })}>
           <Library size={17} />
         </button>
         <DockButton tab="fx" icon={<SlidersHorizontal size={17} />} label="Smart Controls & FX" shortcut="B" />
         <DockButton tab="editor" icon={<SquarePen size={17} />} label="Editor" shortcut="E" />
         <DockButton tab="instrument" icon={<Piano size={17} />} label="Instrument / Keyboard" shortcut="P" />
         <DockButton tab="mixer" icon={<SlidersVertical size={17} />} label="Mixer" shortcut="X" />
-        <DockButton tab="assistant" icon={<Wand2 size={17} />} label="Songwriter: chords, auto-accompaniment & Song Wizard" shortcut="W" />
+        <DockButton tab="assistant" icon={<Music4 size={17} />} label="Chord Track" shortcut="W" />
         <FullScoreButton />
         <button className="btn icon tb" title="New Track (⌥⌘N)" onClick={() => openModal('newTrack')}>
           <Plus size={18} />

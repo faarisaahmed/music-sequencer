@@ -14,7 +14,7 @@ const TABS: { id: DockTab; label: string }[] = [
   { id: 'editor', label: 'Editor' },
   { id: 'instrument', label: 'Instrument' },
   { id: 'mixer', label: 'Mixer' },
-  { id: 'assistant', label: 'Songwriter' },
+  { id: 'assistant', label: 'Chord Track' },
 ];
 
 export default function Dock() {

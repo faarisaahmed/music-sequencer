@@ -2,13 +2,12 @@
 // and Step / Velocity / Note Repeat / Chance / Loop editing modes.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronLeft, ChevronRight, ChevronsRight, Dices, Eraser, LayoutGrid, MoreHorizontal, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronsRight, Eraser, MoreHorizontal, Plus } from 'lucide-react';
 import type { Draft } from 'immer';
 import type { MidiRegion, Note, Project } from '../../model/types';
 import { beginGesture, commit, draftRegion, endGesture, findRegion, live, useStore, useTransport } from '../../state/store';
 import { DRUM_LANES, DRUM_NAMES, beatsPerBar } from '../../model/music';
 import { uid } from '../../model/defaults';
-import { drumPattern } from '../../model/templates';
 import { PRESETS } from '../../audio/presets';
 import { setTrackInstrument } from '../../state/actions';
 import { getEngine } from '../../audio/engine';
@@ -16,7 +15,6 @@ import { showContextMenu, type MenuItem } from '../common/menus';
 import { clamp } from '../common/drag';
 import { DrumIcon } from './steps/drumVisuals';
 import { drumColor } from './steps/drumColors';
-import { DRUM_PRESETS, presetSteps, type DrumPreset } from './steps/patterns';
 import { useToolbarSlot } from './useToolbarSlot';
 import './steps/steps.css';
 
@@ -240,93 +238,6 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
       if (r.length < r.contentLength) r.length = r.contentLength;
     });
 
-  const applyPreset = (p: DrumPreset) => {
-    const steps = presetSteps(p);
-    // Fit the preset to the current pattern length by repeating it.
-    const targetSteps = Math.max(steps, Math.round(cl / 0.25));
-    const lanesRep: Record<number, string> = {};
-    for (const [pitch, pat] of Object.entries(p.lanes)) {
-      const clean = pat.replace(/\s|\|/g, '').padEnd(steps, '.');
-      lanesRep[Number(pitch)] = clean.repeat(Math.ceil(targetSteps / steps)).slice(0, targetSteps);
-    }
-    setRes(0.25);
-    editRegion((r) => {
-      r.notes = drumPattern(lanesRep, 0.25);
-      r.contentLength = targetSteps * 0.25;
-      r.loop = true;
-      r.name = p.name;
-      if (r.length < r.contentLength) r.length = r.contentLength;
-    });
-    const newExtra = Object.keys(p.lanes).map(Number).filter((x) => !DEFAULT_LANES.includes(x) && !extra.includes(x));
-    if (newExtra.length) setExtra([...extra, ...newExtra]);
-  };
-
-  const randomize = () => {
-    const beatsInBar = Math.round(bpb / (4 / project.timeSig[1]));
-    const out: Note[] = [];
-    const add = (pitch: number, step: number, vel: number) => out.push({ id: uid('n'), pitch, start: step * res, duration: res, velocity: clamp(vel, 0.1, 1) });
-    const half = Math.max(1, Math.round(group / 2));
-    const lastBarStart = Math.floor((patternSteps - 1) / barSteps) * barSteps;
-    const opened = new Set<number>();
-    for (const pitch of lanes) {
-      for (let i = 0; i < patternSteps; i++) {
-        const pos = i % group;
-        const beat = Math.floor(i / group) % beatsInBar;
-        const onBeat = pos === 0;
-        const r = Math.random();
-        const accent = onBeat ? 0.95 : 0.7 + Math.random() * 0.15;
-        switch (pitch) {
-          case 36:
-          case 35: {
-            const p = onBeat ? (beat === 0 ? 1 : beat === 2 ? 0.7 : 0.2) : pos === half ? 0.22 : 0.1;
-            if (r < p) add(pitch, i, accent);
-            break;
-          }
-          case 38:
-          case 40:
-            if (onBeat && beat % 2 === 1) add(pitch, i, 0.95);
-            else if (!onBeat && r < 0.07) add(pitch, i, 0.4);
-            break;
-          case 39:
-            if (onBeat && beat % 2 === 1 && r < 0.45) add(pitch, i, 0.85);
-            break;
-          case 42:
-          case 44:
-            if (pos % Math.max(1, half) === 0 ? r < 0.88 : r < 0.3) add(pitch, i, onBeat ? 0.85 : 0.55 + Math.random() * 0.2);
-            break;
-          case 46:
-            if (pos === half && beat === beatsInBar - 1 && r < 0.55) {
-              add(pitch, i, 0.75);
-              opened.add(i);
-            }
-            break;
-          case 49:
-            if (i === 0 && r < 0.6) add(pitch, i, 0.9);
-            break;
-          case 51:
-            if (pos % half === 0 && r < 0.4) add(pitch, i, 0.6);
-            break;
-          case 41:
-          case 43:
-          case 45:
-          case 47:
-          case 48:
-          case 50:
-            if (i >= lastBarStart + barSteps - group && r < 0.45) add(pitch, i, 0.8);
-            break;
-          default:
-            if (r < (onBeat ? 0.18 : 0.1)) add(pitch, i, 0.5 + Math.random() * 0.4);
-        }
-      }
-    }
-    // Open hats choke closed hats on the same step.
-    const final = out.filter((n) => !(n.pitch === 42 && opened.has(Math.round(n.start / res))));
-    editRegion((r) => {
-      r.notes = final;
-      r.name = 'Random Beat';
-    });
-  };
-
   const shift = (dir: number) =>
     editRegion((r) => {
       for (const n of r.notes) n.start = (((n.start + dir * res) % r.contentLength) + r.contentLength) % r.contentLength;
@@ -393,8 +304,6 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
     );
   };
 
-  const presetMenu = (e: React.MouseEvent) =>
-    showContextMenu(e, [{ title: 'Pattern Presets' }, ...DRUM_PRESETS.map((p) => ({ label: p.name, onClick: () => applyPreset(p) }))]);
 
   const kits = PRESETS.filter((p) => p.kind === 'drums');
   const currentBars = cl / bpb;
@@ -559,12 +468,6 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
             if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
           }}
         />
-        <button className="btn ss-bbtn" title="Pattern presets" onClick={presetMenu}>
-          <LayoutGrid size={17} />
-        </button>
-        <button className="btn ss-bbtn" title="Randomize pattern" onClick={randomize}>
-          <Dices size={18} />
-        </button>
         <div className="ss-hint faint">
           {mode === 'step' && 'Click or drag to paint steps · right-click a row for more'}
           {mode === 'velocity' && 'Drag up/down on a step to set how hard it hits'}

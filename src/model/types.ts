@@ -57,8 +57,6 @@ export interface MidiRegion extends RegionBase {
   notes: Note[];
   /** Score dynamics & hairpins. */
   marks?: ScoreMark[];
-  /** Present on Drummer regions: notes are generated from these settings. */
-  drummer?: DrummerSettings;
 }
 
 export interface AudioRegion extends RegionBase {
@@ -145,8 +143,6 @@ export interface Track {
   /** Transpose applied at playback for MIDI tracks (semitones). */
   transpose: number;
   height?: number;
-  /** Drummer track: the virtual drummer playing it. */
-  drummer?: { style: DrummerStyle };
 }
 
 export type ScaleType =
@@ -204,29 +200,12 @@ export interface Project {
   updatedAt: number;
   /** Data-URL thumbnail colour stripe for the song browser. */
   coverHue?: number;
-  /** Chord track: chord symbols on the timeline that drive accompaniment generation. */
+  /** Chord track: chord symbols on the timeline. */
   chords: ChordSymbol[];
   /** Master-bus mastering chain settings. */
   mastering?: MasteringSettings;
   /** Arrangement markers (Intro, Verse, Chorus…). */
   sections?: Section[];
-  /** Live Loops grid (GarageBand-style cells per track × scene). */
-  liveLoops?: LiveLoops;
-}
-
-export interface LiveCell {
-  id: string;
-  trackId: string;
-  scene: number;
-  /** Loop content; start/offset are 0 and it repeats every `length` beats. */
-  region: Region;
-}
-
-export interface LiveLoops {
-  scenes: { id: string; name: string }[];
-  cells: LiveCell[];
-  /** Launch quantisation in beats (0 = immediate). */
-  quantize: number;
 }
 
 export interface Section {
@@ -235,29 +214,6 @@ export interface Section {
   start: number; // beats
   length: number; // beats
   color: string;
-}
-
-export type DrummerStyle = 'rock' | 'pop' | 'hiphop' | 'trap' | 'funk' | 'jazz' | 'house' | 'lofi' | 'songwriter' | 'rnb' | 'reggae' | 'latin';
-
-/** Settings of a Drummer region — its notes are regenerated from these. */
-export interface DrummerSettings {
-  style: DrummerStyle;
-  complexity: number; // 0..1 (Simple ↔ Complex)
-  loudness: number; // 0..1 (Soft ↔ Loud)
-  fills: number; // 0..1
-  swing: number; // 0..1
-  pieces: { kit: boolean; hats: boolean; cymbals: boolean; toms: boolean; perc: boolean };
-  /** Variation per piece (0..1): kick/snare pattern, hi-hat openness → ride, percussion density. */
-  kickVar: number;
-  hatVar: number;
-  percVar: number;
-  /** Kick follows the rhythm of this track (bass etc.). */
-  followTrackId?: string | null;
-  seed: number;
-  /** Region length the notes were generated for (regenerated when it changes). */
-  generatedFor?: number;
-  /** Context signature (position, length, sections, followed track) of the last generation. */
-  sig?: string;
 }
 
 export interface ProjectMeta {

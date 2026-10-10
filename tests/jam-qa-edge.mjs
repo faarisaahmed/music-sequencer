@@ -119,10 +119,10 @@ try {
   await converged([A, B], 20000, 'midi import');
   check('midiImportPropagates', (await read(A, 'return p.tracks.length')) === (await read(B, 'return p.tracks.length')));
 
-  // 7. Live Loops grid edits propagate.
-  await commit(B, `d.liveLoops = { scenes: [{id:'s1', name:'Intro'}], cells: [] };`);
-  await converged([A, B], 20000, 'liveloops');
-  check('liveLoopsPropagate', (await read(A, 'return p.liveLoops?.scenes?.[0]?.name')) === 'Intro');
+  // 7. Arrangement sections propagate.
+  await commit(B, `d.sections = [{ id: 'sec1', name: 'Intro', start: 0, length: 16, color: '#5aa8ff' }];`);
+  await converged([A, B], 20000, 'sections');
+  check('sectionsPropagate', (await read(A, 'return p.sections?.[0]?.name')) === 'Intro');
 
   // 8. Four participants editing at once.
   const C = await newPeer('C');

@@ -153,9 +153,6 @@ export function useGlobalShortcuts(): void {
         case 'b':
           useStore.setState({ dockTab: s.dockTab === 'fx' ? null : 'fx', dockMaximized: false });
           break;
-        case 'g':
-          useStore.setState({ mainView: s.mainView === 'liveloops' ? 'tracks' : 'liveloops' });
-          break;
         case 'y':
           useStore.setState({ libraryOpen: !s.libraryOpen });
           break;
