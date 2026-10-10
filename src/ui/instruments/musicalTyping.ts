@@ -35,7 +35,7 @@ export function useMusicalTyping(): void {
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       const s = useStore.getState();
-      if (!s.musicalTyping || s.modal || isTyping(e) || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.defaultPrevented || !s.musicalTyping || s.modal || isTyping(e) || e.metaKey || e.ctrlKey || e.altKey) return;
       const key = e.key.toLowerCase();
       const track = findTrack(s.project, s.selectedTrackId);
       if (!track) return;
