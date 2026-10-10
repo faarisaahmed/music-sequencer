@@ -1,0 +1,144 @@
+.score-editor {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.score-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.score-tools select {
+  height: 26px;
+  padding: 0 6px;
+  font-size: 12px;
+}
+.score-palette {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--border-soft);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.pal-group {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-2);
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  padding: 2px;
+}
+.pal-btn {
+  min-width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+}
+.pal-btn:hover {
+  color: var(--text);
+  background: var(--panel-3);
+}
+.pal-btn.on {
+  background: var(--accent);
+  color: white;
+}
+.pal-btn.acc {
+  font-size: 17px;
+}
+.pal-btn.txt {
+  font-size: 11px;
+  font-weight: 600;
+}
+.pal-btn.dyn {
+  font-family: 'Times New Roman', Georgia, serif;
+  font-style: italic;
+  font-weight: 700;
+  font-size: 15px;
+}
+.score-hint {
+  font-size: 11px;
+  margin-left: auto;
+}
+.score-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: #3a3a40;
+  padding: 16px 24px 40px;
+}
+.score-page {
+  position: relative;
+  margin: 0 auto;
+  background: #fdfcf8;
+  box-shadow: 0 6px 30px rgba(0, 0, 0, 0.5);
+  border-radius: 2px;
+}
+.score-svg {
+  position: relative;
+  z-index: 1;
+  cursor: default;
+}
+.score-svg.input {
+  cursor: crosshair;
+}
+.score-svg svg {
+  display: block;
+}
+.score-overlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
+  z-index: 2;
+}
+.score-cursor {
+  position: absolute;
+  width: 14px;
+  background: rgba(47, 140, 255, 0.18);
+  border: 1px solid rgba(47, 140, 255, 0.6);
+  border-radius: 3px;
+}
+.score-ghost {
+  position: absolute;
+  width: 12px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgba(31, 122, 255, 0.55);
+  transform: rotate(-20deg);
+}
+.score-ghost-ledger {
+  position: absolute;
+  width: 20px;
+  height: 1px;
+  background: rgba(31, 122, 255, 0.55);
+}
+.score-ghost-label {
+  position: absolute;
+  font-size: 10px;
+  font-weight: 600;
+  color: #1f7aff;
+  background: rgba(255, 255, 255, 0.85);
+  padding: 0 3px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.score-playhead {
+  position: absolute;
+  width: 2px;
+  margin-left: -1px;
+  background: #ff3b30;
+  box-shadow: 0 0 4px rgba(255, 59, 48, 0.6);
+}
