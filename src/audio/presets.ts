@@ -103,6 +103,11 @@ function sampler(
   };
 }
 
+/** Make a sampler preset's Tone knob start at a given value. */
+function withTone(p: InstrumentPreset, tone: number): InstrumentPreset {
+  return { ...p, controls: p.controls.map((c) => (c.key === 'tone' ? { ...c, default: tone } : c)) };
+}
+
 function synth(id: string, name: string, icon: string, description: string, synth: SynthDef, range: [number, number] = [36, 96]): InstrumentPreset {
   return {
     id,
@@ -197,6 +202,106 @@ export const PRESETS: InstrumentPreset[] = [
       filter: { type: 'bandpass', cutoff: 1800, q: 2, envAmount: 1.6, env: env(0.002, 0.25, 0.1, 0.1) },
       amp: env(0.002, 0.6, 0.2, 0.08),
       gain: 0.45,
+    }),
+    category: 'Keyboards',
+  },
+  withTone(sampler('felt-piano', 'Felt Piano', 'Keyboards', 'piano', 'Soft, muted upright with felt dampers', { samples: salamander(), release: 1.4, gain: 1.25, spread: 0.4, tone: 0.08 }, [21, 108], 1.4), 0.08),
+  withTone(sampler('honky-tonk', 'Honky-Tonk Piano', 'Keyboards', 'piano', 'Bright, jangly saloon upright', { samples: nbSamples('piano', ['A1', 'C2', 'D#2', 'F#2', 'A2', 'C3', 'D#3', 'F#3', 'A3', 'C4', 'D#4', 'F#4', 'A4', 'C5', 'D#5', 'F#5', 'A5', 'C6', 'D#6', 'F#6', 'A6', 'C7']), release: 0.6, gain: 1, spread: 0.3, tone: 0.95 }, [21, 108], 0.6), 0.95),
+  {
+    ...synth('suitcase-ep', 'Suitcase Electric Piano', 'epiano', 'Warm tine piano with stereo tremolo shimmer', {
+      oscs: [{ type: 'sine', gain: 1 }, { type: 'sine', octave: 1, gain: 0.08 }],
+      fm: { ratio: 1, index: 1.1, decay: 1.6, sustain: 0.08 },
+      filter: { type: 'lowpass', cutoff: 3800, q: 0.5, envAmount: 0.3, env: env(0.005, 1, 0.5, 0.5) },
+      amp: env(0.003, 3, 0.2, 0.5),
+      vibrato: { rate: 5.2, depth: 4, delay: 0.05 },
+      gain: 0.55,
+    }),
+    category: 'Keyboards',
+  },
+  {
+    ...synth('wurli', 'Wurly Electric Piano', 'epiano', 'Reedy, barky 70s electric piano', {
+      oscs: [{ type: 'triangle', gain: 1 }, { type: 'square', gain: 0.12, octave: 1 }],
+      fm: { ratio: 2, index: 0.9, decay: 0.35, sustain: 0.05 },
+      filter: { type: 'lowpass', cutoff: 2600, q: 1.2, envAmount: 1, env: env(0.003, 0.4, 0.3, 0.3) },
+      amp: env(0.003, 1.6, 0.3, 0.3),
+      gain: 0.45,
+    }),
+    category: 'Keyboards',
+  },
+  {
+    ...synth('harpsichord', 'Harpsichord', 'piano', 'Baroque plucked harpsichord', {
+      oscs: [
+        { type: 'sawtooth', gain: 0.6 },
+        { type: 'square', gain: 0.25, octave: 1 },
+        { type: 'sawtooth', gain: 0.2, octave: -1, detune: 3 },
+      ],
+      filter: { type: 'highpass', cutoff: 220, q: 0.7, envAmount: 0, env: env(0.001, 0.2, 1, 0.2) },
+      amp: env(0.001, 1.8, 0, 0.25),
+      gain: 0.32,
+    }, [29, 89]),
+    category: 'Keyboards',
+  },
+  {
+    ...synth('celesta', 'Celesta', 'bell', 'Sparkling orchestral celesta', {
+      oscs: [{ type: 'sine', gain: 1 }, { type: 'sine', octave: 2, gain: 0.1 }],
+      fm: { ratio: 4, index: 0.8, decay: 0.25, sustain: 0.02 },
+      filter: { type: 'lowpass', cutoff: 9000, q: 0.5, envAmount: 0, env: env(0.001, 0.2, 1, 0.2) },
+      amp: env(0.001, 1.6, 0, 0.9),
+      gain: 0.5,
+    }, [60, 108]),
+    category: 'Keyboards',
+  },
+  {
+    ...synth('toy-piano', 'Toy Piano', 'piano', 'Plinky, metallic toy piano', {
+      oscs: [{ type: 'sine', gain: 1 }],
+      fm: { ratio: 5.4, index: 1.8, decay: 0.15, sustain: 0.05 },
+      filter: { type: 'highpass', cutoff: 400, q: 0.5, envAmount: 0, env: env(0.001, 0.2, 1, 0.2) },
+      amp: env(0.001, 0.9, 0, 0.4),
+      gain: 0.45,
+    }, [60, 96]),
+    category: 'Keyboards',
+  },
+  {
+    ...synth('accordion', 'Accordion', 'organ', 'Musette accordion with detuned reeds', {
+      oscs: [
+        { type: 'sawtooth', gain: 0.45, detune: -9 },
+        { type: 'sawtooth', gain: 0.45, detune: 9 },
+        { type: 'square', gain: 0.25, octave: -1 },
+      ],
+      filter: { type: 'lowpass', cutoff: 2200, q: 1, envAmount: 0.2, env: env(0.04, 0.3, 0.9, 0.1) },
+      amp: env(0.04, 0.2, 0.95, 0.12),
+      gain: 0.28,
+    }, [41, 89]),
+    category: 'Keyboards',
+  },
+  {
+    ...synth('church-organ', 'Pipe Organ', 'organ', 'Majestic cathedral pipe organ', {
+      oscs: [
+        { type: 'sine', gain: 0.6, octave: -1 },
+        { type: 'sine', gain: 0.6 },
+        { type: 'triangle', gain: 0.35, octave: 1 },
+        { type: 'sine', gain: 0.2, octave: 2 },
+      ],
+      noise: 0.006,
+      filter: { type: 'lowpass', cutoff: 5000, q: 0.5, envAmount: 0, env: env(0.05, 0.2, 1, 0.3) },
+      amp: env(0.06, 0.2, 1, 0.35),
+      gain: 0.3,
+    }),
+    category: 'Keyboards',
+  },
+  {
+    ...synth('rock-organ', 'Rock Organ', 'organ', 'Overdriven tonewheel organ with percussion click', {
+      oscs: [
+        { type: 'sine', gain: 0.7, octave: -1 },
+        { type: 'sine', gain: 0.7 },
+        { type: 'sine', gain: 0.5, octave: 1 },
+        { type: 'square', gain: 0.08, octave: 2 },
+      ],
+      fm: { ratio: 3, index: 0.4, decay: 0.08, sustain: 0 },
+      filter: { type: 'lowpass', cutoff: 4500, q: 0.7, envAmount: 0.3, env: env(0.002, 0.1, 0.8, 0.1) },
+      amp: env(0.004, 0.2, 0.95, 0.06),
+      vibrato: { rate: 6.5, depth: 6, delay: 0 },
+      gain: 0.3,
     }),
     category: 'Keyboards',
   },

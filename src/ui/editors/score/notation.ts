@@ -1,5 +1,6 @@
 // Pure conversion of MIDI notes → notated measures: parts, staves, voices, triplets, ties, rests.
 import type { Articulation, KeySignature } from '../../../model/types';
+import { parentMajorPc } from '../../../model/music';
 
 export const LETTERS = ['c', 'd', 'e', 'f', 'g', 'a', 'b'];
 export const NATURAL_PC = [0, 2, 4, 5, 7, 9, 11];
@@ -14,7 +15,7 @@ const VF_MAJOR_NAMES: Record<number, string> = {
 
 /** Number of sharps (>0) or flats (<0) in the key signature. */
 export function keyFifths(key: KeySignature): number {
-  const majorPc = key.mode === 'major' ? key.tonic : (key.tonic + 3) % 12;
+  const majorPc = parentMajorPc(key);
   return MAJOR_FIFTHS[((majorPc % 12) + 12) % 12];
 }
 
@@ -35,7 +36,7 @@ export function keyAlters(key: KeySignature): number[] {
 export const C_MAJOR: KeySignature = { tonic: 0, mode: 'major' };
 
 export function transposeKey(key: KeySignature, semis: number): KeySignature {
-  return { tonic: (((key.tonic + semis) % 12) + 12) % 12, mode: key.mode };
+  return { ...key, tonic: (((key.tonic + semis) % 12) + 12) % 12 };
 }
 
 export interface Spelled {

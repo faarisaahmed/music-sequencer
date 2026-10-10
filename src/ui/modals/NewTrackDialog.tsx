@@ -1,3 +1,4 @@
+import { ChevronLeft } from 'lucide-react';
 import { useState } from 'react';
 import { closeModal, useStore } from '../../state/store';
 import { addTrack, createEmptyRegion } from '../../state/actions';
@@ -67,7 +68,7 @@ export default function NewTrackDialog() {
             ))}
             <div className="spacer" />
             <button className="btn ghost" onClick={() => setKind(null)}>
-              ← Back
+              <ChevronLeft size={15} /> Back
             </button>
           </div>
           <div className="preset-grid">
@@ -106,7 +107,7 @@ export default function NewTrackDialog() {
           </div>
           <div>
             <button className="btn ghost" onClick={() => setKind(null)}>
-              ← Back
+              <ChevronLeft size={15} /> Back
             </button>
           </div>
         </div>
@@ -124,7 +125,7 @@ export default function NewTrackDialog() {
           </div>
           <div>
             <button className="btn ghost" onClick={() => setKind(null)}>
-              ← Back
+              <ChevronLeft size={15} /> Back
             </button>
           </div>
         </div>

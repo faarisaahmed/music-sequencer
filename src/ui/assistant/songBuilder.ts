@@ -22,7 +22,6 @@ export interface PartChoice {
 export interface Genre {
   id: string;
   name: string;
-  emoji: string;
   bpm: [number, number];
   mode: 'major' | 'minor';
   drums: { kit: string; style: DrumStyle };
@@ -47,7 +46,6 @@ export const GENRES: Genre[] = [
   {
     id: 'pop',
     name: 'Pop',
-    emoji: '✨',
     bpm: [100, 124],
     mode: 'major',
     drums: { kit: 'kit-acoustic', style: 'pop' },
@@ -61,7 +59,6 @@ export const GENRES: Genre[] = [
   {
     id: 'rock',
     name: 'Rock',
-    emoji: '🎸',
     bpm: [110, 140],
     mode: 'major',
     drums: { kit: 'kit-acoustic', style: 'rock' },
@@ -77,7 +74,6 @@ export const GENRES: Genre[] = [
   {
     id: 'hiphop',
     name: 'Hip Hop',
-    emoji: '🎤',
     bpm: [84, 96],
     mode: 'minor',
     drums: { kit: 'kit-808', style: 'hiphop' },
@@ -93,7 +89,6 @@ export const GENRES: Genre[] = [
   {
     id: 'trap',
     name: 'Trap',
-    emoji: '🔥',
     bpm: [130, 150],
     mode: 'minor',
     drums: { kit: 'kit-808', style: 'trap' },
@@ -107,7 +102,6 @@ export const GENRES: Genre[] = [
   {
     id: 'lofi',
     name: 'Lo-Fi',
-    emoji: '☕',
     bpm: [72, 88],
     mode: 'major',
     drums: { kit: 'kit-lofi', style: 'lofi' },
@@ -124,7 +118,6 @@ export const GENRES: Genre[] = [
   {
     id: 'house',
     name: 'House / EDM',
-    emoji: '🪩',
     bpm: [120, 128],
     mode: 'minor',
     drums: { kit: 'kit-909', style: 'house' },
@@ -138,7 +131,6 @@ export const GENRES: Genre[] = [
   {
     id: 'rnb',
     name: 'R&B / Soul',
-    emoji: '💜',
     bpm: [70, 92],
     mode: 'major',
     drums: { kit: 'kit-808', style: 'rnb' },
@@ -151,7 +143,6 @@ export const GENRES: Genre[] = [
   {
     id: 'synthwave',
     name: 'Synthwave',
-    emoji: '🌆',
     bpm: [96, 112],
     mode: 'minor',
     drums: { kit: 'kit-linn', style: 'synthwave' },
@@ -166,7 +157,6 @@ export const GENRES: Genre[] = [
   {
     id: 'funk',
     name: 'Funk',
-    emoji: '🕺',
     bpm: [100, 116],
     mode: 'minor',
     drums: { kit: 'kit-acoustic', style: 'funk' },
@@ -180,7 +170,6 @@ export const GENRES: Genre[] = [
   {
     id: 'folk',
     name: 'Folk / Country',
-    emoji: '🤠',
     bpm: [88, 116],
     mode: 'major',
     drums: { kit: 'kit-acoustic', style: 'country' },
@@ -193,7 +182,6 @@ export const GENRES: Genre[] = [
   {
     id: 'ballad',
     name: 'Piano Ballad',
-    emoji: '🎹',
     bpm: [64, 80],
     mode: 'major',
     drums: { kit: 'kit-acoustic', style: 'ballad' },
@@ -207,7 +195,6 @@ export const GENRES: Genre[] = [
   {
     id: 'cinematic',
     name: 'Cinematic',
-    emoji: '🎬',
     bpm: [80, 100],
     mode: 'minor',
     drums: { kit: 'kit-acoustic', style: 'cinematic' },
@@ -222,7 +209,6 @@ export const GENRES: Genre[] = [
   {
     id: 'jazz',
     name: 'Jazz',
-    emoji: '🎷',
     bpm: [110, 150],
     mode: 'major',
     drums: { kit: 'kit-acoustic', style: 'jazz' },

@@ -1,6 +1,6 @@
 // High-level editing operations shared across views.
 import { current, isDraft, type Draft } from 'immer';
-import type { MidiRegion, Note, Project, Region, Track, TrackType } from '../model/types';
+import type { MidiRegion, Note, Project, Region, ScaleType, Track, TrackType } from '../model/types';
 import { createAudioRegion, createMidiRegion, createProject, createTrack, uid } from '../model/defaults';
 import { beatsPerBar, snap } from '../model/music';
 import { getPreset } from '../audio/presets';
@@ -406,14 +406,14 @@ export function setBpm(bpm: number): void {
 }
 
 /** Change the project key; optionally transpose all pitched MIDI content by the interval. */
-export function setKey(tonic: number, mode: 'major' | 'minor', transposeContent: boolean): void {
+export function setKey(tonic: number, mode: 'major' | 'minor', transposeContent: boolean, scale?: ScaleType): void {
   const p = useStore.getState().project;
   if (!p) return;
   let delta = tonic - p.key.tonic;
   if (delta > 6) delta -= 12;
   if (delta < -6) delta += 12;
   commit((d) => {
-    d.key = { tonic, mode };
+    d.key = scale && scale !== 'major' && scale !== 'minor' ? { tonic, mode, scale } : { tonic, mode };
     if (transposeContent && delta) {
       for (const t of d.tracks) {
         if (t.type !== 'instrument') continue;

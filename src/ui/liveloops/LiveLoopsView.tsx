@@ -585,7 +585,7 @@ export default function LiveLoopsView() {
         </button>
         <div className="spacer" />
         <div className="ll-hint faint">
-          {playing ? (useStore.getState().recording ? 'Recording your performance to Tracks…' : 'Tap cells to launch · press R to record a performance') : 'Tap a cell or ▶ a scene to start · double-click to edit · drag loops from the Library'}
+          {playing ? (useStore.getState().recording ? 'Recording your performance to Tracks…' : 'Tap cells to launch · press R to record a performance') : 'Tap a cell or a scene play button to start · double-click to edit · drag loops from the Library'}
         </div>
       </div>
       <div className="ll-grid-wrap">

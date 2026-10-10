@@ -318,8 +318,14 @@
   border-color: var(--pink);
   background: rgba(255, 45, 146, 0.16);
 }
-.wiz-emoji {
-  font-size: 16px;
+.wiz-genre-icon {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+.wiz-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 .wiz-pill {
   border: 1px solid var(--border-soft);

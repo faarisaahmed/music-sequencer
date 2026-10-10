@@ -3,7 +3,8 @@ import type { Draft } from 'immer';
 import type { Project } from '../../model/types';
 import { closeModal, commit, useStore } from '../../state/store';
 import { setBpm, setKey, setTimeSig } from '../../state/actions';
-import { keyUsesFlats, pitchClassName } from '../../model/music';
+import { keyName, keyUsesFlats, makeKey, pitchClassName } from '../../model/music';
+import ScalePicker from '../common/ScalePicker';
 import { enableMidi, useMidiDevices } from '../../audio/midiInput';
 import { getAudioContext } from '../../audio/context';
 import InputSetup from '../instruments/InputSetup';
@@ -58,21 +59,23 @@ export default function SettingsDialog() {
         </div>
         <span className="label">Key</span>
         <div className="row">
-          <select value={p.key.tonic} onChange={(e) => setKey(Number(e.target.value), p.key.mode, transpose)}>
+          <select value={p.key.tonic} onChange={(e) => setKey(Number(e.target.value), p.key.mode, transpose, p.key.scale)}>
             {Array.from({ length: 12 }, (_, pc) => (
               <option key={pc} value={pc}>
-                {pitchClassName(pc, keyUsesFlats({ tonic: pc, mode: p.key.mode }))}
+                {pitchClassName(pc, keyUsesFlats({ ...p.key, tonic: pc }))}
               </option>
             ))}
           </select>
-          <div className="seg">
-            {(['major', 'minor'] as const).map((m) => (
-              <button key={m} className={p.key.mode === m ? 'on' : ''} onClick={() => setKey(p.key.tonic, m, false)}>
-                {m === 'major' ? 'Major' : 'Minor'}
-              </button>
-            ))}
-          </div>
+          <span className="dim">{keyName(p.key)}</span>
         </div>
+        <span />
+        <ScalePicker
+          value={p.key}
+          onChange={(sc) => {
+            const k = makeKey(p.key.tonic, sc);
+            setKey(k.tonic, k.mode, false, sc);
+          }}
+        />
         <span />
         <label className="row" style={{ fontSize: 12, cursor: 'pointer' }}>
           <input type="checkbox" checked={transpose} onChange={(e) => setTranspose(e.target.checked)} />

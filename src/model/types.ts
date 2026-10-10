@@ -149,9 +149,26 @@ export interface Track {
   drummer?: { style: DrummerStyle };
 }
 
+export type ScaleType =
+  | 'major'
+  | 'minor'
+  | 'dorian'
+  | 'phrygian'
+  | 'lydian'
+  | 'mixolydian'
+  | 'locrian'
+  | 'harmonic minor'
+  | 'melodic minor'
+  | 'major pentatonic'
+  | 'minor pentatonic'
+  | 'blues';
+
 export interface KeySignature {
   tonic: number; // 0..11 (C = 0)
+  /** Major/minor family of the key (drives chord & progression logic). */
   mode: 'major' | 'minor';
+  /** Specific scale or mode. Absent means plain major/minor. */
+  scale?: ScaleType;
 }
 
 export type ChordQuality = '' | 'm' | 'dim' | 'aug' | '7' | 'maj7' | 'm7' | 'sus4' | 'sus2' | 'add9' | '6' | 'm6' | 'm9' | '9';

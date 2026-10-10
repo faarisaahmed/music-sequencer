@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Draft } from 'immer';
-import { Plus } from 'lucide-react';
+import { Plus, Circle } from 'lucide-react';
 import type { Project, Track } from '../../model/types';
 import { commit, openModal, useStore, useTransport } from '../../state/store';
 import { updateTrack } from '../../state/actions';
@@ -113,7 +113,7 @@ function Strip({ t, selected }: { t: Track; selected: boolean }) {
             S
           </button>
           <button className={'ms-btn r' + (t.armed ? ' on' : '')} title="Record enable" onClick={() => set((x) => void (x.armed = !x.armed))}>
-            ●
+            <Circle size={9} fill="currentColor" />
           </button>
         </div>
       </div>

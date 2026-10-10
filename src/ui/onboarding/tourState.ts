@@ -19,7 +19,7 @@ const openDock = (tab: DockTab) => () => useStore.setState({ dockTab: tab, dockM
 export const TOURS: Record<TourId, TourStep[]> = {
   home: [
     {
-      title: 'Welcome to BandForge 🎶',
+      title: 'Welcome to BandForge',
       body: 'A complete music studio in your browser. Make beats, record, write sheet music and export MP3s. This quick tour shows you around (about a minute).',
     },
     {

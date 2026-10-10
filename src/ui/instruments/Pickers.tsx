@@ -17,7 +17,8 @@ export function InstrumentPicker({ track }: { track: Track }) {
       : CATEGORIES.filter((c) => c !== 'Drums').map((c) => ({
           label: c,
           submenu: PRESETS.filter((p) => p.category === c).map((p) => ({
-            label: (p.id === track.instrument ? '✓ ' : '') + p.name,
+            label: p.name,
+            shortcut: p.id === track.instrument ? 'Current' : undefined,
             icon: <IconFor name={p.icon} size={14} />,
             onClick: () => setTrackInstrument(track.id, p.id),
           })),

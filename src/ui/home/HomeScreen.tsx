@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Search, FolderOpen, FileMusic, MoreHorizontal, Music2, Trash2, Copy, Pencil, Download, Play, Wand2 } from 'lucide-react';
+import { Plus, Search, FolderOpen, FileMusic, MoreHorizontal, Music2, Trash2, Copy, Pencil, Download, Play, Wand2, ChevronDown, ChevronRight } from 'lucide-react';
 import type { ProjectMeta } from '../../model/types';
 import { listProjects, loadProject, saveProject } from '../../state/persistence';
 import { duplicateProjectById, exportProjectFile, importMidiFile, importProjectFile, openProjectById, removeProject, createNewProject } from '../../state/actions';
@@ -10,6 +10,7 @@ import { download, safeFileName } from '../../audio/export';
 import { TEMPLATES } from '../../model/templates';
 import { resumeAudio } from '../../audio/context';
 import { maybeAutoStart } from '../onboarding/tourState';
+import { IconFor } from '../common/icons';
 
 function formatDuration(sec: number): string {
   const t = Math.round(sec);
@@ -51,6 +52,22 @@ export default function HomeScreen() {
   const [songs, setSongs] = useState<ProjectMeta[] | null>(null);
   const [query, setQuery] = useState('');
   const [renaming, setRenaming] = useState<string | null>(null);
+  const [showTemplates, setShowTemplates] = useState(() => {
+    try {
+      return localStorage.getItem('bf.hideTemplates') !== '1';
+    } catch {
+      return true;
+    }
+  });
+  const toggleTemplates = () => {
+    const next = !showTemplates;
+    setShowTemplates(next);
+    try {
+      localStorage.setItem('bf.hideTemplates', next ? '0' : '1');
+    } catch {
+      /* storage unavailable */
+    }
+  };
   const fileRef = useRef<HTMLInputElement>(null);
 
   const refresh = () => listProjects().then(setSongs);
@@ -151,13 +168,20 @@ export default function HomeScreen() {
 
       <main className="home-main">
         <section>
-          <h2 className="home-h2">Start Something New</h2>
+          <div className="home-section-head">
+            <h2 className="home-h2">Start Something New</h2>
+            <button className="btn ghost sm" onClick={toggleTemplates} title={showTemplates ? 'Hide templates' : 'Show templates'}>
+              {showTemplates ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              {showTemplates ? 'Hide' : 'Show templates'}
+            </button>
+          </div>
+          {showTemplates && (
           <div className="quick-row">
             <button className="quick-card wizard" onClick={() => openModal('songWizard')}>
               <div className="quick-title">
                 <Wand2 size={14} /> Song Wizard
               </div>
-              <div className="quick-desc">Pick a genre & mood — get a full arranged song</div>
+              <div className="quick-desc">Pick a genre and mood to get a fully arranged song</div>
             </button>
             {TEMPLATES.map((t) => (
               <button
@@ -168,11 +192,14 @@ export default function HomeScreen() {
                   await createNewProject(t.build());
                 }}
               >
-                <div className="quick-title">{t.name}</div>
+                <div className="quick-title">
+                  <IconFor name={t.icon} size={14} /> {t.name}
+                </div>
                 <div className="quick-desc">{t.description}</div>
               </button>
             ))}
           </div>
+          )}
         </section>
 
         <section>

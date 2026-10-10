@@ -1,15 +1,59 @@
 // Music theory helpers.
-import type { KeySignature } from './types';
+import type { KeySignature, ScaleType } from './types';
 
 export const NOTE_NAMES_SHARP = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 export const NOTE_NAMES_FLAT = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
 
 /** Tonics (pitch classes) whose key signatures use flats. */
 const FLAT_MAJOR = new Set([5, 10, 3, 8, 1, 6]); // F Bb Eb Ab Db Gb
-const FLAT_MINOR = new Set([2, 7, 0, 5, 10, 3]); // Dm Gm Cm Fm Bbm Ebm
+
+export interface ScaleInfo {
+  id: ScaleType;
+  name: string;
+  family: 'major' | 'minor';
+  /** Semitones from the tonic up to the major key that shares its key signature. */
+  parentOffset: number;
+  group: 'Common' | 'Modes' | 'Minor variants' | 'Pentatonic & blues';
+}
+
+export const SCALE_INFO: ScaleInfo[] = [
+  { id: 'major', name: 'Major', family: 'major', parentOffset: 0, group: 'Common' },
+  { id: 'minor', name: 'Minor', family: 'minor', parentOffset: 3, group: 'Common' },
+  { id: 'dorian', name: 'Dorian', family: 'minor', parentOffset: 10, group: 'Modes' },
+  { id: 'phrygian', name: 'Phrygian', family: 'minor', parentOffset: 8, group: 'Modes' },
+  { id: 'lydian', name: 'Lydian', family: 'major', parentOffset: 7, group: 'Modes' },
+  { id: 'mixolydian', name: 'Mixolydian', family: 'major', parentOffset: 5, group: 'Modes' },
+  { id: 'locrian', name: 'Locrian', family: 'minor', parentOffset: 1, group: 'Modes' },
+  { id: 'harmonic minor', name: 'Harmonic Minor', family: 'minor', parentOffset: 3, group: 'Minor variants' },
+  { id: 'melodic minor', name: 'Melodic Minor', family: 'minor', parentOffset: 3, group: 'Minor variants' },
+  { id: 'major pentatonic', name: 'Major Pentatonic', family: 'major', parentOffset: 0, group: 'Pentatonic & blues' },
+  { id: 'minor pentatonic', name: 'Minor Pentatonic', family: 'minor', parentOffset: 3, group: 'Pentatonic & blues' },
+  { id: 'blues', name: 'Blues', family: 'minor', parentOffset: 3, group: 'Pentatonic & blues' },
+];
+
+export function scaleType(key: KeySignature): ScaleType {
+  return key.scale ?? key.mode;
+}
+
+export function scaleInfo(key: KeySignature): ScaleInfo {
+  const id = scaleType(key);
+  return SCALE_INFO.find((s) => s.id === id) ?? SCALE_INFO[0];
+}
+
+/** Build a key from a tonic and scale, deriving the major/minor family. */
+export function makeKey(tonic: number, scale: ScaleType): KeySignature {
+  const info = SCALE_INFO.find((s) => s.id === scale) ?? SCALE_INFO[0];
+  return scale === 'major' || scale === 'minor' ? { tonic, mode: info.family } : { tonic, mode: info.family, scale };
+}
+
+/** Pitch class of the major key whose signature this key uses. */
+export function parentMajorPc(key: KeySignature): number {
+  return (key.tonic + scaleInfo(key).parentOffset) % 12;
+}
 
 export function keyUsesFlats(key: KeySignature): boolean {
-  return key.mode === 'major' ? FLAT_MAJOR.has(key.tonic) : FLAT_MINOR.has(key.tonic);
+  // A key uses flats when the major key sharing its signature does (F, Bb, Eb, Ab, Db, Gb).
+  return FLAT_MAJOR.has(parentMajorPc(key));
 }
 
 export function pitchClassName(pc: number, flats = false): string {
@@ -21,7 +65,9 @@ export function noteName(pitch: number, flats = false): string {
 }
 
 export function keyName(key: KeySignature): string {
-  return pitchClassName(key.tonic, keyUsesFlats(key)) + (key.mode === 'minor' ? ' minor' : ' major');
+  const st = scaleType(key);
+  if (st === 'major' || st === 'minor') return pitchClassName(key.tonic, keyUsesFlats(key)) + ' ' + st;
+  return pitchClassName(key.tonic, keyUsesFlats(key)) + ' ' + scaleInfo(key).name;
 }
 
 export function isBlackKey(pitch: number): boolean {
@@ -50,11 +96,15 @@ export const SCALES: Record<string, number[]> = {
   'minor pentatonic': [0, 3, 5, 7, 10],
   blues: [0, 3, 5, 6, 7, 10],
   'harmonic minor': [0, 2, 3, 5, 7, 8, 11],
+  phrygian: [0, 1, 3, 5, 7, 8, 10],
+  lydian: [0, 2, 4, 6, 7, 9, 11],
+  locrian: [0, 1, 3, 5, 6, 8, 10],
+  'melodic minor': [0, 2, 3, 5, 7, 9, 11],
   chromatic: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
 };
 
 export function scaleOfKey(key: KeySignature): number[] {
-  return SCALES[key.mode].map((s) => (s + key.tonic) % 12);
+  return (SCALES[scaleType(key)] ?? SCALES[key.mode]).map((s) => (s + key.tonic) % 12);
 }
 
 export function inScale(pitch: number, scale: number[]): boolean {
@@ -106,8 +156,22 @@ export function diatonicChords(key: KeySignature): ChordDef[] {
   const mk = (off: number, q: ChordDef['quality']): ChordDef => ({
     root: (t + off) % 12,
     quality: q,
-    name: pitchClassName(t + off, flats || (key.mode === 'major' && off === 10)) + (q === 'm' ? 'm' : q === 'dim' ? '°' : q),
+    name: pitchClassName(t + off, flats || (key.mode === 'major' && off === 10)) + (q === 'm' ? 'm' : q === 'dim' ? '°' : q === 'aug' ? '+' : q),
   });
+  const st = scaleType(key);
+  const steps = SCALES[st];
+  if (st !== 'major' && st !== 'minor' && steps && steps.length === 7) {
+    // Modes: stack thirds on each scale degree, then add the family's most useful borrowed chord.
+    const triads = steps.map((s, i) => {
+      const third = (steps[(i + 2) % 7] - s + 12) % 12;
+      const fifth = (steps[(i + 4) % 7] - s + 12) % 12;
+      const q: ChordDef['quality'] = third === 4 ? (fifth === 8 ? 'aug' : '') : fifth === 6 ? 'dim' : 'm';
+      return mk(s, q);
+    });
+    // Eighth strip: the first common borrowed chord not already in the list.
+    const extra = [mk(7, ''), mk(5, ''), mk(10, ''), mk(8, ''), mk(2, '')].find((c) => !triads.some((t) => t.name === c.name)) ?? mk(7, '');
+    return [...triads, extra];
+  }
   if (key.mode === 'major') {
     return [mk(0, ''), mk(2, 'm'), mk(4, 'm'), mk(5, ''), mk(7, ''), mk(9, 'm'), mk(10, ''), mk(2, '')];
   }

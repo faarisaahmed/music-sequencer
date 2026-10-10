@@ -25,7 +25,9 @@ import {
 import { beginGesture, commit, endGesture, live, openModal, redo, undo, useStore, useTransport, type DockTab } from '../state/store';
 import { closeProject, setBpm, setKey } from '../state/actions';
 import { getEngine } from '../audio/engine';
-import { formatPosition, formatTime, keyName, keyUsesFlats, pitchClassName } from '../model/music';
+import { formatPosition, formatTime, keyName as fullKeyName, keyUsesFlats, makeKey, pitchClassName, scaleType } from '../model/music';
+import type { KeySignature } from '../model/types';
+import ScalePicker from './common/ScalePicker';
 import { saveListeners, type SaveStatus } from '../state/persistence';
 import { HSlider } from './common/controls';
 import { startDrag } from './common/drag';
@@ -123,8 +125,8 @@ function Lcd() {
         <div className="lcd-small">TEMPO</div>
       </div>
       <div className="lcd-sep" />
-      <div className="lcd-cell" style={{ position: 'relative', cursor: 'pointer' }} onClick={() => setKeyOpen(!keyOpen)} title="Song key">
-        <div className="lcd-big">{keyName(project.key).replace(' major', ' maj').replace(' minor', ' min')}</div>
+      <div className="lcd-cell" style={{ position: 'relative', cursor: 'pointer' }} onClick={() => setKeyOpen(!keyOpen)} title={`Song key: ${fullKeyName(project.key)}`}>
+        <div className="lcd-big">{shortKeyName(project.key)}</div>
         <div className="lcd-small">KEY</div>
         {keyOpen && <KeyPopover onClose={() => setKeyOpen(false)} />}
       </div>
@@ -137,6 +139,25 @@ function Lcd() {
       </div>
     </div>
   );
+}
+
+const SCALE_SHORT: Record<string, string> = {
+  major: 'maj',
+  minor: 'min',
+  dorian: 'Dor',
+  phrygian: 'Phr',
+  lydian: 'Lyd',
+  mixolydian: 'Mix',
+  locrian: 'Loc',
+  'harmonic minor': 'hm',
+  'melodic minor': 'mm',
+  'major pentatonic': 'pent',
+  'minor pentatonic': 'm pent',
+  blues: 'blues',
+};
+
+function shortKeyName(key: KeySignature): string {
+  return pitchClassName(key.tonic, keyUsesFlats(key)) + ' ' + SCALE_SHORT[scaleType(key)];
 }
 
 function KeyPopover({ onClose }: { onClose: () => void }) {
@@ -152,20 +173,21 @@ function KeyPopover({ onClose }: { onClose: () => void }) {
   }, [onClose]);
   return (
     <div ref={ref} className="popover key-popover" onClick={(e) => e.stopPropagation()}>
-      <div className="seg" style={{ width: '100%', marginBottom: 10 }}>
-        {(['major', 'minor'] as const).map((m) => (
-          <button key={m} className={project.key.mode === m ? 'on' : ''} style={{ flex: 1 }} onClick={() => setKey(project.key.tonic, m, false)}>
-            {m === 'major' ? 'Major' : 'Minor'}
-          </button>
-        ))}
-      </div>
+      <div className="scale-group-title">Root note</div>
       <div className="key-grid">
         {Array.from({ length: 12 }, (_, pc) => (
-          <button key={pc} className={'key-btn' + (project.key.tonic === pc ? ' on' : '')} onClick={() => setKey(pc, project.key.mode, transpose)}>
-            {pitchClassName(pc, keyUsesFlats({ tonic: pc, mode: project.key.mode }))}
+          <button key={pc} className={'key-btn' + (project.key.tonic === pc ? ' on' : '')} onClick={() => setKey(pc, project.key.mode, transpose, project.key.scale)}>
+            {pitchClassName(pc, keyUsesFlats({ ...project.key, tonic: pc }))}
           </button>
         ))}
       </div>
+      <ScalePicker
+        value={project.key}
+        onChange={(sc) => {
+          const k = makeKey(project.key.tonic, sc);
+          setKey(k.tonic, k.mode, false, sc);
+        }}
+      />
       <label className="row" style={{ marginTop: 10, fontSize: 12, cursor: 'pointer' }}>
         <input type="checkbox" checked={transpose} onChange={(e) => setTranspose(e.target.checked)} />
         Transpose existing notes to the new key

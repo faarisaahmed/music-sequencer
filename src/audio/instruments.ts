@@ -106,6 +106,8 @@ export interface SamplerDef {
   gain?: number;
   /** Velocity-dependent lowpass for more natural dynamics. */
   velocityFilter?: boolean;
+  /** Default brightness (0..1) when the track hasn't set the Tone control. */
+  tone?: number;
   /** If true notes ring out for the full sample even after release (plucked/struck). */
   oneShot?: boolean;
   /** Loop the sustain portion of samples (for organs / bowed strings). */
@@ -182,7 +184,7 @@ export class SamplerInstrument extends BaseInstrument {
     g.gain.linearRampToValueAtTime(peak, time + Math.max(0.002, attack));
     let last: AudioNode = src;
     if (this.def.velocityFilter !== false) {
-      const tone = this.p('tone', 0.5);
+      const tone = this.p('tone', this.def.tone ?? 0.5);
       const cutoff = 900 + Math.pow(velocity, 1.5) * 9000 * (0.4 + tone * 1.2) + tone * 3000;
       // Skip the per-note filter when it would be inaudible (saves CPU on dense parts).
       if (cutoff < 14000) {

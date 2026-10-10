@@ -1,4 +1,4 @@
-import { Plus } from 'lucide-react';
+import { Plus, ArrowLeft } from 'lucide-react';
 import { findRegion, findTrack, useStore, type EditorMode } from '../../state/store';
 import { createEmptyRegion } from '../../state/actions';
 import PianoRoll from './PianoRoll';
@@ -41,7 +41,7 @@ export default function EditorPanel() {
           </div>
           {back && back.region.kind === 'midi' && (
             <div className="seg">
-              <button onClick={() => useStore.setState({ editorMode: back.track.type === 'drums' ? 'steps' : 'score', dockMaximized: false })}>← {back.region.name}</button>
+              <button onClick={() => useStore.setState({ editorMode: back.track.type === 'drums' ? 'steps' : 'score', dockMaximized: false })}><ArrowLeft size={13} /> {back.region.name}</button>
             </div>
           )}
           <div id="editor-toolbar-slot" className="editor-toolbar-slot" />

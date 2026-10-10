@@ -440,7 +440,42 @@
 .key-popover {
   left: 50%;
   transform: translateX(-50%);
-  width: 250px;
+  width: 330px;
+}
+.scale-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+.scale-group-title {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 5px;
+}
+.scale-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.scale-btn {
+  border: 1px solid var(--border-soft);
+  background: var(--panel-2);
+  border-radius: 5px;
+  padding: 4px 9px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.scale-btn:hover {
+  background: var(--panel-3);
+}
+.scale-btn.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
 }
 .key-grid {
   display: grid;
@@ -652,4 +687,22 @@
   flex: 1;
   min-height: 0;
   position: relative;
+}
+
+.home-section-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.home-section-head .home-h2 {
+  margin-right: auto;
+}
+.quick-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.quick-title svg {
+  color: var(--accent-2);
+  flex-shrink: 0;
 }

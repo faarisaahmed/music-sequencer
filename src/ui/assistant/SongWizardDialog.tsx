@@ -1,3 +1,4 @@
+import { AudioWaveform, Check, Clapperboard, Coffee, Disc3, Flame, Guitar, Heart, Mic, Music2, Piano, Sparkles, Sunset, TreePine, type LucideIcon } from 'lucide-react';
 // Song Wizard: genre + mood + structure → a complete, editable song.
 import { useMemo, useState } from 'react';
 import { Wand2, Dices, Plus, X, ArrowUp, ArrowDown, Play, Square } from 'lucide-react';
@@ -15,6 +16,27 @@ const KINDS: SectionKind[] = ['Intro', 'Verse', 'Pre-Chorus', 'Chorus', 'Drop', 
 const TITLES = ['Golden Hour', 'Midnight Drive', 'Paper Planes', 'Neon Rain', 'Summer Static', 'Northern Lights', 'Slow Motion', 'Electric Heart', 'Velvet Sky', 'City Lights', 'Ocean Avenue', 'Daydreamer'];
 
 let previewSrc: AudioBufferSourceNode | null = null;
+
+const GENRE_ICONS: Record<string, LucideIcon> = {
+  pop: Sparkles,
+  rock: Guitar,
+  hiphop: Mic,
+  trap: Flame,
+  lofi: Coffee,
+  house: Disc3,
+  rnb: Heart,
+  synthwave: Sunset,
+  funk: AudioWaveform,
+  folk: TreePine,
+  ballad: Piano,
+  cinematic: Clapperboard,
+  jazz: Music2,
+};
+
+function GenreIcon({ id }: { id: string }) {
+  const I = GENRE_ICONS[id] ?? Music2;
+  return <I size={15} className="wiz-genre-icon" />;
+}
 
 export default function SongWizardDialog() {
   const [genre, setGenre] = useState('pop');
@@ -157,7 +179,7 @@ export default function SongWizardDialog() {
           <div className="wiz-genres">
             {GENRES.map((x) => (
               <button key={x.id} className={'wiz-genre' + (genre === x.id ? ' on' : '')} onClick={() => pickGenre(x.id)}>
-                <span className="wiz-emoji">{x.emoji}</span>
+                <GenreIcon id={x.id} />
                 {x.name}
               </button>
             ))}
@@ -214,7 +236,7 @@ export default function SongWizardDialog() {
               .filter(([k]) => (k !== 'arp' || g.arp) && (k !== 'pad' || g.pad))
               .map(([k, label]) => (
               <button key={k} className={'wiz-pill' + (parts[k] ? ' on' : '')} onClick={() => setParts({ ...parts, [k]: !parts[k] })}>
-                {parts[k] ? '✓ ' : ''}
+                {parts[k] && <Check size={13} />}
                 {label}
               </button>
             ))}
