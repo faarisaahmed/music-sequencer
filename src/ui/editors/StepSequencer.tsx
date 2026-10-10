@@ -1,8 +1,8 @@
 // GarageBand-style drum Beat Sequencer: rows per drum piece, glowing step pads,
 // and Step / Velocity / Note Repeat / Chance / Loop editing modes.
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronLeft, ChevronRight, Dices, Eraser, LayoutGrid, MoreHorizontal, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronsRight, Dices, Eraser, LayoutGrid, MoreHorizontal, Plus } from 'lucide-react';
 import type { Draft } from 'immer';
 import type { MidiRegion, Note, Project } from '../../model/types';
 import { beginGesture, commit, draftRegion, endGesture, findRegion, live, useStore, useTransport } from '../../state/store';
@@ -14,8 +14,10 @@ import { setTrackInstrument } from '../../state/actions';
 import { getEngine } from '../../audio/engine';
 import { showContextMenu, type MenuItem } from '../common/menus';
 import { clamp } from '../common/drag';
-import { DrumIcon, drumColor } from './steps/drumVisuals';
+import { DrumIcon } from './steps/drumVisuals';
+import { drumColor } from './steps/drumColors';
 import { DRUM_PRESETS, presetSteps, type DrumPreset } from './steps/patterns';
+import { useToolbarSlot } from './useToolbarSlot';
 import './steps/steps.css';
 
 type Mode = 'step' | 'velocity' | 'repeat' | 'chance' | 'loop';
@@ -40,6 +42,8 @@ const HEADER_W = 158;
 const GAP = 4;
 const GROUP_GAP = 5;
 const BAR_GAP = 6;
+/** Smallest comfortable pad width before the sequencer switches to pages. */
+const MIN_CELL = 30;
 
 /** Remembered extra/hidden rows per track so they survive switching regions. */
 const laneMemory = new Map<string, { extra: number[]; hidden: number[] }>();
@@ -59,8 +63,10 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
   const mem = laneMemory.get(trackId) ?? { extra: [], hidden: [] };
   const [extra, setExtraState] = useState<number[]>(mem.extra);
   const [hidden, setHiddenState] = useState<number[]>(mem.hidden);
-  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  const slot = useToolbarSlot();
   const [size, setSize] = useState({ w: 900, h: 300 });
+  const [page, setPage] = useState(0);
+  const [follow, setFollow] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ paintOn: boolean; visited: Set<string> } | null>(null);
 
@@ -74,12 +80,10 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
   };
 
   useLayoutEffect(() => {
-    setSlot(document.getElementById('editor-toolbar-slot'));
     const el = scrollRef.current;
     if (!el) return;
     const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }));
     ro.observe(el);
-    setSize({ w: el.clientWidth, h: el.clientHeight });
     return () => ro.disconnect();
   }, []);
 
@@ -114,14 +118,37 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
   const group = Math.max(1, Math.round(1 / res)); // steps per beat
   const barSteps = Math.max(1, Math.round(bpb / res));
 
-  // Geometry
-  const nGroups = Math.floor((cols - 1) / group);
-  const nBars = Math.floor((cols - 1) / barSteps);
+  // Geometry: show every step if the pads stay comfortably wide, otherwise page through
+  // whole bars (or bar fractions) like GarageBand's beat sequencer.
   const availW = size.w - HEADER_W - 24;
-  const cw = clamp((availW - (cols - 1) * GAP - nGroups * GROUP_GAP - nBars * BAR_GAP) / cols, 18, 90);
+  const cellFor = (n: number) =>
+    (availW - (n - 1) * GAP - Math.floor((n - 1) / group) * GROUP_GAP - Math.floor((n - 1) / barSteps) * BAR_GAP) / n;
+  let pageSize = cols;
+  if (cellFor(cols) < MIN_CELL) {
+    let bars = Math.floor(cols / barSteps);
+    while (bars > 1 && cellFor(bars * barSteps) < MIN_CELL) bars--;
+    if (bars >= 1 && cellFor(bars * barSteps) >= MIN_CELL) pageSize = bars * barSteps;
+    else {
+      let n = Math.min(barSteps, cols);
+      while (n > group && cellFor(n) < MIN_CELL) n = Math.ceil(n / 2);
+      pageSize = Math.max(1, n);
+    }
+  }
+  const pages = Math.max(1, Math.ceil(cols / pageSize));
+  const curPage = Math.min(page, pages - 1);
+  const p0 = curPage * pageSize;
+  const visCount = Math.min(pageSize, cols - p0);
+  const cw = clamp(cellFor(pageSize), 18, 90);
   const rh = clamp((size.h - 44 - lanes.length * GAP) / lanes.length, 26, 64);
-  const colX = (i: number) => i * (cw + GAP) + Math.floor(i / group) * GROUP_GAP + Math.floor(i / barSteps) * BAR_GAP;
-  const gridW = colX(cols - 1) + cw;
+  // x of a step index relative to the first step of the current page
+  const colX = (j: number) => j * (cw + GAP) + Math.floor(j / group) * GROUP_GAP + Math.floor(j / barSteps) * BAR_GAP;
+  const gridW = colX(visCount - 1) + cw;
+
+  const stepCounts = new Array<number>(cols).fill(0);
+  for (const n of notes) {
+    const st = stepOf(n, res);
+    if (st >= 0 && st < patternSteps) stepCounts[st]++;
+  }
 
   const playing = useStore.getState().playing;
   const engine = getEngine();
@@ -410,6 +437,25 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
   return (
     <div className="ss" onContextMenu={(e) => e.preventDefault()}>
       {slot ? createPortal(toolbar, slot) : toolbar}
+      {pages > 1 && (
+        <PageBar
+          pages={pages}
+          pageSize={pageSize}
+          current={curPage}
+          counts={stepCounts}
+          res={res}
+          bpb={bpb}
+          region={region}
+          cols={patternSteps}
+          follow={follow}
+          onFollow={() => setFollow(!follow)}
+          onAutoPage={setPage}
+          onPage={(k) => {
+            setPage(k);
+            setFollow(false);
+          }}
+        />
+      )}
       <div className="ss-scroll" ref={scrollRef}>
         <div className="ss-grid" style={{ width: HEADER_W + gridW + 12 }} onPointerDown={onGridDown}>
           {lanes.map((pitch) => {
@@ -439,12 +485,13 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
                   </button>
                 </div>
                 <div className="ss-cells" style={{ width: gridW }} onContextMenu={(e) => showContextMenu(e, rowMenu(pitch))}>
-                  {Array.from({ length: cols }, (_, i) => {
+                  {Array.from({ length: visCount }, (_, j) => {
+                    const i = p0 + j;
                     const n = cellMap.get(`${pitch}:${i}`);
                     const outside = i >= patternSteps;
                     const cls = 'ss-cell' + (n && !outside ? ' on' : '') + (outside ? ' outside' : '') + (Math.floor(i / group) % 2 ? ' alt' : '');
                     let inner: React.ReactNode = null;
-                    let style: React.CSSProperties = { left: colX(i), width: cw };
+                    let style: React.CSSProperties = { left: colX(j), width: cw };
                     if (n && !outside) {
                       if (mode === 'step') style = { ...style, opacity: 0.5 + n.velocity * 0.5 };
                       else if (mode === 'velocity') inner = <div className="ss-fill" style={{ height: `${n.velocity * 100}%` }} />;
@@ -480,10 +527,19 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
               </div>
             );
           })}
-          {mode === 'loop' && (
-            <div className="ss-loopmark" style={{ left: HEADER_W + colX(patternSteps - 1) + cw + 2, height: lanes.length * (rh + GAP) }} />
+          {mode === 'loop' && patternSteps - 1 >= p0 && patternSteps - 1 < p0 + visCount && (
+            <div className="ss-loopmark" style={{ left: HEADER_W + colX(patternSteps - 1 - p0) + cw + 2, height: lanes.length * (rh + GAP) }} />
           )}
-          <PlayColumn region={region} res={res} cols={patternSteps} left={(i) => HEADER_W + colX(i)} width={cw} height={lanes.length * (rh + GAP) - GAP} />
+          <PlayColumn
+            region={region}
+            res={res}
+            cols={patternSteps}
+            first={p0}
+            count={visCount}
+            left={(j) => HEADER_W + colX(j)}
+            width={cw}
+            height={lanes.length * (rh + GAP) - GAP}
+          />
           <button className="ss-addrow" style={{ marginLeft: 4 }} onClick={addRowMenu}>
             <Plus size={13} /> Add Row
           </button>
@@ -529,13 +585,117 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
   );
 }
 
-function PlayColumn({ region, res, cols, left, width, height }: { region: MidiRegion; res: number; cols: number; left: (i: number) => number; width: number; height: number }) {
+function PlayColumn({
+  region,
+  res,
+  cols,
+  first,
+  count,
+  left,
+  width,
+  height,
+}: {
+  region: MidiRegion;
+  res: number;
+  cols: number;
+  first: number;
+  count: number;
+  left: (j: number) => number;
+  width: number;
+  height: number;
+}) {
   const pos = useTransport((s) => s.position);
   const playing = useStore((s) => s.playing);
   if (!playing || pos < region.start || pos >= region.start + region.length) return null;
   let rel = pos - region.start + region.offset;
   if (region.loop) rel = ((rel % region.contentLength) + region.contentLength) % region.contentLength;
   const step = Math.floor(rel / res);
-  if (step < 0 || step >= cols) return null;
-  return <div className="ss-playcol" style={{ left: left(step), width, height }} />;
+  if (step < 0 || step >= cols || step < first || step >= first + count) return null;
+  return <div className="ss-playcol" style={{ left: left(step - first), width, height }} />;
+}
+
+/** Which step of the region is sounding right now (or -1). */
+function usePlayingStep(region: MidiRegion, res: number): number {
+  const pos = useTransport((s) => s.position);
+  const playing = useStore((s) => s.playing);
+  if (!playing || pos < region.start || pos >= region.start + region.length) return -1;
+  let rel = pos - region.start + region.offset;
+  if (region.loop) rel = ((rel % region.contentLength) + region.contentLength) % region.contentLength;
+  return Math.floor(rel / res);
+}
+
+/** GarageBand-style page selector with a mini overview of each page's hits. */
+function PageBar({
+  pages,
+  pageSize,
+  current,
+  counts,
+  res,
+  bpb,
+  region,
+  cols,
+  follow,
+  onFollow,
+  onAutoPage,
+  onPage,
+}: {
+  pages: number;
+  pageSize: number;
+  current: number;
+  counts: number[];
+  res: number;
+  bpb: number;
+  region: MidiRegion;
+  cols: number;
+  follow: boolean;
+  onFollow: () => void;
+  onAutoPage: (k: number) => void;
+  onPage: (k: number) => void;
+}) {
+  const playStep = usePlayingStep(region, res);
+  const playPage = playStep >= 0 && playStep < cols ? Math.min(pages - 1, Math.floor(playStep / pageSize)) : -1;
+  // Follow the playing page during playback.
+  useEffect(() => {
+    if (follow && playPage >= 0 && playPage !== current) onAutoPage(playPage);
+  }, [follow, playPage, current, onAutoPage]);
+  const maxCount = Math.max(1, ...counts);
+  const label = (k: number) => {
+    const beat = k * pageSize * res;
+    const bar = Math.floor(beat / bpb + 1e-6) + 1;
+    const inBar = beat - (bar - 1) * bpb;
+    return inBar < 1e-6 ? `${bar}` : `${bar}.${Math.round(inBar) + 1}`;
+  };
+  return (
+    <div className="ss-pages">
+      <button className="btn sm icon" title="Previous page" disabled={current === 0} onClick={() => onPage(current - 1)}>
+        <ChevronLeft size={14} />
+      </button>
+      <div className="ss-page-list">
+        {Array.from({ length: pages }, (_, k) => {
+          const slice = counts.slice(k * pageSize, (k + 1) * pageSize);
+          return (
+            <button
+              key={k}
+              className={'ss-page' + (k === current ? ' on' : '') + (k === playPage ? ' playing' : '')}
+              onClick={() => onPage(k)}
+              title={`Page ${k + 1} (bar ${label(k)})`}
+            >
+              <span className="ss-page-label">{label(k)}</span>
+              <span className="ss-page-map">
+                {slice.map((c, i) => (
+                  <i key={i} style={{ height: c ? `${25 + (c / maxCount) * 75}%` : undefined }} className={c ? 'hit' : ''} />
+                ))}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <button className="btn sm icon" title="Next page" disabled={current >= pages - 1} onClick={() => onPage(current + 1)}>
+        <ChevronRight size={14} />
+      </button>
+      <button className={'btn sm' + (follow ? ' active' : '')} title="Follow the playing page during playback" onClick={onFollow}>
+        <ChevronsRight size={14} /> Follow
+      </button>
+    </div>
+  );
 }

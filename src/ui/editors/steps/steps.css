@@ -251,3 +251,76 @@
   color: #111;
   font-weight: 600;
 }
+
+/* ------------------------------------------------------------------ pages */
+.ss-pages {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px 0 12px;
+  flex-shrink: 0;
+}
+.ss-page-list {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+}
+.ss-page {
+  flex: 1;
+  min-width: 46px;
+  max-width: 140px;
+  height: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 3px 5px;
+  border-radius: 6px;
+  border: 1px solid var(--border-soft);
+  background: #202024;
+  color: var(--text-dim);
+  cursor: pointer;
+  position: relative;
+}
+.ss-page:hover {
+  background: #2a2a2f;
+}
+.ss-page.on {
+  border-color: var(--drums);
+  background: color-mix(in srgb, var(--drums) 16%, #202024);
+  color: var(--text);
+}
+.ss-page.playing::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+}
+.ss-page-label {
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  text-align: left;
+  font-family: var(--mono);
+}
+.ss-page-map {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+}
+.ss-page-map i {
+  flex: 1;
+  height: 2px;
+  border-radius: 1px;
+  background: #3a3a42;
+}
+.ss-page-map i.hit {
+  background: var(--drums);
+}

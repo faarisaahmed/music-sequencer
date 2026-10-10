@@ -2,6 +2,7 @@
 // Works on one region, or on the whole song as a full multi-instrument score.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useToolbarSlot } from './useToolbarSlot';
 import { MousePointer2, PenLine, Plus, Minus, Printer, FileDown, ZoomIn, ZoomOut, ArrowUp, ArrowDown, Type, Hash, Eraser } from 'lucide-react';
 import type { Articulation, MidiRegion, Note, Project, Track } from '../../model/types';
 import { beginGesture, endGesture, findRegion, live, useStore, useTransport, toast } from '../../state/store';
@@ -251,7 +252,7 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
   const [ghost, setGhost] = useState<Ghost | null>(null);
   const [width, setWidth] = useState(900);
   const [layout, setLayout] = useState<ScoreLayout | null>(null);
-  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  const slot = useToolbarSlot();
   const [entry, setEntry] = useState<TextEntry | null>(null);
   const entryRef = useRef<TextEntry | null>(null);
   useEffect(() => {
@@ -264,10 +265,6 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
   const effDur = dur * (dotted ? 1.5 : 1) * (triplet ? 2 / 3 : 1);
   const bpb = beatsPerBar(project.timeSig);
   const velocity = DYNAMICS.find((d) => d.mark === dyn)?.vel ?? 0.64;
-
-  useEffect(() => {
-    setSlot(document.getElementById('editor-toolbar-slot'));
-  }, []);
 
   useLayoutEffect(() => {
     const el = scrollRef.current;
