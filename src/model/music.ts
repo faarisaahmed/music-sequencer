@@ -106,7 +106,7 @@ export function diatonicChords(key: KeySignature): ChordDef[] {
   const mk = (off: number, q: ChordDef['quality']): ChordDef => ({
     root: (t + off) % 12,
     quality: q,
-    name: pitchClassName(t + off, flats) + (q === 'm' ? 'm' : q === 'dim' ? '°' : q),
+    name: pitchClassName(t + off, flats || (key.mode === 'major' && off === 10)) + (q === 'm' ? 'm' : q === 'dim' ? '°' : q),
   });
   if (key.mode === 'major') {
     return [mk(0, ''), mk(2, 'm'), mk(4, 'm'), mk(5, ''), mk(7, ''), mk(9, 'm'), mk(10, ''), mk(2, '')];

@@ -7,6 +7,7 @@ import TracksView from './tracks/TracksView';
 import Dock from './Dock';
 import LibraryPanel from './library/LibraryPanel';
 import { useGlobalShortcuts } from './shortcuts';
+import { useMusicalTyping } from './instruments/musicalTyping';
 import { startDrag } from './common/drag';
 
 export default function ProjectScreen() {
@@ -16,6 +17,7 @@ export default function ProjectScreen() {
   const dockMax = useStore((s) => s.dockMaximized);
   const mainRef = useRef<HTMLDivElement>(null);
   useGlobalShortcuts();
+  useMusicalTyping();
 
   // Level meters polling (~30fps) while the project is open.
   useEffect(() => {
