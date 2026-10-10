@@ -1,0 +1,226 @@
+.pr-root {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: #1a1a1e;
+  overflow: hidden;
+}
+.pr-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.pr-root > .pr-toolbar {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.pr-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+.pr-field select,
+.pr-mini {
+  height: 24px;
+  padding: 0 4px !important;
+  font-size: 12px;
+}
+.pr-top {
+  display: flex;
+  height: 24px;
+  flex-shrink: 0;
+}
+.pr-corner {
+  width: 70px;
+  flex-shrink: 0;
+  background: #1e1e23;
+  border-right: 1px solid #0c0c0e;
+  border-bottom: 1px solid #0c0c0e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.pr-ruler {
+  flex: 1;
+  position: relative;
+  cursor: pointer;
+  overflow: hidden;
+  touch-action: none;
+}
+.pr-ruler canvas,
+.pr-keys canvas,
+.pr-vel-canvas canvas {
+  display: block;
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+.pr-mid {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+.pr-keys {
+  width: 70px;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  touch-action: none;
+}
+.pr-gridwrap {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+}
+.pr-gridcanvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+.pr-scroll {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  touch-action: none;
+}
+.pr-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  background: #fff;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.6);
+  pointer-events: none;
+}
+.pr-vel {
+  flex-shrink: 0;
+  display: flex;
+  position: relative;
+  border-top: 1px solid #0c0c0e;
+}
+.pr-vel-resize {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -3px;
+  height: 6px;
+  cursor: ns-resize;
+  z-index: 2;
+}
+.pr-vel-label {
+  width: 70px;
+  flex-shrink: 0;
+  background: #1e1e23;
+  border-right: 1px solid #0c0c0e;
+  font-size: 10px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pr-vel-canvas {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  cursor: ns-resize;
+  touch-action: none;
+}
+.pr-velpop {
+  position: fixed;
+  z-index: 1001;
+  background: rgba(30, 30, 34, 0.98);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  padding: 10px 12px;
+}
+
+/* ------------------------------------------------------------------ audio editor */
+.ae-root {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: #1a1a1e;
+}
+.ae-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.ae-body {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+}
+.ae-scroll {
+  position: absolute;
+  inset: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.ae-canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+.ae-handle {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--audio);
+  margin: -7px 0 0 -7px;
+  cursor: ew-resize;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  z-index: 3;
+}
+.ae-trim {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  margin-left: -5px;
+  cursor: ew-resize;
+  z-index: 2;
+}
+.ae-trim::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--audio);
+}
+.ae-info {
+  display: flex;
+  gap: 16px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--border-soft);
+  font-size: 11.5px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+.ae-info b {
+  color: var(--text);
+  font-weight: 600;
+}
