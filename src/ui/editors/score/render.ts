@@ -14,9 +14,28 @@ import {
   StaveTie,
   Tuplet,
   Voice,
+  SVGContext,
 } from 'vexflow';
 import type { Articulation as Artic, KeySignature } from '../../../model/types';
 import { LETTERS, durCode, keyAlters, spell, diatonicIndex, vexKeySpec, type Clef, type Piece, type ScoreModel } from './notation';
+
+// VexFlow measures text by inserting <text> into the live SVG and calling getBBox(), which forces a
+// layout of the whole (growing) score for every new label. Measure with a canvas instead.
+{
+  const cache = (SVGContext as unknown as { measureTextCache: { measureImpl: (t: string, svg: SVGElement, a: Record<string, unknown>) => unknown } }).measureTextCache;
+  let g: CanvasRenderingContext2D | null = null;
+  cache.measureImpl = (text, _svg, a) => {
+    g ??= document.createElement('canvas').getContext('2d');
+    // Keep the unit VexFlow used (normally pt); unitless SVG sizes are px.
+    const raw = String(a['font-size'] ?? '10pt');
+    const num = parseFloat(raw) || 10;
+    const unit = /[a-z%]+$/i.exec(raw)?.[0] ?? 'px';
+    const px = unit === 'pt' ? (num * 4) / 3 : unit === 'em' ? num * 16 : num;
+    if (g) g.font = `${a['font-style'] ?? 'normal'} ${a['font-weight'] ?? 'normal'} ${px}px ${a['font-family'] ?? 'Arial'}`;
+    const width = g ? g.measureText(text).width : text.length * px * 0.6;
+    return { x: 0, y: -px * 0.8, width, height: px };
+  };
+}
 
 export interface HeadHit {
   x0: number;
@@ -422,7 +441,7 @@ export function renderScore(container: HTMLDivElement, model: ScoreModel, widthP
           }
           lastSeen.set(key, entry);
           if (!piece.tied[idx] && ys[idx] !== undefined) {
-            const qn = part.notes.find((n) => n.key === key);
+            const qn = noteByKey(part).get(key);
             layout.heads.push({
               x0: hx0,
               x1: hx1,
@@ -609,11 +628,40 @@ export function renderScore(container: HTMLDivElement, model: ScoreModel, widthP
 }
 
 /** Extra drop below the staff caused by low ledger notes in this system (so marks clear them). */
+const partIndex = new WeakMap<object, Map<string, ScoreModel['parts'][number]['notes'][number]>>();
+
+/** key → note lookup for a part (avoids a linear search per notehead). */
+function noteByKey(part: ScoreModel['parts'][number]): Map<string, ScoreModel['parts'][number]['notes'][number]> {
+  let m = partIndex.get(part);
+  if (!m) {
+    m = new Map();
+    for (const n of part.notes) if (!m.has(n.key)) m.set(n.key, n);
+    partIndex.set(part, m);
+  }
+  return m;
+}
+
+const headBuckets = new WeakMap<ScoreLayout, { n: number; map: Map<string, HeadHit[]> }>();
+
+/** Heads grouped by system/staff, indexed incrementally as heads are added. */
+function headsOf(layout: ScoreLayout, system: number, staff: number): HeadHit[] {
+  let b = headBuckets.get(layout);
+  if (!b) headBuckets.set(layout, (b = { n: 0, map: new Map() }));
+  for (; b.n < layout.heads.length; b.n++) {
+    const h = layout.heads[b.n];
+    const k = h.system + ':' + h.staff;
+    let list = b.map.get(k);
+    if (!list) b.map.set(k, (list = []));
+    list.push(h);
+  }
+  return b.map.get(system + ':' + staff) ?? [];
+}
+
 function extBelowNotes(layout: ScoreLayout, sg: StaffGeom, system: number): number {
   const bottomLine = sg.topLineY + sg.spacing * 4;
   let maxY = bottomLine;
-  for (const h of layout.heads)
-    if (h.system === system && h.staff === sg.index) {
+  for (const h of headsOf(layout, system, sg.index))
+    {
       // Voice-2 (stems down) and low notes carry stems below the head.
       const stemDown = h.voice === 2 || h.y < sg.topLineY + sg.spacing * 2 - 1;
       maxY = Math.max(maxY, h.y + (h.voice === 2 ? 30 : stemDown ? 0 : 6));
