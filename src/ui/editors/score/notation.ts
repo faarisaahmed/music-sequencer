@@ -450,6 +450,8 @@ function inferMarks(notes: QNote[], staves: number): { marks: DisplayMark[]; acc
     for (const n of notes) if (n.staff === st) byOnset.set(n.s, [...(byOnset.get(n.s) ?? []), n]);
     const onsets = [...byOnset.entries()].sort((a, b) => a[0] - b[0]).map(([t, ns]) => ({ t, v: Math.max(...ns.map((n) => n.vel)), ns }));
     if (!onsets.length) continue;
+    const sortedV = onsets.map((o) => o.v).sort((a, b) => a - b);
+    const median = sortedV[Math.floor(sortedV.length / 2)];
     const head = onsets.slice(0, 4).map((o) => o.v).sort((a, b) => a - b);
     let level = dynamicOf(head[Math.floor((head.length - 1) / 2)]);
     marks.push({ kind: 'dyn', t: onsets[0].t, value: level, staff: st, inferred: true });
@@ -461,7 +463,7 @@ function inferMarks(notes: QNote[], staves: number): { marks: DisplayMark[]; acc
       if (next === d) {
         level = d;
         marks.push({ kind: 'dyn', t: o.t, value: d, staff: st, inferred: true });
-      } else if (i + 1 < onsets.length && o.v > onsets[i + 1].v + 0.1) {
+      } else if (i + 1 < onsets.length && o.v - Math.max(onsets[i - 1].v, onsets[i + 1].v) >= 0.15 && o.v >= median * 1.3) {
         for (const n of o.ns) if (n.vel === o.v) accents.add(n.key);
       }
     });

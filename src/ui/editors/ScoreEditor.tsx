@@ -254,7 +254,9 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
   const [slot, setSlot] = useState<HTMLElement | null>(null);
   const [entry, setEntry] = useState<TextEntry | null>(null);
   const entryRef = useRef<TextEntry | null>(null);
-  entryRef.current = entry;
+  useEffect(() => {
+    entryRef.current = entry;
+  }, [entry]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<HTMLDivElement>(null);
   const lastInsert = useRef<{ t: number; dur: number; pitch: number; staff: number } | null>(null);
@@ -294,6 +296,7 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
         partLabels: src.labels,
       });
       setLayout(l);
+      if (import.meta.env.DEV) (window as unknown as { __scoreLayout: ScoreLayout }).__scoreLayout = l;
     } catch (e) {
       console.error('score render failed', e);
     }
@@ -478,7 +481,12 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
     const m = Math.floor(t / bpb + 1e-9);
     for (const sys of layout.systems) {
       const mg = sys.measures.find((x) => x.index === m);
-      if (mg) return { x: beatToX(mg, t - m * bpb, bpb), y: sys.staves[0].topLineY - 40 };
+      if (mg) {
+        const top = sys.staves[0];
+        let minY = top.topLineY;
+        for (const h of layout.heads) if (h.staff === top.index && layout.systems[h.system] === sys) minY = Math.min(minY, h.y - (h.voice === 2 ? 0 : 34));
+        return { x: beatToX(mg, t - m * bpb, bpb), y: Math.min(top.topLineY - 24, minY - 10) - 18 };
+      }
     }
     return null;
   };
@@ -805,8 +813,7 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
       showDynamics: showDyn,
       showNames: full,
       title,
-      subtitle: `♩ = ${project.bpm}`,
-      tempo: undefined,
+      tempo: project.bpm,
       chords: src.chords,
       partLabels: src.labels,
     });

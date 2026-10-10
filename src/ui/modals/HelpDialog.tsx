@@ -77,6 +77,12 @@ const SECTIONS: { title: string; rows: Row[] }[] = [
       ['Previous / next note', ['←', '→']],
       ['Rest', ['0']],
       ['Delete note', ['Delete']],
+      ['Triplets on / off', [`${CMD} 3`]],
+      ['Voice 1 / voice 2', ['⌥ 1', '⌥ 2']],
+      ['Staccato / tenuto / accent / marcato', ['⇧S', '⇧N', '⇧V', '⇧O']],
+      ['Lyrics (Space = next note, - = hyphen)', [`${CMD} L`]],
+      ['Chord symbol (Space = next beat, Tab = next bar)', [`${CMD} K`]],
+      ['Full score of the whole song', ['Top-bar score button']],
     ],
   },
 ];

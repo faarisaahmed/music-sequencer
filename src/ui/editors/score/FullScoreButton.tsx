@@ -11,7 +11,7 @@ function ScoreIcon({ size = 17 }: { size?: number }) {
   );
 }
 
-export function openFullScore(): void {
+function openFullScore(): void {
   useStore.setState({ dockTab: 'editor', editorMode: 'fullscore', dockMaximized: true, focusArea: 'editor' });
 }
 

@@ -128,7 +128,7 @@ export function renderScore(container: HTMLDivElement, model: ScoreModel, widthP
   const nameW = (first: boolean) => {
     if (!opts.showNames) return 0;
     const labels = first ? opts.partLabels : model.parts.map((p) => p.abbr);
-    return Math.min(170, Math.max(...labels.map((l) => l.length)) * 7.2 + 26);
+    return Math.min(180, Math.max(...labels.map((l) => l.length)) * 7.2 + 40);
   };
   const titleSpace = opts.title ? (opts.subtitle ? 74 : 56) : 10;
 
@@ -189,11 +189,11 @@ export function renderScore(container: HTMLDivElement, model: ScoreModel, widthP
       let below = lo === Infinity ? 0 : Math.max(0, (topDI - 8 - lo) * 5 + 22 - 30);
       if (staffHasDyn[si]) below += 18;
       if (staffHasLyrics[si]) below += 24;
-      if (si === 0 && opts.chords.length) above += 22;
+      if (si === 0 && opts.chords.length) above += 22 + (hi > topDI - 2 ? 26 : 0);
       return { above, below };
     });
     const staffY: number[] = [];
-    let yy = yCursor + ext[0].above + (yCursor === titleSpace && opts.tempo ? 30 : 0);
+    let yy = yCursor + ext[0].above + (yCursor === titleSpace && opts.tempo ? 24 : 0);
     staffY.push(yy);
     for (let si = 1; si < model.staves.length; si++) {
       const samePart = model.staves[si].part === model.staves[si - 1].part;
@@ -217,7 +217,7 @@ export function renderScore(container: HTMLDivElement, model: ScoreModel, widthP
     if (opts.subtitle) {
       ctx.setFont('Georgia, serif', 12, 'italic');
       const sw = ctx.measureText(opts.subtitle).width;
-      ctx.fillText(opts.subtitle, logicalW - MARGIN - sw, 58);
+      ctx.fillText(opts.subtitle, logicalW / 2 - sw / 2, 56);
     }
     ctx.restore();
   }
@@ -248,7 +248,6 @@ export function renderScore(container: HTMLDivElement, model: ScoreModel, widthP
           if (ref.clef !== 'percussion') st.addKeySignature(vexKeySpec(key));
           if (li === 0) st.addTimeSignature(timeSpec);
           if (si === 0) st.setMeasure(opts.firstBarNumber + m);
-          if (li === 0 && si === 0 && opts.tempo) st.setTempo({ duration: 'q', bpm: Math.round(opts.tempo) }, -12);
         }
         if (m === model.measures.length - 1) st.setEndBarType(BarlineType.END);
         st.setContext(ctx);
@@ -477,11 +476,23 @@ export function renderScore(container: HTMLDivElement, model: ScoreModel, widthP
           const b = sys.staves[part.firstStaff + part.clefs.length - 1];
           const midY = (a.topLineY + b.topLineY + b.spacing * 4) / 2;
           const tw = ctx.measureText(label).width;
-          const right = line.left - (part.clefs.length > 1 ? 22 : 10);
+          const right = line.left - (part.clefs.length > 1 ? 26 : multi ? 22 : 10);
           ctx.fillText(label, right - tw, midY + 4);
         });
         ctx.restore();
       }
+    }
+
+    // ---- tempo marking above the first system (drawn above chord symbols)
+    if (li === 0 && opts.tempo && sys.staves[0]) {
+      const top = sys.staves[0];
+      let minY = top.topLineY;
+      for (const h of layout.heads) if (h.system === 0 && h.staff === top.index) minY = Math.min(minY, h.y - (h.voice === 2 ? 0 : 34));
+      const y = Math.min(top.topLineY - 24, minY - 10) - (opts.chords.length ? 22 : 0);
+      ctx.save();
+      ctx.setFont('Georgia, serif', 13, 'bold');
+      ctx.fillText(`♩ = ${Math.round(opts.tempo)}`, line.left + 4, y);
+      ctx.restore();
     }
 
     // ---- chord symbols above the top staff
@@ -494,10 +505,14 @@ export function renderScore(container: HTMLDivElement, model: ScoreModel, widthP
     if (opts.chords.length && sys.staves[0]) {
       ctx.save();
       ctx.setFont('Georgia, serif', 14, 'bold');
+      const top = sys.staves[0];
+      let minY = top.topLineY;
+      for (const h of layout.heads) if (h.system === li && h.staff === top.index) minY = Math.min(minY, h.y - (h.voice === 2 ? 0 : 34));
+      const cy = Math.min(top.topLineY - 24, minY - 10);
       for (const c of opts.chords) {
         const cx = beatX(c.t);
         if (cx === null) continue;
-        ctx.fillText(c.name, cx - 2, sys.staves[0].topLineY - 24);
+        ctx.fillText(c.name, cx - 2, cy);
       }
       ctx.restore();
     }
