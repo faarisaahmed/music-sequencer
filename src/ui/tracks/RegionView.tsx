@@ -1,0 +1,277 @@
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { Repeat } from 'lucide-react';
+import type { AudioRegion, MidiRegion, Region, TrackType } from '../../model/types';
+import { placedNotes, regionSegments } from '../../model/regions';
+import { DRUM_LANES } from '../../model/music';
+import { commit, draftRegion, useStore } from '../../state/store';
+import { getPeaks, getBuffer, onAudioChange } from '../../audio/audioStore';
+import { showContextMenu, showPillMenu } from '../common/menus';
+import { dragFade, dragLoop, dragMove, dragResizeLeft, dragResizeRight } from './regionOps';
+import { openRegionEditor, regionMenu, regionPillItems } from './menus';
+import { useTracksUi } from './tracksUi';
+
+const NAME_H = 16;
+
+interface Props {
+  region: Region;
+  trackId: string;
+  trackType: TrackType;
+  color: string;
+  ppb: number;
+  height: number;
+  bpm: number;
+}
+
+function MidiPreview({ r, ppb, h, drums }: { r: MidiRegion; ppb: number; h: number; drums: boolean }) {
+  const content = useMemo(() => {
+    const notes = placedNotes(r);
+    const segs = regionSegments(r);
+    const w = r.length * ppb;
+    const bodyH = Math.max(6, h - 6);
+    const out: React.ReactNode[] = [];
+    if (drums) {
+      const lanes = [...DRUM_LANES];
+      for (const n of r.notes) if (!lanes.includes(n.pitch)) lanes.push(n.pitch);
+      const rowH = bodyH / lanes.length;
+      const hitW = Math.max(2, Math.min(ppb * 0.18, 6));
+      notes.forEach((pn, i) => {
+        const li = lanes.indexOf(pn.note.pitch);
+        out.push(
+          <rect
+            key={i}
+            x={(pn.start - r.start) * ppb}
+            y={3 + li * rowH + rowH * 0.1}
+            width={hitW}
+            height={Math.max(1.5, rowH * 0.8)}
+            rx={1}
+            opacity={(pn.iteration > 0 ? 0.6 : 1) * (0.45 + pn.note.velocity * 0.55)}
+          />,
+        );
+      });
+    } else {
+      let lo = 127;
+      let hi = 0;
+      for (const n of r.notes) {
+        lo = Math.min(lo, n.pitch);
+        hi = Math.max(hi, n.pitch);
+      }
+      if (lo > hi) {
+        lo = 60;
+        hi = 72;
+      }
+      lo -= 1;
+      hi += 1;
+      const span = Math.max(8, hi - lo);
+      const mid = (lo + hi) / 2;
+      lo = mid - span / 2;
+      const noteH = Math.max(1.5, Math.min(5, bodyH / span));
+      notes.forEach((pn, i) => {
+        const y = 3 + ((lo + span - pn.note.pitch) / span) * (bodyH - noteH);
+        out.push(
+          <rect
+            key={i}
+            x={(pn.start - r.start) * ppb}
+            y={y}
+            width={Math.max(1.5, pn.duration * ppb - 0.6)}
+            height={noteH}
+            rx={Math.min(1.5, noteH / 2)}
+            opacity={pn.iteration > 0 ? 0.62 : 1}
+          />,
+        );
+      });
+    }
+    segs.slice(1).forEach((s, i) => {
+      const x = (s.start - r.start) * ppb;
+      out.push(<line key={'l' + i} x1={x} x2={x} y1={0} y2={bodyH + 6} className="loop-notch" />);
+    });
+    return { out, w };
+  }, [r, ppb, h, drums]);
+  return (
+    <svg className="region-notes" width={content.w} height={h}>
+      {content.out}
+    </svg>
+  );
+}
+
+function AudioWave({ r, ppb, h, bpm }: { r: AudioRegion; ppb: number; h: number; bpm: number }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  const [ver, setVer] = useState(0);
+  useEffect(() => onAudioChange(() => setVer((v) => v + 1)), []);
+  const widthPx = Math.max(1, r.length * ppb);
+  useEffect(() => {
+    const cv = ref.current;
+    if (!cv) return;
+    const buf = getBuffer(r.audioId);
+    const bins = 6000;
+    const peaks = getPeaks(r.audioId, bins);
+    const scale = Math.min(1, 16000 / widthPx) * (window.devicePixelRatio > 1 ? 2 : 1);
+    const W = Math.max(1, Math.floor(widthPx * Math.min(scale, 2)));
+    const H = Math.max(1, Math.floor(h * (window.devicePixelRatio || 1)));
+    cv.width = W;
+    cv.height = H;
+    const g = cv.getContext('2d')!;
+    g.clearRect(0, 0, W, H);
+    if (!buf || !peaks) return;
+    const spb = 60 / bpm;
+    const dur = buf.duration;
+    const segs = regionSegments(r);
+    const mid = H / 2;
+    const amp = (H / 2) * 0.95 * Math.min(2, r.gain);
+    g.fillStyle = 'rgba(255,255,255,0.85)';
+    let si = 0;
+    for (let x = 0; x < W; x++) {
+      const beat0 = r.start + (x / W) * r.length;
+      const beat1 = r.start + ((x + 1) / W) * r.length;
+      while (si < segs.length - 1 && beat0 >= segs[si].end) si++;
+      const seg = segs[si];
+      const c0 = seg.contentStart + (beat0 - seg.start);
+      const c1 = seg.contentStart + (Math.min(beat1, seg.end) - seg.start);
+      let b0 = Math.floor(((c0 * spb) / dur) * bins);
+      let b1 = Math.max(b0 + 1, Math.ceil(((c1 * spb) / dur) * bins));
+      if (r.reversed) {
+        const t = b0;
+        b0 = bins - b1;
+        b1 = bins - t;
+      }
+      let lo = 0;
+      let hi = 0;
+      for (let b = Math.max(0, b0); b < Math.min(bins, b1); b++) {
+        if (peaks[b * 2] < lo) lo = peaks[b * 2];
+        if (peaks[b * 2 + 1] > hi) hi = peaks[b * 2 + 1];
+      }
+      // fades shape the drawn amplitude
+      let f = 1;
+      const rel = beat0 - r.start;
+      if (r.fadeIn > 0 && rel < r.fadeIn) f *= rel / r.fadeIn;
+      if (r.fadeOut > 0 && rel > r.length - r.fadeOut) f *= Math.max(0, (r.length - rel) / r.fadeOut);
+      const y0 = mid - hi * amp * f;
+      const y1 = mid - lo * amp * f;
+      g.fillRect(x, y0, 1, Math.max(1, y1 - y0));
+    }
+  }, [r, ppb, h, bpm, ver, widthPx]);
+  const segs = regionSegments(r);
+  return (
+    <>
+      <canvas ref={ref} className="region-wave" style={{ width: widthPx, height: h }} />
+      <svg className="region-notes" width={widthPx} height={h} style={{ pointerEvents: 'none' }}>
+        {segs.slice(1).map((s, i) => {
+          const x = (s.start - r.start) * ppb;
+          return <line key={i} x1={x} x2={x} y1={0} y2={h} className="loop-notch" />;
+        })}
+        {r.fadeIn > 0 && <path d={`M0 0 L${r.fadeIn * ppb} 0 L0 ${h} Z`} className="fade-shade" />}
+        {r.fadeOut > 0 && <path d={`M${widthPx} 0 L${widthPx - r.fadeOut * ppb} 0 L${widthPx} ${h} Z`} className="fade-shade" />}
+        {r.fadeIn > 0 && <line x1={0} y1={h} x2={r.fadeIn * ppb} y2={0} className="fade-line" />}
+        {r.fadeOut > 0 && <line x1={widthPx} y1={h} x2={widthPx - r.fadeOut * ppb} y2={0} className="fade-line" />}
+      </svg>
+    </>
+  );
+}
+
+function RegionView({ region: r, trackId, trackType, color, ppb, height, bpm }: Props) {
+  const selected = useStore((s) => s.selectedRegionIds.includes(r.id));
+  const editing = useStore((s) => s.editingRegionId === r.id);
+  const renaming = useTracksUi((s) => s.renamingRegionId === r.id);
+  const left = r.start * ppb;
+  const width = Math.max(4, r.length * ppb);
+  const bodyH = height - NAME_H - 4;
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    const s = useStore.getState();
+    const wasSelected = s.selectedRegionIds.includes(r.id);
+    const additive = e.shiftKey || e.metaKey;
+    if (additive) {
+      useStore.setState({
+        selectedRegionIds: wasSelected ? s.selectedRegionIds.filter((x) => x !== r.id) : [...s.selectedRegionIds, r.id],
+        selectedTrackId: trackId,
+        focusArea: 'tracks',
+      });
+      if (wasSelected) return;
+    } else if (!wasSelected) {
+      useStore.setState({ selectedRegionIds: [r.id], selectedTrackId: trackId, focusArea: 'tracks' });
+    } else {
+      useStore.setState({ selectedTrackId: trackId, focusArea: 'tracks' });
+    }
+    // If the editor is open, follow the clicked region.
+    if (s.dockTab === 'editor' && s.editingRegionId !== r.id) useStore.setState({ editingRegionId: r.id });
+    const target = e.currentTarget as HTMLElement;
+    dragMove(e, r.id, () => {
+      if (wasSelected && !additive) {
+        const rect = target.getBoundingClientRect();
+        showPillMenu(e.clientX, rect.top, regionPillItems(r.id));
+      }
+    });
+  };
+
+  const handle = (fn: (e: React.PointerEvent, id: string) => void) => (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    useStore.setState({ selectedRegionIds: [r.id], selectedTrackId: trackId, focusArea: 'tracks' });
+    fn(e, r.id);
+  };
+
+  const cls = ['region', r.kind, trackType === 'drums' ? 'drums' : '', selected ? 'selected' : '', editing ? 'editing' : '', r.muted ? 'muted' : '', r.loop ? 'looped' : '']
+    .filter(Boolean)
+    .join(' ');
+
+  return (
+    <div
+      className={cls}
+      data-region-id={r.id}
+      style={{ left, width, height: height - 4, ['--c' as string]: color, ['--rl' as string]: `${left}px`, ['--rw' as string]: `${width}px` }}
+      onPointerDown={onPointerDown}
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        openRegionEditor(r.id);
+      }}
+      onContextMenu={(e) => {
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        showContextMenu(e, regionMenu(r.id, r.start + (e.clientX - rect.left) / ppb));
+      }}
+    >
+      <div className="region-name">
+        {r.loop && <Repeat size={10} style={{ flexShrink: 0 }} />}
+        {renaming ? (
+          <input
+            autoFocus
+            className="region-rename"
+            defaultValue={r.name}
+            onPointerDown={(e) => e.stopPropagation()}
+            onBlur={(e) => {
+              const v = e.target.value.trim();
+              if (v && v !== r.name)
+                commit((d) => {
+                  const x = draftRegion(d, r.id);
+                  if (x) x.name = v;
+                });
+              useTracksUi.setState({ renamingRegionId: null });
+            }}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+              if (e.key === 'Escape') useTracksUi.setState({ renamingRegionId: null });
+            }}
+          />
+        ) : (
+          <span>{r.name}</span>
+        )}
+      </div>
+      <div className="region-body" style={{ height: bodyH }}>
+        {r.kind === 'midi' ? <MidiPreview r={r} ppb={ppb} h={bodyH} drums={trackType === 'drums'} /> : <AudioWave r={r} ppb={ppb} h={bodyH} bpm={bpm} />}
+      </div>
+      {/* Edge handles */}
+      <div className="rh rh-left" onPointerDown={handle(dragResizeLeft)} title="Trim start" />
+      <div className="rh rh-right" onPointerDown={handle(dragResizeRight)} title="Trim / extend" />
+      <div className="rh rh-loop" onPointerDown={handle(dragLoop)} title="Drag to loop" />
+      {r.kind === 'audio' && (
+        <>
+          <div className="fade-handle" style={{ left: Math.max(2, r.fadeIn * ppb - 5) }} onPointerDown={handle((e, id) => dragFade(e, id, 'in'))} title="Fade in" />
+          <div className="fade-handle" style={{ left: Math.min(width - 20, width - r.fadeOut * ppb - 5) }} onPointerDown={handle((e, id) => dragFade(e, id, 'out'))} title="Fade out" />
+        </>
+      )}
+    </div>
+  );
+}
+
+export default memo(RegionView);
