@@ -3,7 +3,7 @@ import { produce, type Draft } from 'immer';
 import type { Note, Project, Region, Track } from '../model/types';
 
 export type DockTab = 'editor' | 'instrument' | 'mixer' | 'fx';
-export type EditorMode = 'pianoroll' | 'score' | 'steps' | 'audio' | 'drummer';
+export type EditorMode = 'pianoroll' | 'score' | 'steps' | 'audio' | 'drummer' | 'fullscore';
 
 export interface Clipboard {
   kind: 'regions' | 'notes' | 'track';

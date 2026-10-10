@@ -28,6 +28,7 @@ import { formatPosition, formatTime, keyName, keyUsesFlats, pitchClassName } fro
 import { saveListeners, type SaveStatus } from '../state/persistence';
 import { HSlider } from './common/controls';
 import { startDrag } from './common/drag';
+import FullScoreButton from './editors/score/FullScoreButton';
 
 function MetronomeIcon({ size = 17 }: { size?: number }) {
   return (
@@ -240,6 +241,7 @@ export default function TopBar() {
         <DockButton tab="editor" icon={<SquarePen size={17} />} label="Editor" shortcut="E" />
         <DockButton tab="instrument" icon={<Piano size={17} />} label="Instrument / Keyboard" shortcut="P" />
         <DockButton tab="mixer" icon={<SlidersVertical size={17} />} label="Mixer" shortcut="X" />
+        <FullScoreButton />
         <button className="btn icon tb" title="New Track (⌥⌘N)" onClick={() => openModal('newTrack')}>
           <Plus size={18} />
         </button>

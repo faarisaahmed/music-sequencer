@@ -25,6 +25,31 @@ export default function EditorPanel() {
     if (r) found = { track, region: r };
   }
 
+  if (mode === 'fullscore') {
+    const back = found;
+    return (
+      <div className="editor-panel">
+        <div className="editor-head">
+          <div className="editor-title">
+            <span>Full Score</span>
+            <span className="faint" style={{ fontWeight: 400 }}>
+              · all instruments
+            </span>
+          </div>
+          {back && back.region.kind === 'midi' && (
+            <div className="seg">
+              <button onClick={() => useStore.setState({ editorMode: back.track.type === 'drums' ? 'steps' : 'score', dockMaximized: false })}>← {back.region.name}</button>
+            </div>
+          )}
+          <div id="editor-toolbar-slot" className="editor-toolbar-slot" />
+        </div>
+        <div className="editor-body">
+          <ScoreEditor full />
+        </div>
+      </div>
+    );
+  }
+
   if (!found) {
     return (
       <div className="empty-state">
@@ -57,6 +82,7 @@ export default function EditorPanel() {
         : [
             { id: 'pianoroll', label: 'Piano Roll' },
             { id: 'score', label: 'Score' },
+            { id: 'fullscore', label: 'Full Score' },
           ];
   const active = modes.some((m) => m.id === mode) ? mode : modes[0].id;
 

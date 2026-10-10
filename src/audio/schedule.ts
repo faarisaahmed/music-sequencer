@@ -41,18 +41,24 @@ export function scheduleRange(p: Project, mixer: Mixer, b0: number, b1: number, 
         for (const pn of placedNotes(r, b0, b1)) {
           const n = pn.note;
           if (n.chance !== undefined && n.chance < 1 && Math.random() > n.chance) continue;
-          const dur = Math.max(0.01, Math.min(pn.duration, opts.limit - pn.start));
+          let dur = Math.max(0.01, Math.min(pn.duration, opts.limit - pn.start));
+          let vel = n.velocity;
+          if (n.artic) {
+            if (n.artic.includes('staccato')) dur = Math.max(0.01, Math.min(dur * 0.45, 0.5));
+            if (n.artic.includes('accent')) vel = Math.min(1, vel * 1.22 + 0.05);
+            if (n.artic.includes('marcato')) vel = Math.min(1, vel * 1.32 + 0.08);
+          }
           const pitch = n.pitch + transpose;
           if (pitch < 0 || pitch > 127) continue;
           const reps = Math.max(1, n.repeat ?? 1);
           if (reps > 1) {
             const step = dur / reps;
             for (let i = 0; i < reps; i++) {
-              const v = n.velocity * (i === 0 ? 1 : 0.8);
+              const v = vel * (i === 0 ? 1 : 0.8);
               inst.playNote(pitch, v, toTime(pn.start + i * step), step * spb * 0.9);
             }
           } else {
-            inst.playNote(pitch, n.velocity, toTime(pn.start), dur * spb);
+            inst.playNote(pitch, vel, toTime(pn.start), dur * spb);
           }
         }
       } else {

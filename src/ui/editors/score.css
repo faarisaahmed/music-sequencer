@@ -142,3 +142,62 @@
   background: #ff3b30;
   box-shadow: 0 0 4px rgba(255, 59, 48, 0.6);
 }
+.score-sel {
+  position: absolute;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(31, 122, 255, 0.55);
+  box-shadow: 0 0 0 1.5px rgba(31, 122, 255, 0.9);
+  transform: rotate(-18deg);
+}
+.score-sounding {
+  position: absolute;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(52, 199, 89, 0.45);
+  box-shadow: 0 0 8px rgba(52, 199, 89, 0.9);
+}
+.score-entry {
+  position: absolute;
+  pointer-events: auto;
+  height: 24px;
+  min-width: 80px;
+  width: 90px;
+  padding: 0 6px !important;
+  font-family: Georgia, serif;
+  font-size: 14px;
+  color: #111 !important;
+  background: #fffbe6 !important;
+  border: 1.5px solid #1f7aff !important;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  z-index: 5;
+}
+.score-entry.chord {
+  font-weight: 700;
+}
+.pal-btn .tuplet-glyph {
+  font-family: Georgia, serif;
+  font-style: italic;
+  font-size: 15px;
+  font-weight: 700;
+}
+.pal-btn.voice-btn {
+  min-width: 24px;
+  font-size: 12px;
+  border-bottom: 3px solid transparent;
+}
+.pal-btn.voice-btn.v1 {
+  border-bottom-color: #2f8cff;
+}
+.pal-btn.voice-btn.v2 {
+  border-bottom-color: #34c759;
+}
+.pal-btn.artic {
+  font-family: Georgia, serif;
+  font-size: 15px;
+  font-weight: 700;
+}
+.score-editor.full .score-scroll {
+  padding-top: 12px;
+}
