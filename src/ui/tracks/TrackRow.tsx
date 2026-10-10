@@ -1,3 +1,4 @@
+import { addLoopToSong } from '../library/loops';
 import { memo, useEffect, useRef, useState } from 'react';
 import { Circle } from 'lucide-react';
 import type { Track } from '../../model/types';
@@ -280,6 +281,12 @@ function TrackLane({ track, width, ppb, height, bpm, selected, onMarquee }: Lane
         setDragOver(false);
         const grid = useStore.getState().snapGrid || 1;
         const beat = Math.max(0, Math.round(beatAt(e.clientX) / grid) * grid);
+        const loopId = e.dataTransfer.getData('application/x-bandforge-loop');
+        if (loopId) {
+          // Library loop: place it on this lane when the track type fits, otherwise on a matching track.
+          addLoopToSong(loopId, beat, track.type === 'audio' ? undefined : track.id);
+          return;
+        }
         for (const f of Array.from(e.dataTransfer.files)) {
           if (/\.midi?$/i.test(f.name)) void importMidiFile(f, true);
           else void importAudioFile(f, track.type === 'audio' ? track.id : undefined, beat);
