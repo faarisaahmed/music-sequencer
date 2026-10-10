@@ -30,6 +30,7 @@ import { saveListeners, type SaveStatus } from '../state/persistence';
 import { HSlider } from './common/controls';
 import { startDrag } from './common/drag';
 import FullScoreButton from './editors/score/FullScoreButton';
+import ViewSwitch from './liveloops/ViewSwitch';
 
 function MetronomeIcon({ size = 17 }: { size?: number }) {
   return (
@@ -235,6 +236,7 @@ export default function TopBar() {
       </div>
 
       <div className="tb-group">
+        <ViewSwitch />
         <button className={'btn icon tb' + (libraryOpen ? ' active' : '')} title="Library (Y)" onClick={() => useStore.setState({ libraryOpen: !libraryOpen })}>
           <Library size={17} />
         </button>

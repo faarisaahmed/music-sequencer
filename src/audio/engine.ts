@@ -30,7 +30,14 @@ interface RecordingState {
   recorder?: PcmRecorder;
 }
 
-type LiveListener = (pitch: number, on: boolean, trackId: string) => void;
+type LiveListener = (pitch: number, on: boolean, trackId: string, velocity?: number) => void;
+
+/** Alternative scheduler that replaces timeline playback (used by Live Loops). */
+export interface LiveScheduler {
+  schedule(p: Project, mixer: Mixer, b0: number, b1: number, toTime: (beat: number) => number, fresh: boolean, sources: ActiveSource[]): void;
+  /** Transport stopped at `pos` (beats). */
+  onStop(pos: number): void;
+}
 
 class Engine {
   ctx: AudioContext;
@@ -50,6 +57,7 @@ class Engine {
   private micSource: GainNode | null = null;
   private countInUntil = -Infinity;
   private liveListeners = new Set<LiveListener>();
+  private liveScheduler: LiveScheduler | null = null;
   /** Notes currently held by the user, per track (for UI highlighting). */
   readonly held = new Map<string, Set<number>>();
 
@@ -110,6 +118,20 @@ class Engine {
     return this.playing;
   }
 
+  /** Install (or remove) a scheduler that takes over from the timeline, e.g. Live Loops. */
+  setLiveScheduler(s: LiveScheduler | null): void {
+    if (this.liveScheduler === s) return;
+    if (this.playing) this.stop();
+    this.liveScheduler = s;
+  }
+
+  /** Audio-context time at which `beat` plays (only meaningful while playing). */
+  timeOfBeat(beat: number): number {
+    const seg = this.segments[this.segments.length - 1];
+    if (!seg) return this.ctx.currentTime;
+    return seg.ctxTime + ((beat - seg.beat) * 60) / (this.project?.bpm ?? 120);
+  }
+
   // ----------------------------------------------------------- playback
 
   async play(from?: number): Promise<void> {
@@ -139,6 +161,7 @@ class Engine {
     this.timer = null;
     this.stopSources();
     for (const ch of this.mixer.channels.values()) ch.instrument?.allNotesOff(this.ctx.currentTime);
+    this.liveScheduler?.onStop(pos);
     const s = useStore.getState();
     useStore.setState({ playing: false, recording: false, countingIn: false });
     const resume = returnToCursor ? s.cursor : Math.max(0, pos);
@@ -178,7 +201,8 @@ class Engine {
     if (!this.playing || !p) return;
     const now = this.ctx.currentTime;
     const horizon = now + LOOKAHEAD;
-    const loopOn = p.loop.enabled && p.loop.end > p.loop.start && !(this.rec?.kind === 'audio');
+    const live = this.liveScheduler;
+    const loopOn = !live && p.loop.enabled && p.loop.end > p.loop.start && !(this.rec?.kind === 'audio');
     this.sources = this.sources.filter((s) => s.end > now);
     let guard = 0;
     while (guard++ < 8) {
@@ -189,7 +213,8 @@ class Engine {
       const b0 = this.scheduledBeat;
       if (b1 > b0) {
         const toTime = (b: number) => seg.ctxTime + ((b - seg.beat) * 60) / p.bpm;
-        scheduleRange(p, this.mixer, b0, b1, toTime, { fresh: this.freshPending, limit: segEnd, sources: this.sources });
+        if (live) live.schedule(p, this.mixer, b0, b1, toTime, this.freshPending, this.sources);
+        else scheduleRange(p, this.mixer, b0, b1, toTime, { fresh: this.freshPending, limit: segEnd, sources: this.sources });
         this.scheduleMetronome(p, b0, b1, toTime);
         this.freshPending = false;
         this.scheduledBeat = b1;
@@ -208,7 +233,7 @@ class Engine {
     // Auto-stop at the end of the song when not looping.
     const pos = this.beatAt(now);
     const endBeat = p.lengthBars * beatsPerBar(p.timeSig);
-    if (!loopOn && !this.rec && pos > endBeat) this.stop(false);
+    if (!live && !loopOn && !this.rec && pos > endBeat) this.stop(false);
   }
 
   private scheduleMetronome(p: Project, b0: number, b1: number, toTime: (b: number) => number): void {
@@ -298,7 +323,7 @@ class Engine {
     let set = this.held.get(trackId);
     if (!set) this.held.set(trackId, (set = new Set()));
     set.add(pitch);
-    this.liveListeners.forEach((f) => f(pitch, true, trackId));
+    this.liveListeners.forEach((f) => f(pitch, true, trackId, velocity));
     const rec = this.rec;
     if (rec && rec.kind === 'midi' && rec.trackId === trackId && this.playing) {
       const pos = this.position;
@@ -335,7 +360,7 @@ class Engine {
     const transpose = t.type === 'drums' ? 0 : t.transpose;
     ch.instrument.playNote(pitch + transpose, velocity, time, seconds);
     const delayMs = Math.max(0, (time - this.ctx.currentTime) * 1000);
-    setTimeout(() => this.liveListeners.forEach((f) => f(pitch, true, trackId)), delayMs);
+    setTimeout(() => this.liveListeners.forEach((f) => f(pitch, true, trackId, velocity)), delayMs);
     setTimeout(() => this.liveListeners.forEach((f) => f(pitch, false, trackId)), delayMs + seconds * 1000);
     const rec = this.rec;
     if (rec && rec.kind === 'midi' && rec.trackId === trackId && this.playing) {

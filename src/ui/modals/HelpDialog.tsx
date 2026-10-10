@@ -31,6 +31,7 @@ const SECTIONS: { title: string; rows: Row[] }[] = [
       ['Mixer', ['X']],
       ['Smart Controls & FX', ['B']],
       ['Library (sounds & loops)', ['Y']],
+      ['Tracks ↔ Live Loops grid', ['G']],
       ['Zoom in / out', [`${CMD} =`, `${CMD} −`]],
       ['This help', ['?']],
     ],

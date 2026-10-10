@@ -4,6 +4,7 @@ import { contentEndBeat, createMidiRegion, createProject, createTrack, note, uid
 import { diatonic, layChords } from './accompaniment';
 import { SCALES, beatsPerBar, chordPitches, diatonicChords } from './music';
 import { sectionsFromBars } from './sections';
+import { buildEdmGrid, buildHipHopGrid } from './liveLoopTemplates';
 
 /** Fill the chord track with a repeating diatonic progression so the demo works with the Songwriter tools. */
 function chordTrack(p: Project, degrees: number[], beatsEach: number, seventh = false): void {
@@ -160,6 +161,20 @@ export const TEMPLATES: Template[] = [
       p.metronome = true;
       return p;
     },
+  },
+  {
+    id: 'liveloops-hiphop',
+    name: 'Live Loops: Hip Hop',
+    description: 'Trigger loops in a grid and perform a beat',
+    icon: 'sparkles',
+    build: () => buildHipHopGrid(),
+  },
+  {
+    id: 'liveloops-edm',
+    name: 'Live Loops: EDM',
+    description: 'Build up and drop with scenes of loops',
+    icon: 'sparkles',
+    build: () => buildEdmGrid(),
   },
   {
     id: 'demo-sunset',

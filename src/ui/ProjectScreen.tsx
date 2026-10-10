@@ -4,6 +4,7 @@ import { getEngine } from '../audio/engine';
 import { importAudioFile, importMidiFile } from '../state/actions';
 import TopBar from './TopBar';
 import TracksView from './tracks/TracksView';
+import LiveLoopsView from './liveloops/LiveLoopsView';
 import Dock from './Dock';
 import LibraryPanel from './library/LibraryPanel';
 import { addLoopToSong } from './library/loops';
@@ -19,6 +20,7 @@ export default function ProjectScreen() {
   const dockTab = useStore((s) => s.dockTab);
   const dockHeight = useStore((s) => s.dockHeight);
   const dockMax = useStore((s) => s.dockMaximized);
+  const mainView = useStore((s) => s.mainView);
   const mainRef = useRef<HTMLDivElement>(null);
   useGlobalShortcuts();
   useMusicalTyping();
@@ -65,8 +67,14 @@ export default function ProjectScreen() {
         {libraryOpen && <LibraryPanel />}
         <div className="main-col" ref={mainRef}>
           <div className="tracks-area" style={{ display: dockTab && dockMax ? 'none' : undefined }}>
-            <TracksView />
-            <EmptyHint />
+            {mainView === 'liveloops' ? (
+              <LiveLoopsView />
+            ) : (
+              <>
+                <TracksView />
+                <EmptyHint />
+              </>
+            )}
           </div>
           {dockTab && (
             <>

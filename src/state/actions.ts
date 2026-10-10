@@ -27,6 +27,8 @@ export async function openProject(p: Project): Promise<void> {
     selectedNoteIds: [],
     cursor: 0,
     dockTab: null,
+    // Grid-only songs (Live Loops templates) open in the Live Loops view.
+    mainView: p.liveLoops?.cells.length && !p.tracks.some((t) => t.regions.length) ? 'liveloops' : 'tracks',
   });
   await getEngine().loadProjectAudio(p);
 }

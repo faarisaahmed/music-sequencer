@@ -193,6 +193,23 @@ export interface Project {
   mastering?: MasteringSettings;
   /** Arrangement markers (Intro, Verse, Chorus…). */
   sections?: Section[];
+  /** Live Loops grid (GarageBand-style cells per track × scene). */
+  liveLoops?: LiveLoops;
+}
+
+export interface LiveCell {
+  id: string;
+  trackId: string;
+  scene: number;
+  /** Loop content; start/offset are 0 and it repeats every `length` beats. */
+  region: Region;
+}
+
+export interface LiveLoops {
+  scenes: { id: string; name: string }[];
+  cells: LiveCell[];
+  /** Launch quantisation in beats (0 = immediate). */
+  quantize: number;
 }
 
 export interface Section {
