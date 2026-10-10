@@ -382,6 +382,7 @@ export class Mixer {
       const key = instrumentKey(t);
       if (ch.instrumentKey !== key) ch.setInstrument(createInstrument(this.ctx, t), key);
       ch.instrument?.setParams(t.instrumentParams);
+      if (ch.instrument && t.type === 'drums') applyDrumSamples(ch.instrument, t);
     }
     for (const [id, ch] of this.channels) {
       if (!seen.has(id)) {
@@ -430,6 +431,17 @@ export function instrumentKey(t: Track): string {
   return t.instrument + (t.instrument === 'user-sampler' ? ':' + (t.samplerAudioId ?? '') + ':' + (t.samplerRoot ?? 60) + ':' + (t.samplerAudioId && getBuffer(t.samplerAudioId) ? 1 : 0) : '');
 }
 
+/** Put the track's own row samples (once loaded) into its drum kit. */
+function applyDrumSamples(inst: Instrument, t: Track): void {
+  if (!(inst instanceof DrumKitInstrument)) return;
+  const map = new Map<number, AudioBuffer>();
+  for (const [pitch, d] of Object.entries(t.drumSamples ?? {})) {
+    const buf = getBuffer(d.audioId);
+    if (buf) map.set(Number(pitch), buf);
+  }
+  inst.setOverrides(map);
+}
+
 export function createInstrument(ctx: BaseAudioContext, t: Track): Instrument | null {
   if (t.type === 'audio') return null;
   const preset = getPreset(t.instrument);
@@ -443,6 +455,7 @@ export function createInstrument(ctx: BaseAudioContext, t: Track): Instrument | 
       break;
     case 'drums':
       inst = new DrumKitInstrument(ctx, preset.kit, DRUM_LANES);
+      applyDrumSamples(inst, t);
       break;
     case 'user-sampler': {
       const buf = t.samplerAudioId ? getBuffer(t.samplerAudioId) : undefined;

@@ -1,5 +1,6 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Repeat } from 'lucide-react';
+import { Link2, Repeat } from 'lucide-react';
+import { isLinkedClip } from '../../model/patterns';
 import type { AudioRegion, MidiRegion, Region, TrackType } from '../../model/types';
 import { placedNotes, regionSegments } from '../../model/regions';
 import { DRUM_LANES } from '../../model/music';
@@ -272,6 +273,15 @@ function RegionView({ region: r, trackId, trackType, color, ppb, height, bpm }: 
     fn(e, r.id);
   };
 
+  // Linked Beat Sequencer pattern: how many clips play it.
+  const pid = isLinkedClip(r) ? r.patternId : null;
+  const links = useStore((s) => {
+    if (!pid || !s.project) return 0;
+    let n = 0;
+    for (const t of s.project.tracks) for (const x of t.regions) if (x.kind === 'midi' && x.patternId === pid && x.loop) n++;
+    return n;
+  });
+
   const cls = ['region', r.kind, trackType === 'drums' ? 'drums' : '', selected ? 'selected' : '', editing ? 'editing' : '', r.muted ? 'muted' : '', r.loop ? 'looped' : '']
     .filter(Boolean)
     .join(' ');
@@ -296,7 +306,14 @@ function RegionView({ region: r, trackId, trackType, color, ppb, height, bpm }: 
     >
       <RegionPresence regionId={r.id} />
       <div className="region-name">
-        {r.loop && <Repeat size={10} style={{ flexShrink: 0 }} />}
+        {links > 1 ? (
+          <span className="region-link" title={`Linked pattern: used ${links} times. Editing one changes all (right-click › Make Unique to separate).`}>
+            <Link2 size={10} />
+            {links}
+          </span>
+        ) : (
+          r.loop && <Repeat size={10} style={{ flexShrink: 0 }} />
+        )}
         {renaming ? (
           <input
             autoFocus

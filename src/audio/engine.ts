@@ -2,11 +2,11 @@
 import type { Note, Project } from '../model/types';
 import { beatsPerBar } from '../model/music';
 import { createMidiRegion, createAudioRegion, uid } from '../model/defaults';
-import { commit, findTrack, toast, useStore, useTransport } from '../state/store';
+import { commit, findRegion, findTrack, toast, useStore, useTransport } from '../state/store';
 import { getAudioContext, resumeAudio } from './context';
 import { Mixer } from './mixer';
 import { scheduleRange, type ActiveSource } from './schedule';
-import { addBuffer, ensureClips } from './audioStore';
+import { addBuffer, ensureClips, onAudioChange } from './audioStore';
 import { PcmRecorder } from './pcmRecorder';
 import { useInputSettings } from './inputSettings';
 import { projectAudioIds } from '../state/persistence';
@@ -60,6 +60,8 @@ class Engine {
     useStore.subscribe((s, prev) => {
       if (s.project !== prev.project) this.setProject(s.project);
     });
+    // Samples that finish loading later (e.g. sent by a Jam partner) join their instruments.
+    onAudioChange(() => this.project && this.mixer.sync(this.project));
     this.setProject(useStore.getState().project);
   }
 
@@ -119,10 +121,33 @@ class Engine {
 
   // ----------------------------------------------------------- playback
 
-  async play(from?: number): Promise<void> {
+  /** Pattern preview: loop one Beat Sequencer clip on its own (FL Studio's pattern mode). */
+  private patternRegion: string | null = null;
+
+  /** Loop bounds of the previewed pattern: one pass of the clip, nothing else playing. */
+  private patternBounds(p: Project): { start: number; end: number; trackId: string } | null {
+    const f = this.patternRegion ? findRegion(p, this.patternRegion) : undefined;
+    if (!f) return null;
+    const r = f.region;
+    const len = r.loop ? Math.min(r.length, r.contentLength) : r.length;
+    return { start: r.start, end: r.start + Math.max(0.25, len), trackId: f.track.id };
+  }
+
+  /** Play one clip's pattern on a loop, solo, without touching the song's cycle. */
+  async playPattern(regionId: string): Promise<void> {
+    const p = this.project;
+    const f = p ? findRegion(p, regionId) : undefined;
+    if (!f) return;
+    if (this.rec) this.stop();
+    await this.play(f.region.start, regionId);
+  }
+
+  async play(from?: number, pattern: string | null = null): Promise<void> {
     await resumeAudio();
     const p = this.project;
     if (!p) return;
+    this.patternRegion = pattern;
+    useStore.setState({ patternPlay: pattern });
     if (this.playing) this.stopSources();
     const start = from ?? useStore.getState().cursor;
     const now = this.ctx.currentTime + 0.06;
@@ -147,7 +172,8 @@ class Engine {
     this.stopSources();
     for (const ch of this.mixer.channels.values()) ch.instrument?.allNotesOff(this.ctx.currentTime);
     const s = useStore.getState();
-    useStore.setState({ playing: false, recording: false, countingIn: false });
+    this.patternRegion = null;
+    useStore.setState({ playing: false, recording: false, countingIn: false, patternPlay: null });
     const resume = returnToCursor ? s.cursor : Math.max(0, pos);
     useTransport.setState({ position: resume, seconds: resume * this.spb });
     if (!returnToCursor) useStore.setState({ cursor: resume });
@@ -185,18 +211,25 @@ class Engine {
     if (!this.playing || !p) return;
     const now = this.ctx.currentTime;
     const horizon = now + LOOKAHEAD;
-    const loopOn = p.loop.enabled && p.loop.end > p.loop.start && !(this.rec?.kind === 'audio');
+    const pat = this.patternBounds(p);
+    if (this.patternRegion && !pat) {
+      this.stop();
+      return;
+    }
+    const loopStart = pat ? pat.start : p.loop.start;
+    const loopEnd = pat ? pat.end : p.loop.end;
+    const loopOn = !!pat || (p.loop.enabled && p.loop.end > p.loop.start && !(this.rec?.kind === 'audio'));
     this.sources = this.sources.filter((s) => s.end > now);
     let guard = 0;
     while (guard++ < 8) {
       const seg = this.segments[this.segments.length - 1];
       const horizonBeat = seg.beat + ((horizon - seg.ctxTime) * p.bpm) / 60;
-      const segEnd = loopOn && seg.beat < p.loop.end ? p.loop.end : Infinity;
+      const segEnd = loopOn && seg.beat < loopEnd ? loopEnd : Infinity;
       const b1 = Math.min(horizonBeat, segEnd);
       const b0 = this.scheduledBeat;
       if (b1 > b0) {
         const toTime = (b: number) => seg.ctxTime + ((b - seg.beat) * 60) / p.bpm;
-        scheduleRange(p, this.mixer, b0, b1, toTime, { fresh: this.freshPending, limit: segEnd, sources: this.sources });
+        scheduleRange(p, this.mixer, b0, b1, toTime, { fresh: this.freshPending, limit: segEnd, sources: this.sources, onlyTrack: pat?.trackId });
         this.scheduleMetronome(p, b0, b1, toTime);
         this.freshPending = false;
         this.scheduledBeat = b1;
@@ -204,9 +237,9 @@ class Engine {
       if (b1 >= segEnd) {
         // Wrap to loop start.
         const wrapTime = seg.ctxTime + ((segEnd - seg.beat) * 60) / p.bpm;
-        this.segments.push({ ctxTime: wrapTime, beat: p.loop.start });
+        this.segments.push({ ctxTime: wrapTime, beat: loopStart });
         if (this.segments.length > 8) this.segments.splice(0, this.segments.length - 8);
-        this.scheduledBeat = p.loop.start;
+        this.scheduledBeat = loopStart;
         this.freshPending = true;
         continue;
       }

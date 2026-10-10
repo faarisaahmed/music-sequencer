@@ -5,7 +5,7 @@ import { getPreset } from '../../audio/presets';
 import { getEngine } from '../../audio/engine';
 import type { Draft } from 'immer';
 import { live, useStore, useTransport } from '../../state/store';
-import { createEmptyRegion, importAudioFile, importMidiFile, moveTrack, updateTrack } from '../../state/actions';
+import { createEmptyRegion, currentPatternClip, placePattern, importAudioFile, importMidiFile, moveTrack, updateTrack } from '../../state/actions';
 import { HSlider, Knob } from '../common/controls';
 import { TrackIcon } from '../common/icons';
 import { showContextMenu } from '../common/menus';
@@ -264,7 +264,10 @@ function TrackLane({ track, width, ppb, height, bpm, selected, onMarquee }: Lane
       }}
       onDoubleClick={(e) => {
         if (e.target !== e.currentTarget || track.type === 'audio') return;
-        createEmptyRegion(track.id, beatAt(e.clientX));
+        // Drum tracks: stamp the current pattern (linked), FL Studio-style.
+        const pattern = track.type === 'drums' ? currentPatternClip(useStore.getState().project!, track.id) : undefined;
+        if (pattern) placePattern(track.id, beatAt(e.clientX), pattern.id);
+        else createEmptyRegion(track.id, beatAt(e.clientX));
       }}
       onContextMenu={(e) => {
         if (e.target !== e.currentTarget) return;

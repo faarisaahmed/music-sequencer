@@ -1,15 +1,20 @@
-// GarageBand-style drum Beat Sequencer: rows per drum piece, glowing step pads,
-// and Step / Velocity / Note Repeat / Chance / Loop editing modes.
+// Drum Beat Sequencer: GarageBand-style glowing pads with an FL Studio-style channel
+// rack (per-row mute/solo/volume/pan/tune and your own sounds), linked patterns,
+// pattern-only loop playback and swing. Step / Velocity / Note Repeat / Chance /
+// Loop Length editing modes.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronLeft, ChevronRight, ChevronsRight, Eraser, MoreHorizontal, Plus } from 'lucide-react';
+import { AudioLines, ChevronLeft, ChevronRight, ChevronsRight, CopyPlus, Eraser, Link2, MoreHorizontal, Play, Plus, Square, Unlink } from 'lucide-react';
 import type { Draft } from 'immer';
 import type { MidiRegion, Note, Project } from '../../model/types';
-import { beginGesture, commit, draftRegion, endGesture, findRegion, live, useStore, useTransport } from '../../state/store';
+import { beginGesture, commit, draftRegion, endGesture, findRegion, live, toast, useStore, useTransport } from '../../state/store';
 import { DRUM_LANES, DRUM_NAMES, beatsPerBar } from '../../model/music';
 import { uid } from '../../model/defaults';
 import { PRESETS } from '../../audio/presets';
-import { setTrackInstrument } from '../../state/actions';
+import { makePatternUnique, newPatternClip, setClipPattern, setTrackInstrument, updateTrack } from '../../state/actions';
+import { patternUseCounts } from '../../model/patterns';
+import { addClip } from '../../audio/audioStore';
+import { Knob, HSlider } from '../common/controls';
 import { getEngine } from '../../audio/engine';
 import { showContextMenu, type MenuItem } from '../common/menus';
 import { clamp } from '../common/drag';
@@ -36,7 +41,7 @@ const RESOLUTIONS = [
 ];
 
 const DEFAULT_LANES = DRUM_LANES.slice(0, 8);
-const HEADER_W = 158;
+const HEADER_W = 250;
 const GAP = 4;
 const GROUP_GAP = 5;
 const BAR_GAP = 6;
@@ -47,6 +52,42 @@ const MIN_CELL = 30;
 const laneMemory = new Map<string, { extra: number[]; hidden: number[] }>();
 
 const stepOf = (n: Note, res: number) => Math.floor(n.start / res + 1e-6);
+
+/** Copied row (steps of one drum piece) for Copy Row / Paste Row. */
+let rowClipboard: { notes: Note[]; res: number } | null = null;
+
+/** First free pitch for a row that holds your own sound (above the GM drum map). */
+function freeCustomPitch(used: Set<number>): number {
+  for (let p = 88; p < 128; p++) if (!used.has(p)) return p;
+  return 127;
+}
+
+/** Ask for an audio file. */
+function pickAudio(): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'audio/*,.wav,.mp3,.ogg,.m4a,.aac,.flac';
+    input.onchange = () => resolve(input.files?.[0] ?? null);
+    input.click();
+  });
+}
+
+/** Load an audio file as a row's sound on a drum track. */
+async function setRowSample(trackId: string, pitch: number, file: File): Promise<void> {
+  const id = uid('aud');
+  try {
+    await addClip(id, file, file.name);
+  } catch {
+    toast('Could not read that audio file', 'error');
+    return;
+  }
+  const name = file.name.replace(/\.[^.]+$/, '').slice(0, 24) || 'Sound';
+  updateTrack(trackId, (t) => {
+    t.drumSamples = { ...(t.drumSamples ?? {}), [pitch]: { audioId: id, name } };
+  });
+  getEngine().preview(trackId, pitch, 0.9, 0.5);
+}
 
 function midiDraft(d: Draft<Project>, id: string): Draft<MidiRegion> | null {
   const r = draftRegion(d, id);
@@ -88,6 +129,7 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
   const region = found?.region.kind === 'midi' ? found.region : null;
   const track = found?.track;
   const notes = useMemo(() => region?.notes ?? [], [region]);
+  const customKey = Object.keys(track?.drumSamples ?? {}).join(',');
 
   const cellMap = useMemo(() => {
     const m = new Map<string, Note>();
@@ -97,14 +139,18 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
 
   const lanes = useMemo(() => {
     const used = new Set(notes.map((n) => n.pitch));
-    const set = new Set<number>([...DEFAULT_LANES, ...extra, ...used]);
+    const custom = customKey ? customKey.split(',').map(Number) : [];
+    const set = new Set<number>([...DEFAULT_LANES, ...extra, ...used, ...custom]);
     for (const h of hidden) if (!used.has(h)) set.delete(h);
     const order = (p: number) => {
       const i = DRUM_LANES.indexOf(p);
       return i < 0 ? 100 + p : i;
     };
     return [...set].sort((a, b) => order(a) - order(b));
-  }, [notes, extra, hidden]);
+  }, [notes, extra, hidden, customKey]);
+
+  const patternPlaying = useStore((s) => s.patternPlay === regionId);
+  const useCounts = useMemo(() => patternUseCounts(project), [project]);
 
   if (!region || !track) return null;
 
@@ -238,6 +284,29 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
       if (r.length < r.contentLength) r.length = r.contentLength;
     });
 
+  /** Copy the pattern after itself: 1 bar → 2 bars with the same beat twice, ready to vary. */
+  const doublePattern = () =>
+    editRegion((r) => {
+      const len = r.contentLength;
+      if (len * 2 > bpb * 16) return;
+      const copies = r.notes.filter((n) => n.start < len).map((n) => ({ ...n, id: uid('n'), start: n.start + len }));
+      r.notes.push(...copies);
+      r.contentLength = len * 2;
+      r.loop = true;
+      if (r.length < r.contentLength) r.length = r.contentLength;
+    });
+
+  // ---------------------------------------------------------------- channel rack (rows)
+
+  const params = track.instrumentParams;
+  const param = (key: string, fallback: number) => params[key] ?? fallback;
+  const setParam = (key: string, v: number) =>
+    updateTrack(track.id, (t) => {
+      t.instrumentParams[key] = v;
+    });
+  const rowName = (pitch: number) => track.drumSamples?.[pitch]?.name ?? DRUM_NAMES[pitch] ?? `Note ${pitch}`;
+  const anySolo = lanes.some((p) => params['solo' + p]);
+
   const shift = (dir: number) =>
     editRegion((r) => {
       for (const n of r.notes) n.start = (((n.start + dir * res) % r.contentLength) + r.contentLength) % r.contentLength;
@@ -254,9 +323,56 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
       rowEdit((r) => {
         for (const n of r.notes) if (n.pitch === pitch) n.velocity = v === 'human' ? clamp(n.velocity + (Math.random() - 0.5) * 0.25, 0.15, 1) : v;
       });
+    const tune = param('tune' + pitch, 0);
+    const own = track.drumSamples?.[pitch];
     return [
-      { title: DRUM_NAMES[pitch] ?? `Note ${pitch}` },
+      { title: rowName(pitch) },
       { label: 'Audition', onClick: () => engine.preview(trackId, pitch, 0.9, 0.25) },
+      {
+        label: own ? 'Replace Sound…' : 'Use Your Own Sound…',
+        onClick: async () => {
+          const f = await pickAudio();
+          if (f) await setRowSample(track.id, pitch, f);
+        },
+      },
+      ...(own && pitch < 88
+        ? [
+            {
+              label: 'Back to Kit Sound',
+              onClick: () =>
+                updateTrack(track.id, (t) => {
+                  if (t.drumSamples) delete t.drumSamples[pitch];
+                }),
+            },
+          ]
+        : []),
+      {
+        label: `Tune (${tune > 0 ? '+' : ''}${tune} st)`,
+        submenu: [12, 7, 5, 2, 1, 0, -1, -2, -5, -7, -12].map((st) => ({
+          label: st === 0 ? 'Original pitch' : `${st > 0 ? '+' : ''}${st} semitone${Math.abs(st) > 1 ? 's' : ''}`,
+          onClick: () => {
+            setParam('tune' + pitch, st);
+            setTimeout(() => engine.preview(trackId, pitch, 0.9, 0.3), 30);
+          },
+        })),
+      },
+      { separator: true },
+      {
+        label: 'Copy Row',
+        onClick: () => {
+          rowClipboard = { notes: notes.filter((n) => n.pitch === pitch).map((n) => ({ ...n })), res };
+        },
+      },
+      {
+        label: 'Paste Row',
+        disabled: !rowClipboard,
+        onClick: () =>
+          rowEdit((r) => {
+            if (!rowClipboard) return;
+            r.notes = r.notes.filter((n) => n.pitch !== pitch);
+            for (const n of rowClipboard.notes) if (n.start < r.contentLength) r.notes.push({ ...n, id: uid('n'), pitch });
+          }),
+      },
       { separator: true },
       { label: 'Fill Every Step', onClick: () => fill(1) },
       { label: 'Fill Every 2 Steps', onClick: () => fill(2) },
@@ -280,6 +396,11 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
           rowEdit((r) => void (r.notes = r.notes.filter((n) => n.pitch !== pitch)));
           setHidden([...hidden.filter((h) => h !== pitch), pitch]);
           setExtra(extra.filter((x) => x !== pitch));
+          if (track.drumSamples?.[pitch])
+            updateTrack(track.id, (t) => {
+              if (t.drumSamples) delete t.drumSamples[pitch];
+              for (const k of ['level', 'pan', 'tune', 'mute', 'solo']) delete t.instrumentParams[k + pitch];
+            });
         },
       },
     ];
@@ -289,9 +410,17 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
     const avail = Object.keys(DRUM_NAMES)
       .map(Number)
       .filter((p) => !lanes.includes(p));
+    const ownSound: MenuItem = {
+      label: 'Your Own Sound…',
+      icon: <Plus size={14} />,
+      onClick: async () => {
+        const f = await pickAudio();
+        if (f) await setRowSample(track.id, freeCustomPitch(new Set(lanes)), f);
+      },
+    };
     showContextMenu(
       e,
-      avail.length
+      [ownSound, { separator: true }, ...(avail.length
         ? avail.map((p) => ({
             label: DRUM_NAMES[p],
             onClick: () => {
@@ -300,12 +429,13 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
               engine.preview(trackId, p, 0.8, 0.25);
             },
           }))
-        : [{ label: 'All rows are shown', disabled: true }],
+        : [{ label: 'All kit rows are shown', disabled: true }])],
     );
   };
 
 
   const kits = PRESETS.filter((p) => p.kind === 'drums');
+  const linkCount = region.patternId && region.loop ? useCounts.get(region.patternId) ?? 0 : 0;
   const currentBars = cl / bpb;
 
   const toolbar = (
@@ -318,12 +448,15 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
         ))}
       </select>
       <div className="seg" title="Pattern length">
-        {[1, 2, 4].map((b) => (
+        {[1, 2, 4, 8].map((b) => (
           <button key={b} className={Math.abs(currentBars - b) < 1e-6 ? 'on' : ''} onClick={() => setBars(b)}>
             {b} bar{b > 1 ? 's' : ''}
           </button>
         ))}
       </div>
+      <button className="btn sm" title="Double the pattern: copy it after itself so you can vary the second half" onClick={doublePattern} disabled={currentBars >= 16}>
+        <CopyPlus size={14} /> Double
+      </button>
       <div className="seg" title="Step size">
         {RESOLUTIONS.map((r) => (
           <button key={r.label} className={Math.abs(res - r.value) < 1e-9 ? 'on' : ''} onClick={() => setRes(r.value)}>
@@ -370,7 +503,24 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
           {lanes.map((pitch) => {
             const color = drumColor(pitch);
             return (
-              <div key={pitch} className="ss-row" style={{ height: rh, ['--c' as string]: color }}>
+              <div
+                key={pitch}
+                className={'ss-row' + (params['mute' + pitch] || (anySolo && !params['solo' + pitch]) ? ' silent' : '')}
+                style={{ height: rh, ['--c' as string]: color }}
+                onDragOver={(e) => {
+                  if (e.dataTransfer.types.includes('Files')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }
+                }}
+                onDrop={(e) => {
+                  const f = e.dataTransfer.files[0];
+                  if (!f) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  void setRowSample(track.id, pitch, f);
+                }}
+              >
                 <div className="ss-head" style={{ width: HEADER_W }}>
                   <button
                     className="ss-icon"
@@ -383,7 +533,33 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
                   >
                     <DrumIcon pitch={pitch} size={Math.min(26, rh - 6)} />
                   </button>
-                  <span className="ss-name">{DRUM_NAMES[pitch] ?? `Note ${pitch}`}</span>
+                  <span className="ss-name" title={track.drumSamples?.[pitch] ? `Your sound: ${rowName(pitch)}` : rowName(pitch)}>
+                    {track.drumSamples?.[pitch] && <AudioLines size={11} className="ss-own" />}
+                    {rowName(pitch)}
+
+                  </span>
+                  <button
+                    className={'ss-ms' + (params['mute' + pitch] ? ' on mute' : '')}
+                    title="Mute this row"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() => setParam('mute' + pitch, params['mute' + pitch] ? 0 : 1)}
+                  >
+                    M
+                  </button>
+                  <button
+                    className={'ss-ms' + (params['solo' + pitch] ? ' on solo' : '')}
+                    title="Solo this row"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() => setParam('solo' + pitch, params['solo' + pitch] ? 0 : 1)}
+                  >
+                    S
+                  </button>
+                  <span className="ss-knob" title={`Volume ${Math.round(param('level' + pitch, 1) * 100)}% (double-click to reset)`} onPointerDown={(e) => e.stopPropagation()}>
+                    <Knob size={24} value={param('level' + pitch, 1)} min={0} max={1.5} defaultValue={1} color={color} onChange={(v) => setParam('level' + pitch, Math.round(v * 100) / 100)} />
+                  </span>
+                  <span className="ss-knob" title={`Pan ${panLabel(param('pan' + pitch, 0))} (double-click to centre)`} onPointerDown={(e) => e.stopPropagation()}>
+                    <Knob size={24} bipolar value={param('pan' + pitch, 0)} min={-1} max={1} defaultValue={0} color={color} onChange={(v) => setParam('pan' + pitch, Math.round(v * 100) / 100)} />
+                  </span>
                   <button
                     className="ss-more"
                     onPointerDown={(e) => e.stopPropagation()}
@@ -455,21 +631,27 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
         </div>
       </div>
       <div className="ss-bottom">
-        <input
-          className="ss-patname"
-          key={region.name}
-          defaultValue={region.name}
-          onBlur={(e) => {
-            const v = e.target.value.trim();
-            if (v && v !== region.name) editRegion((r) => void (r.name = v));
-          }}
-          onKeyDown={(e) => {
-            e.stopPropagation();
-            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-          }}
-        />
+        <button
+          className={'btn ss-play' + (patternPlaying ? ' on' : '')}
+          title={patternPlaying ? 'Stop (Space)' : 'Loop just this pattern, on its own — the song and its length stay untouched'}
+          onClick={() => (patternPlaying ? engine.stop() : void engine.playPattern(regionId))}
+        >
+          {patternPlaying ? <Square size={13} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
+          {patternPlaying ? 'Stop' : 'Play Pattern'}
+        </button>
+        <PatternPicker trackId={track.id} region={region} counts={useCounts} />
+        {linkCount > 1 && (
+          <button className="btn sm ss-linked" title="This pattern is placed in several spots. Editing it changes all of them. Click to give this spot its own copy." onClick={() => makePatternUnique(regionId)}>
+            <Link2 size={13} /> Used {linkCount}× <Unlink size={12} className="faint" />
+          </button>
+        )}
+        <div className="ss-swing" title="Swing: push every other 16th late for a shuffled groove">
+          <span className="label">Swing</span>
+          <HSlider value={region.swing ?? 0} min={0} max={1} width={80} defaultValue={0} onChange={(v) => editRegion((r) => void (r.swing = Math.round(v * 100) / 100 || undefined))} />
+          <span className="mono faint">{Math.round((region.swing ?? 0) * 100)}%</span>
+        </div>
         <div className="ss-hint faint">
-          {mode === 'step' && 'Click or drag to paint steps · right-click a row for more'}
+          {mode === 'step' && 'Click or drag to paint · right-click a row for tune, copy & your own sounds · drop an audio file on a row'}
           {mode === 'velocity' && 'Drag up/down on a step to set how hard it hits'}
           {mode === 'repeat' && 'Drag up/down to play 1–4 quick hits per step (rolls)'}
           {mode === 'chance' && 'Drag up/down to set the chance a step plays'}
@@ -600,5 +782,75 @@ function PageBar({
         <ChevronsRight size={14} /> Follow
       </button>
     </div>
+  );
+}
+
+function panLabel(v: number): string {
+  if (Math.abs(v) < 0.01) return 'centre';
+  return `${Math.round(Math.abs(v) * 100)}% ${v < 0 ? 'left' : 'right'}`;
+}
+
+/** Pick which pattern this clip plays, rename it, or start a new one (FL Studio's pattern selector). */
+function PatternPicker({ trackId, region, counts }: { trackId: string; region: MidiRegion; counts: Map<string, number> }) {
+  const project = useStore((s) => s.project)!;
+  const [renaming, setRenaming] = useState(false);
+  // One representative clip per pattern used anywhere on drum tracks.
+  const seen = new Set<string>();
+  const options: MidiRegion[] = [];
+  for (const t of project.tracks) {
+    if (t.type !== 'drums') continue;
+    for (const r of t.regions)
+      if (r.kind === 'midi' && r.patternId && r.loop && !seen.has(r.patternId)) {
+        seen.add(r.patternId);
+        options.push(r);
+      }
+  }
+  options.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  const rename = (v: string) =>
+    commit((d) => {
+      const r = draftRegion(d, region.id);
+      if (r) r.name = v;
+    });
+  if (renaming)
+    return (
+      <input
+        className="ss-patname"
+        autoFocus
+        defaultValue={region.name}
+        onBlur={(e) => {
+          const v = e.target.value.trim();
+          if (v && v !== region.name) rename(v);
+          setRenaming(false);
+        }}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+          if (e.key === 'Escape') setRenaming(false);
+        }}
+      />
+    );
+  return (
+    <button
+      className="btn sm ss-patpick"
+      title="Choose which pattern plays here, rename it, or make a new one"
+      onClick={(e) =>
+        showContextMenu(e, [
+          { title: 'Play this pattern here' },
+          ...options.map((o) => ({
+            label: o.name + ((counts.get(o.patternId!) ?? 0) > 1 ? `  (${counts.get(o.patternId!)}×)` : ''),
+            icon: o.patternId === region.patternId ? <Link2 size={13} /> : undefined,
+            disabled: o.patternId === region.patternId,
+            onClick: () => setClipPattern(region.id, o.id),
+          })),
+          { separator: true },
+          { label: 'New Empty Pattern After This', icon: <Plus size={14} />, onClick: () => newPatternClip(trackId, region.id) },
+          { label: 'Rename Pattern…', onClick: () => setRenaming(true) },
+        ])
+      }
+    >
+      <span className="ss-patdot" />
+      {region.name}
+      <ChevronRight size={12} style={{ transform: 'rotate(90deg)' }} />
+    </button>
   );
 }

@@ -1,7 +1,7 @@
 // Global keyboard shortcuts (GarageBand-style).
 import { useEffect } from 'react';
 import { commit, openModal, redo, undo, useStore, toast } from '../state/store';
-import { copySelection, deleteRegions, duplicateRegions, joinRegions, pasteRegions, splitRegionsAt, toggleLoopRegions } from '../state/actions';
+import { copySelection, deleteRegions, loopPlaybackOver, duplicateRegions, joinRegions, pasteRegions, splitRegionsAt, toggleLoopRegions } from '../state/actions';
 import { getEngine } from '../audio/engine';
 import { flushSave } from '../state/persistence';
 import { beatsPerBar } from '../model/music';
@@ -129,6 +129,11 @@ export function useGlobalShortcuts(): void {
           void engine.record();
           break;
         case 'c':
+          if (e.shiftKey) {
+            // Loop playback over the selected regions (or the current bar).
+            loopPlaybackOver(s.selectedRegionIds);
+            break;
+          }
           commit((d) => {
             d.loop.enabled = !d.loop.enabled;
           });

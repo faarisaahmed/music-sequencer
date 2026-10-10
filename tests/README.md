@@ -11,6 +11,7 @@ node tests/jam-qa-edge.mjs <chromium-executable>        # same-entity drags, del
 node tests/jam-qa-ux.mjs <chromium-executable> http://localhost:5391/ /tmp   # UI states + screenshots, error paths, navigation
 node tests/jam-qa-split.mjs <chromium-executable>       # network split & heal keeps both sides' edits
 node tests/jam-qa-leave.mjs <chromium-executable>       # edit-then-leave, same-tab rejoin, chat right after joining
+node tests/beat-patterns.mjs <chromium-executable> http://localhost:5391/ /tmp   # linked patterns, pattern play, swing, row mix, own sounds
 node tests/jam-qa-long.mjs <chromium-executable> http://localhost:5391/ 300   # frozen tab, recording, big join, soak
 ```
 

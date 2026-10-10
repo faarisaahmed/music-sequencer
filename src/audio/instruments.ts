@@ -753,6 +753,13 @@ export class DrumKitInstrument extends BaseInstrument {
   private def: DrumKitDef;
   /** Ringing voices that can be choked (open hats), with their start times. */
   private chokeable: { pitch: number; start: number; voice: Voice }[] = [];
+  /** Your own sounds on Beat Sequencer rows (replace the kit piece). */
+  private overrides = new Map<number, AudioBuffer>();
+
+  /** Replace kit pieces with user samples (pitch → buffer). */
+  setOverrides(map: Map<number, AudioBuffer>): void {
+    this.overrides = map;
+  }
 
   constructor(ctx: BaseAudioContext, def: DrumKitDef, pitches: number[]) {
     super(ctx);
@@ -771,8 +778,9 @@ export class DrumKitInstrument extends BaseInstrument {
   }
 
   protected startVoice(pitch: number, velocity: number, time: number): Voice | null {
-    const buf = this.buffers.get(pitch);
+    const buf = this.overrides.get(pitch) ?? this.buffers.get(pitch);
     if (!buf) {
+      if (pitch < 27 || pitch > 87) return null;
       // Lazily synthesise unknown pieces.
       synthDrum(this.def.synth, pitch).then((b) => this.buffers.set(pitch, b));
       return null;
@@ -795,7 +803,14 @@ export class DrumKitInstrument extends BaseInstrument {
     const g = ctx.createGain();
     g.gain.value = velGain(velocity) * (this.p('level' + pitch, 1));
     src.connect(g);
-    g.connect(this.output);
+    const pan = this.p('pan' + pitch, 0);
+    if (pan && ctx.createStereoPanner) {
+      const pn = ctx.createStereoPanner();
+      pn.pan.value = Math.max(-1, Math.min(1, pan));
+      g.connect(pn);
+      pn.connect(this.output);
+      src.addEventListener('ended', () => pn.disconnect());
+    } else g.connect(this.output);
     src.start(time);
     src.onended = () => g.disconnect();
     const voice: Voice = {

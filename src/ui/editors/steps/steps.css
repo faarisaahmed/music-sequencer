@@ -324,3 +324,101 @@
 .ss-page-map i.hit {
   background: var(--drums);
 }
+
+/* ------------------------------------------------------------------ channel rack row controls */
+.ss-name {
+  min-width: 0;
+}
+.ss-own {
+  color: var(--c);
+  vertical-align: -1px;
+  margin-right: 4px;
+}
+.ss-ms {
+  flex-shrink: 0;
+  width: 19px;
+  height: 19px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: #2b2b31;
+  color: var(--text-faint);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ss-ms:hover {
+  color: var(--text);
+}
+.ss-ms.on.mute {
+  background: #3d8bff;
+  color: #fff;
+}
+.ss-ms.on.solo {
+  background: #f5c518;
+  color: #1a1a1a;
+}
+.ss-knob {
+  flex-shrink: 0;
+  display: flex;
+}
+.ss-knob .knob {
+  cursor: ns-resize;
+}
+.ss-row.silent .ss-cells,
+.ss-row.silent .ss-icon,
+.ss-row.silent .ss-name {
+  opacity: 0.35;
+}
+
+/* ------------------------------------------------------------------ pattern bar */
+.ss-play {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 8px;
+  background: #2e2e34;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.ss-play.on {
+  background: var(--green);
+  color: #08260f;
+}
+.ss-patpick {
+  height: 34px;
+  border-radius: 8px;
+  background: #2e2e34;
+  max-width: 190px;
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ss-patdot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--drums);
+  flex-shrink: 0;
+}
+.ss-linked {
+  flex-shrink: 0;
+  color: var(--accent-2);
+}
+.ss-swing {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  padding: 0 4px;
+}
+.ss-swing .mono {
+  width: 30px;
+  font-size: 11px;
+}
+.ss-hint {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  flex: 1 1 0;
+}

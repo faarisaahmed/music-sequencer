@@ -55,6 +55,7 @@ export function projectAudioIds(p: Project): string[] {
   const ids = new Set<string>();
   for (const t of p.tracks) {
     if (t.samplerAudioId) ids.add(t.samplerAudioId);
+    for (const d of Object.values(t.drumSamples ?? {})) ids.add(d.audioId);
     for (const r of t.regions) if (r.kind === 'audio') ids.add(r.audioId);
   }
   return [...ids];

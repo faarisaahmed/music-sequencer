@@ -17,6 +17,31 @@ export interface ScheduleOptions {
   limit: number;
   /** Collect started audio sources so they can be stopped later. */
   sources?: ActiveSource[];
+  /** Pattern preview: only this track plays. */
+  onlyTrack?: string;
+}
+
+/** How far swing (0..1) pushes an off-beat 16th, in beats (max a 32nd note). */
+export const SWING_MAX = 0.125;
+
+/** Delay for a note at content position `start` in a pattern with `swing`. */
+export function swingDelay(start: number, swing: number | undefined): number {
+  if (!swing) return 0;
+  const inEighth = ((start % 0.5) + 0.5) % 0.5;
+  return Math.abs(inEighth - 0.25) < 1e-3 ? swing * SWING_MAX : 0;
+}
+
+/** Beat Sequencer rows that are muted (or not soloed while another row is). */
+export function silentRows(params: Record<string, number>): Set<number> {
+  const out = new Set<number>();
+  const solo: number[] = [];
+  for (const [k, v] of Object.entries(params)) {
+    if (!v) continue;
+    if (k.startsWith('mute')) out.add(Number(k.slice(4)));
+    else if (k.startsWith('solo')) solo.push(Number(k.slice(4)));
+  }
+  if (solo.length) for (let p = 0; p < 128; p++) if (!solo.includes(p)) out.add(p);
+  return out;
 }
 
 /** Schedule everything that starts within [b0, b1). `toTime` maps beats → context seconds. */
@@ -25,8 +50,10 @@ export function scheduleRange(p: Project, mixer: Mixer, b0: number, b1: number, 
   const ctx = mixer.ctx;
   const spb = 60 / p.bpm;
   for (const t of p.tracks) {
+    if (opts.onlyTrack && t.id !== opts.onlyTrack) continue;
     const ch = mixer.channels.get(t.id);
     if (!ch) continue;
+    const silent = t.type === 'drums' ? silentRows(t.instrumentParams) : null;
     // Automation
     scheduleAutomation(t.automation.volume, ch.autoGain.gain, b0, b1, toTime, opts.fresh, 1, (v) => v * v);
     if (t.automation.pan.length) scheduleAutomation(t.automation.pan, ch.panner.pan, b0, b1, toTime, opts.fresh, t.pan, (v) => v);
@@ -40,7 +67,11 @@ export function scheduleRange(p: Project, mixer: Mixer, b0: number, b1: number, 
         const transpose = t.type === 'drums' ? 0 : t.transpose;
         for (const pn of placedNotes(r, b0, b1)) {
           const n = pn.note;
+          if (silent?.has(n.pitch)) continue;
           if (n.chance !== undefined && n.chance < 1 && Math.random() > n.chance) continue;
+          const swung = pn.start + swingDelay(n.start, r.swing);
+          if (swung >= opts.limit) continue;
+          pn.start = swung;
           let dur = Math.max(0.01, Math.min(pn.duration, opts.limit - pn.start));
           let vel = n.velocity;
           if (n.artic) {

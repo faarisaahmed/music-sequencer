@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Plus, ZoomIn, ZoomOut, Maximize, Magnet, Crown, LayoutList } from 'lucide-react';
-import { beginGesture, endGesture, live, openModal, useStore, useTransport } from '../../state/store';
+import { beginGesture, commit, endGesture, live, openModal, useStore, useTransport } from '../../state/store';
 import { beatsPerBar, GRID_OPTIONS, snap } from '../../model/music';
 import { contentEndBeat } from '../../model/defaults';
 import { getEngine } from '../../audio/engine';
@@ -161,7 +161,23 @@ function Ruler({ width, ppb }: { width: number; ppb: number }) {
   };
 
   return (
-    <div ref={ref} className="tv-ruler" style={{ width }} onPointerDown={onPointerDown}>
+    <div
+      ref={ref}
+      className="tv-ruler"
+      style={{ width }}
+      onPointerDown={onPointerDown}
+      title="Click to move the playhead · drag along the top strip to loop bars · double-click a bar to loop it"
+      onDoubleClick={(e) => {
+        // Double-click a bar: loop just that bar for review.
+        const { x } = local(e);
+        const bar = Math.floor(x / ppb / bpb) * bpb;
+        commit((d) => {
+          d.loop.start = bar;
+          d.loop.end = bar + bpb;
+          d.loop.enabled = true;
+        });
+      }}
+    >
       <svg width={width} height={RULER_H} className="rt-svg">
         <rect x={0} y={0} width={width} height={CYCLE_H + 1} className="rt-cycle-strip" />
         <rect
@@ -244,7 +260,7 @@ function Toolbar({ viewW }: { viewW: number }) {
       <ChordToggleButton />
       <div className="spacer" />
       <div className="tv-hint faint">
-        Double-click empty space for a new region · <kbd>⌥</kbd> drag copies · drag the top-right corner to loop · <kbd>⌘T</kbd> split
+        Double-click empty space for a new region (on drums: places the current pattern) · <kbd>⌥</kbd> drag copies · drag the top-right corner to loop · <kbd>⌘T</kbd> split
       </div>
     </div>
   );

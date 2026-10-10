@@ -1,5 +1,6 @@
 // Context menus for regions, lanes and track headers.
-import { Copy, Scissors, Trash2, ClipboardPaste, Repeat, SquarePen, Plus, FileAudio, Palette, Pencil, Music } from 'lucide-react';
+import { Copy, Scissors, Trash2, ClipboardPaste, Repeat, SquarePen, Plus, FileAudio, Palette, Pencil, Music, Play, Unlink, Repeat1 } from 'lucide-react';
+import { isLinkedClip, patternUseCounts } from '../../model/patterns';
 import type { Track } from '../../model/types';
 import { commit, draftRegion, findRegion, openModal, useStore } from '../../state/store';
 import {
@@ -15,6 +16,10 @@ import {
   pasteRegions,
   quantizeNotesIn,
   splitRegionsAt,
+  currentPatternClip,
+  loopPlaybackOver,
+  makePatternUnique,
+  placePattern,
   toggleLoopRegions,
   transposeRegions,
   updateTrack,
@@ -79,6 +84,15 @@ export function regionMenu(regionId: string, clickBeat: number): MenuItem[] {
   const bpb = beatsPerBar(p.timeSig);
   const items: MenuItem[] = [
     { label: 'Open in Editor', icon: <SquarePen size={14} />, onClick: () => openRegionEditor(regionId) },
+    ...(isLinkedClip(r)
+      ? [
+          { label: 'Play Pattern on Its Own', icon: <Play size={14} />, onClick: () => void getEngine().playPattern(regionId) },
+          ...((patternUseCounts(p).get(r.patternId) ?? 0) > 1
+            ? [{ label: 'Make Unique (stop linking)', icon: <Unlink size={14} />, onClick: () => makePatternUnique(regionId) }]
+            : []),
+        ]
+      : []),
+    { label: 'Loop Playback Over These Bars', icon: <Repeat1 size={14} />, shortcut: '⇧C', onClick: () => loopPlaybackOver(ids) },
     { separator: true },
     { label: 'Cut', icon: <Scissors size={14} />, shortcut: '⌘X', onClick: () => copySelection(true) },
     { label: 'Copy', icon: <Copy size={14} />, shortcut: '⌘C', onClick: () => copySelection(false) },
@@ -233,6 +247,7 @@ export function pickAudioFile(trackId: string | undefined, beat: number): void {
 export function laneMenu(track: Track, beat: number): MenuItem[] {
   const bpb = beatsPerBar(useStore.getState().project!.timeSig);
   const barBeat = Math.floor(beat / bpb) * bpb;
+  const pattern = track.type === 'drums' ? currentPatternClip(useStore.getState().project!, track.id) : undefined;
   return [
     {
       label: 'Paste Here',
@@ -243,8 +258,11 @@ export function laneMenu(track: Track, beat: number): MenuItem[] {
         pasteRegions(barBeat);
       },
     },
+    ...(track.type === 'drums' && pattern
+      ? [{ label: `Place “${pattern.name}” Here`, icon: <Repeat size={14} />, onClick: () => placePattern(track.id, beat, pattern.id) }]
+      : []),
     ...(track.type !== 'audio'
-      ? [{ label: track.type === 'drums' ? 'Create Drum Pattern' : 'Create MIDI Region', icon: <Plus size={14} />, onClick: () => createEmptyRegion(track.id, beat) }]
+      ? [{ label: track.type === 'drums' ? 'New Pattern Here' : 'Create MIDI Region', icon: <Plus size={14} />, onClick: () => createEmptyRegion(track.id, beat) }]
       : []),
     { label: 'Import Audio File…', icon: <FileAudio size={14} />, onClick: () => pickAudioFile(track.type === 'audio' ? track.id : undefined, barBeat) },
     { label: 'Set Playhead Here', onClick: () => getEngine().seek(barBeat) },

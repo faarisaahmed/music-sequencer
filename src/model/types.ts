@@ -57,6 +57,13 @@ export interface MidiRegion extends RegionBase {
   notes: Note[];
   /** Score dynamics & hairpins. */
   marks?: ScoreMark[];
+  /**
+   * Beat Sequencer pattern this clip plays. Clips sharing a patternId are linked
+   * (FL Studio-style): editing one edits them all. Only used while `loop` is on.
+   */
+  patternId?: string;
+  /** Pattern swing 0..1: delays every off-beat 16th by up to a 32nd note. */
+  swing?: number;
 }
 
 export interface AudioRegion extends RegionBase {
@@ -127,6 +134,11 @@ export interface Track {
   /** For the user Sampler instrument: id of the sample in the audio store. */
   samplerAudioId?: string;
   samplerRoot?: number;
+  /**
+   * Drum tracks: your own sounds on Beat Sequencer rows, keyed by row pitch.
+   * Row mix lives in instrumentParams: level<p>, pan<p>, tune<p>, mute<p>, solo<p>.
+   */
+  drumSamples?: Record<string, { audioId: string; name: string }>;
   color: string;
   volume: number; // 0..1.25 fader (gain = volume^2 style mapping handled by engine)
   pan: number; // -1..1

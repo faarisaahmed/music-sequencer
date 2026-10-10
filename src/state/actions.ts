@@ -57,7 +57,11 @@ export function migrate(p: Project): Project {
         ...stripDrummer(t),
         fx: { ...fresh.fx, ...t.fx },
         instrumentParams: t.instrumentParams ?? {},
-        regions: (t.regions ?? []).map((r) => (r.kind === 'midi' ? stripDrummer({ ...r, notes: r.notes ?? [] }) : r)),
+        regions: (t.regions ?? []).map((r) =>
+          r.kind === 'midi'
+            ? stripDrummer({ ...r, notes: r.notes ?? [], ...(t.type === 'drums' && r.loop && !r.patternId ? { patternId: uid('pat') } : {}) })
+            : r,
+        ),
         automation: { ...{ volume: [], pan: [] }, ...t.automation },
       };
     }),
@@ -70,8 +74,9 @@ function stripDrummer<T extends object>(o: T): T {
 }
 
 export async function createNewProject(p: Project): Promise<void> {
-  await saveProject(p);
-  await openProject(p);
+  const m = migrate(p);
+  await saveProject(m);
+  await openProject(m);
 }
 
 export async function closeProject(): Promise<void> {
@@ -184,8 +189,14 @@ export function createEmptyRegion(trackId: string, start: number, length?: numbe
   const t = p?.tracks.find((x) => x.id === trackId);
   if (!p || !t || t.type === 'audio') return null;
   const bpb = beatsPerBar(p.timeSig);
-  const len = length ?? bpb * (t.type === 'drums' ? 2 : 4);
+  const len = length ?? bpb * (t.type === 'drums' ? 1 : 4);
   const r = createMidiRegion(Math.max(0, Math.floor(start / bpb) * bpb), len, [], t.name);
+  if (t.type === 'drums') {
+    // Drum regions are Beat Sequencer patterns: they loop and can be placed again, linked.
+    r.loop = true;
+    r.patternId = uid('pat');
+    r.name = nextPatternName(p);
+  }
   commit((d) => {
     d.tracks.find((x) => x.id === trackId)?.regions.push(r);
     growSong(d, r.start + r.length);
@@ -199,6 +210,116 @@ export function createEmptyRegion(trackId: string, start: number, length?: numbe
     ...(st.dockTab === null || st.dockTab === 'mixer' ? { dockTab: 'editor' as const, editorMode: t.type === 'drums' ? ('steps' as const) : st.editorMode === 'score' ? ('score' as const) : ('pianoroll' as const) } : {}),
   });
   return r.id;
+}
+
+// ------------------------------------------------------------------ patterns
+
+/** "Pattern N" with the next free number across the song. */
+export function nextPatternName(p: Project): string {
+  const used = new Set<string>();
+  for (const t of p.tracks) for (const r of t.regions) if (r.kind === 'midi' && r.patternId) used.add(r.name);
+  for (let i = 1; ; i++) if (!used.has(`Pattern ${i}`)) return `Pattern ${i}`;
+}
+
+/** The pattern a drum track is "holding": the clip being edited/selected there, else its latest clip. */
+export function currentPatternClip(p: Project, trackId: string): MidiRegion | undefined {
+  const t = p.tracks.find((x) => x.id === trackId);
+  if (!t) return undefined;
+  const s = useStore.getState();
+  const clips = t.regions.filter((r): r is MidiRegion => r.kind === 'midi' && !!r.patternId && r.loop);
+  return (
+    clips.find((r) => r.id === s.editingRegionId) ??
+    clips.find((r) => s.selectedRegionIds.includes(r.id)) ??
+    [...clips].sort((a, b) => b.start - a.start)[0]
+  );
+}
+
+/** Place a linked copy of a pattern clip at a bar (one pass of the pattern long). */
+export function placePattern(trackId: string, beat: number, sourceId: string): string | null {
+  const p = useStore.getState().project;
+  const src = findRegion(p, sourceId)?.region;
+  if (!p || !src || src.kind !== 'midi') return null;
+  const bpb = beatsPerBar(p.timeSig);
+  const start = Math.max(0, Math.floor(beat / bpb + 1e-6) * bpb);
+  const c = cloneRegion(src, { start, offset: 0, length: src.contentLength, loop: true }) as MidiRegion;
+  commit((d) => {
+    d.tracks.find((x) => x.id === trackId)?.regions.push(c);
+    growSong(d, c.start + c.length);
+  });
+  useStore.setState({ selectedRegionIds: [c.id], selectedTrackId: trackId });
+  return c.id;
+}
+
+/** Give a clip its own copy of the pattern so edits no longer change the others. */
+export function makePatternUnique(regionId: string): void {
+  const p = useStore.getState().project;
+  if (!p) return;
+  const name = nextPatternName(p);
+  commit((d) => {
+    const r = draftRegion(d, regionId);
+    if (r?.kind !== 'midi') return;
+    r.patternId = uid('pat');
+    r.loop = true;
+    r.name = name;
+  });
+}
+
+/** Switch a clip to play another pattern (keeps its place and length). */
+export function setClipPattern(regionId: string, sourceId: string): void {
+  const p = useStore.getState().project;
+  const src = findRegion(p, sourceId)?.region;
+  if (!src || src.kind !== 'midi') return;
+  commit((d) => {
+    const r = draftRegion(d, regionId);
+    if (r?.kind !== 'midi') return;
+    r.patternId = src.patternId;
+    r.notes = src.notes.map((n) => ({ ...n }));
+    r.contentLength = src.contentLength;
+    r.name = src.name;
+    r.swing = src.swing;
+    r.loop = true;
+    r.offset = 0;
+  });
+}
+
+/** Add a new empty pattern clip right after `afterId` (or at the playhead) and open it. */
+export function newPatternClip(trackId: string, afterId?: string): string | null {
+  const p = useStore.getState().project;
+  if (!p) return null;
+  const after = afterId ? findRegion(p, afterId)?.region : undefined;
+  const at = after ? after.start + after.length : useStore.getState().cursor;
+  const id = createEmptyRegion(trackId, at);
+  if (id) useStore.setState({ dockTab: 'editor', editorMode: 'steps' });
+  return id;
+}
+
+/**
+ * Cycle playback over whole bars for review: the selected regions, or the bar
+ * under the playhead. Doesn't change any region.
+ */
+export function loopPlaybackOver(ids: string[]): void {
+  const p = useStore.getState().project;
+  if (!p) return;
+  const bpb = beatsPerBar(p.timeSig);
+  const regs = p.tracks.flatMap((t) => t.regions).filter((r) => ids.includes(r.id));
+  let lo: number;
+  let hi: number;
+  if (regs.length) {
+    lo = Math.min(...regs.map((r) => r.start));
+    hi = Math.max(...regs.map((r) => r.start + r.length));
+  } else {
+    lo = getEngine().position;
+    hi = lo;
+  }
+  lo = Math.floor(lo / bpb + 1e-6) * bpb;
+  hi = Math.max(lo + bpb, Math.ceil(hi / bpb - 1e-6) * bpb);
+  commit((d) => {
+    d.loop.start = lo;
+    d.loop.end = hi;
+    d.loop.enabled = true;
+  });
+  const bars = Math.round((hi - lo) / bpb);
+  toast(`Looping bar${bars > 1 ? 's' : ''} ${lo / bpb + 1}${bars > 1 ? `–${hi / bpb}` : ''}`);
 }
 
 export function growSong(d: Draft<Project>, endBeat: number): void {

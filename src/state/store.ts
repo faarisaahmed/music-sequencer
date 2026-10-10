@@ -1,3 +1,4 @@
+import { syncLinkedPatterns } from '../model/patterns';
 import { create } from 'zustand';
 import { produce, type Draft } from 'immer';
 import type { Note, Project, Region, Track } from '../model/types';
@@ -55,6 +56,8 @@ export interface AppState {
 
   // Transport (low-frequency state only; position lives in useTransport)
   playing: boolean;
+  /** Region whose pattern is looping on its own (Beat Sequencer pattern preview). */
+  patternPlay: string | null;
   recording: boolean;
   countingIn: boolean;
   /** Where playback starts from / returns to (beats). */
@@ -87,6 +90,7 @@ export const useStore = create<AppState>(() => ({
   keyboardOctave: 1,
   velocity: 0.8,
   playing: false,
+  patternPlay: null,
   recording: false,
   countingIn: false,
   cursor: 0,
@@ -98,7 +102,7 @@ const HISTORY_LIMIT = 200;
 export function commit(recipe: (p: Draft<Project>) => void): void {
   const s = useStore.getState();
   if (!s.project) return;
-  const next = produce(s.project, recipe);
+  const next = syncLinkedPatterns(s.project, produce(s.project, recipe));
   if (next === s.project) return;
   useStore.setState({
     project: { ...next, updatedAt: Date.now() },
@@ -120,7 +124,7 @@ export function beginGesture(): void {
 export function live(recipe: (p: Draft<Project>) => void): void {
   const s = useStore.getState();
   if (!s.project) return;
-  const next = produce(s.project, recipe);
+  const next = syncLinkedPatterns(s.project, produce(s.project, recipe));
   if (next === s.project) return;
   useStore.setState({ project: next });
 }

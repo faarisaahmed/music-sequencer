@@ -20,6 +20,8 @@ const SECTIONS: { title: string; rows: Row[] }[] = [
       ['Go to beginning', ['Return']],
       ['Previous / next bar', [',', '.']],
       ['Cycle (loop) on/off', ['C']],
+      ['Loop the selected regions’ bars (or this bar)', ['⇧ C']],
+      ['Loop one bar: double-click it in the ruler', []],
       ['Metronome on/off', ['K']],
     ],
   },
