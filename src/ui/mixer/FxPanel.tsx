@@ -12,12 +12,14 @@ import { noteName } from '../../model/music';
 import { Knob, HSlider } from '../common/controls';
 import { TrackIcon } from '../common/icons';
 import { gainToDb } from './MixerPanel';
+import { InsertCards } from './InsertCards';
+import { AUDIO_PATCHES } from '../../audio/audioPatches';
 import { faderGain } from '../../audio/mixer';
 import './mixer.css';
 
-const NEUTRAL: TrackFx = { eqLow: 0, eqMid: 0, eqHigh: 0, compressor: 0, drive: 0, chorus: 0, reverb: 0, delay: 0, filterCutoff: 1 };
+const NEUTRAL: Record<FxKey, number> = { eqLow: 0, eqMid: 0, eqHigh: 0, compressor: 0, drive: 0, chorus: 0, reverb: 0, delay: 0, filterCutoff: 1 };
 
-type FxKey = keyof TrackFx;
+type FxKey = Exclude<keyof TrackFx, 'inserts'>;
 interface FxCardDef {
   id: string;
   name: string;
@@ -35,7 +37,7 @@ const CARDS: FxCardDef[] = [
   { id: 'delay', name: 'Echo / Delay', color: '#30d158', keys: ['delay'] },
 ];
 
-const FX_PRESETS: Record<string, Partial<TrackFx>> = {
+const FX_PRESETS: Record<string, Partial<Record<FxKey, number>>> = {
   Dry: { ...NEUTRAL, compressor: 0.15 },
   Vocal: { eqLow: -3, eqMid: 2, eqHigh: 4, compressor: 0.6, drive: 0, chorus: 0, reverb: 0.3, delay: 0.15, filterCutoff: 1 },
   Bright: { eqLow: 0, eqMid: 1, eqHigh: 6, compressor: 0.3, drive: 0, chorus: 0.1, reverb: 0.15, delay: 0, filterCutoff: 1 },
@@ -48,7 +50,7 @@ const FX_PRESETS: Record<string, Partial<TrackFx>> = {
 };
 
 // Remember settings of bypassed effects per track.
-const stash = new Map<string, Partial<TrackFx>>();
+const stash = new Map<string, Partial<Record<FxKey, number>>>();
 
 function isOn(fx: TrackFx, keys: FxKey[]): boolean {
   return keys.some((k) => Math.abs(fx[k] - NEUTRAL[k]) > 1e-4);
@@ -98,7 +100,7 @@ function FxCard({ def, t }: { def: FxCardDef; t: Track }) {
     const key = t.id + ':' + def.id;
     updateTrack(t.id, (x) => {
       if (on) {
-        const saved: Partial<TrackFx> = {};
+        const saved: Partial<Record<FxKey, number>> = {};
         for (const k of def.keys) {
           saved[k] = x.fx[k];
           x.fx[k] = NEUTRAL[k];
@@ -106,7 +108,7 @@ function FxCard({ def, t }: { def: FxCardDef; t: Track }) {
         stash.set(key, saved);
       } else {
         const saved = stash.get(key);
-        const defaults: Partial<TrackFx> = { eqLow: 2, eqMid: 0, eqHigh: 2, filterCutoff: 0.7, compressor: 0.4, drive: 0.25, chorus: 0.35, reverb: 0.3, delay: 0.25 };
+        const defaults: Partial<Record<FxKey, number>> = { eqLow: 2, eqMid: 0, eqHigh: 2, filterCutoff: 0.7, compressor: 0.4, drive: 0.25, chorus: 0.35, reverb: 0.3, delay: 0.25 };
         for (const k of def.keys) x.fx[k] = saved?.[k] ?? defaults[k] ?? NEUTRAL[k];
       }
     });
@@ -347,6 +349,25 @@ export default function FxPanel() {
           <span className="label" style={{ marginRight: 4 }}>
             Effect presets
           </span>
+          <select
+            value=""
+            title="Load a full channel patch (amp, gate, vocal chain…)"
+            onChange={(e) => {
+              const patch = AUDIO_PATCHES.find((x) => x.id === e.target.value);
+              if (patch) setT((x) => void (x.fx = structuredClone(patch.fx)));
+            }}
+          >
+            <option value="">{t.type === 'audio' ? 'Audio patches…' : 'Channel patches…'}</option>
+            {(['Guitar', 'Bass', 'Vocals', 'Creative'] as const).map((cat) => (
+              <optgroup key={cat} label={cat}>
+                {AUDIO_PATCHES.filter((x) => x.category === cat).map((x) => (
+                  <option key={x.id} value={x.id}>
+                    {x.name}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
           {Object.keys(FX_PRESETS).map((name) => (
             <button
               key={name}
@@ -365,6 +386,7 @@ export default function FxPanel() {
           {CARDS.map((c) => (
             <FxCard key={c.id} def={c} t={t} />
           ))}
+          <InsertCards t={t} />
         </div>
       </div>
     </div>

@@ -6,6 +6,8 @@ import { useStore, useTransport } from '../../state/store';
 import { getEngine } from '../../audio/engine';
 import { importAudioFile } from '../../state/actions';
 import { Toggle } from '../common/controls';
+import Tuner from './Tuner';
+import InputSetup from './InputSetup';
 
 export function LevelMeter({ value, wide = false }: { value: number; wide?: boolean }) {
   const db = 20 * Math.log10(Math.max(value, 1e-5));
@@ -63,6 +65,7 @@ export default function AudioInputPanel({ track }: { track: Track }) {
               />
               <Headphones size={15} /> Monitor input <span className="faint">(use headphones to avoid feedback)</span>
             </label>
+            <InputSetup />
           </>
         )}
         <div className="row" style={{ marginTop: 6 }}>
@@ -91,6 +94,7 @@ export default function AudioInputPanel({ track }: { track: Track }) {
           />
         </div>
       </div>
+      {micOn && <Tuner active={micOn} />}
       <div className="aip-tips">
         <div className="label" style={{ marginBottom: 8 }}>
           Tips

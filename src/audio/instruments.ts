@@ -112,6 +112,8 @@ export interface SamplerDef {
   loop?: { start: number; end: number };
   minPitch?: number;
   maxPitch?: number;
+  /** Pan notes across the stereo field by pitch (0..1), like sitting at a piano. */
+  spread?: number;
 }
 
 export class SamplerInstrument extends BaseInstrument {
@@ -164,7 +166,9 @@ export class SamplerInstrument extends BaseInstrument {
     const ctx = this.ctx;
     const src = ctx.createBufferSource();
     src.buffer = buf;
-    src.playbackRate.value = Math.pow(2, (pitch - root + this.p('tune', 0)) / 12);
+    // Round-robin humanisation: tiny random detune so repeated notes don't sound machine-gunned.
+    const humanCents = (Math.random() - 0.5) * 6;
+    src.playbackRate.value = Math.pow(2, (pitch - root + this.p('tune', 0) + humanCents / 100) / 12);
     if (this.def.loop) {
       src.loop = true;
       src.loopStart = Math.min(this.def.loop.start, buf.duration * 0.5);
@@ -173,21 +177,32 @@ export class SamplerInstrument extends BaseInstrument {
     const g = ctx.createGain();
     const attack = this.p('attack', this.def.attack ?? 0.002);
     const release = this.p('release', this.def.release ?? 0.4);
-    const peak = velGain(velocity);
+    const peak = velGain(velocity) * (1 + (Math.random() - 0.5) * 0.18);
     g.gain.setValueAtTime(0, time);
     g.gain.linearRampToValueAtTime(peak, time + Math.max(0.002, attack));
     let last: AudioNode = src;
     if (this.def.velocityFilter !== false) {
-      const f = ctx.createBiquadFilter();
-      f.type = 'lowpass';
       const tone = this.p('tone', 0.5);
-      f.frequency.value = 900 + Math.pow(velocity, 1.5) * 9000 * (0.4 + tone * 1.2) + tone * 3000;
-      f.Q.value = 0.3;
-      src.connect(f);
-      last = f;
+      const cutoff = 900 + Math.pow(velocity, 1.5) * 9000 * (0.4 + tone * 1.2) + tone * 3000;
+      // Skip the per-note filter when it would be inaudible (saves CPU on dense parts).
+      if (cutoff < 14000) {
+        const f = ctx.createBiquadFilter();
+        f.type = 'lowpass';
+        f.frequency.value = cutoff;
+        f.Q.value = 0.3;
+        src.connect(f);
+        last = f;
+      }
     }
     last.connect(g);
-    g.connect(this.output);
+    if (this.def.spread) {
+      const pan = ctx.createStereoPanner();
+      pan.pan.value = Math.max(-1, Math.min(1, ((pitch - 64) / 36) * this.def.spread));
+      g.connect(pan);
+      pan.connect(this.output);
+    } else {
+      g.connect(this.output);
+    }
     src.start(time);
     const naturalEnd = this.def.loop ? Infinity : time + buf.duration / src.playbackRate.value;
     let ended = false;
@@ -201,7 +216,7 @@ export class SamplerInstrument extends BaseInstrument {
         g.gain.cancelScheduledValues(at);
         g.gain.setValueAtTime(peak, at);
         g.gain.setTargetAtTime(0, at, release / 4);
-        const stopAt = at + release * 1.5 + 0.05;
+        const stopAt = at + release * 1.25 + 0.05; // ≈ -43 dB
         voice.endTime = Math.min(naturalEnd, stopAt);
         try {
           src.stop(stopAt);
@@ -351,6 +366,12 @@ export class SynthInstrument extends BaseInstrument {
       const og = ctx.createGain();
       og.gain.value = (o.gain ?? 1) / Math.sqrt(n);
       og.connect(mix);
+      // Unison voices alternate hard left/right for a wide stereo image.
+      let stereo: ChannelMergerNode | null = null;
+      if (n > 1) {
+        stereo = ctx.createChannelMerger(2);
+        stereo.connect(og);
+      }
       for (let i = 0; i < n; i++) {
         const osc = ctx.createOscillator();
         osc.type = o.type;
@@ -359,7 +380,8 @@ export class SynthInstrument extends BaseInstrument {
         osc.detune.value = (o.detune ?? 0) * (o.unison ? 1 : detuneAmt) + spreadOff;
         if (modGain) modGain.connect(osc.frequency);
         if (lfoGain) lfoGain.connect(osc.detune);
-        osc.connect(og);
+        if (stereo) osc.connect(stereo, 0, i % 2);
+        else osc.connect(og);
         osc.start(time);
         sources.push(osc);
       }
@@ -407,7 +429,7 @@ export class SynthInstrument extends BaseInstrument {
         vca.gain.setTargetAtTime(0, at, Math.max(0.005, amp.release / 4));
         filter.frequency.cancelScheduledValues(at);
         filter.frequency.setTargetAtTime(baseCut, at, Math.max(0.01, fe.release / 4));
-        const end = at + amp.release * 1.6 + 0.05;
+        const end = at + amp.release * 1.25 + 0.05; // ≈ -43 dB
         voice.endTime = end;
         stopAll(end);
       },

@@ -1,11 +1,12 @@
 // Audio graph: per-track channel strips, effect buses and master bus.
 // Context-agnostic so the same graph renders live and offline (export).
-import type { AutomationPoint, Project, Track } from '../model/types';
+import type { AutomationPoint, MasteringSettings, Project, Track } from '../model/types';
 import { DRUM_LANES } from '../model/music';
 import { makeImpulse } from './context';
 import { getBuffer } from './audioStore';
 import { DrumKitInstrument, SamplerInstrument, SynthInstrument, driveCurve, type Instrument } from './instruments';
 import { getPreset } from './presets';
+import { InsertChain, MID_INSERTS, POST_INSERTS, PRE_INSERTS, STEREO_INSERTS } from './effects';
 
 function softClipCurve(): Float32Array<ArrayBuffer> {
   const n = 4096;
@@ -19,6 +20,17 @@ function softClipCurve(): Float32Array<ArrayBuffer> {
   }
   return c;
 }
+
+export const DEFAULT_MASTERING: MasteringSettings = { preset: 'Clean', low: 0, mid: 0, high: 0, glue: 0.3, ceiling: -1, loudness: 0 };
+
+export const MASTERING_PRESETS: MasteringSettings[] = [
+  DEFAULT_MASTERING,
+  { preset: 'Loud', low: 1.5, mid: 0, high: 1.5, glue: 0.7, ceiling: -0.5, loudness: 5 },
+  { preset: 'Warm', low: 2.5, mid: -0.5, high: -2, glue: 0.5, ceiling: -1, loudness: 2 },
+  { preset: 'Bright', low: -0.5, mid: 0.5, high: 3.5, glue: 0.45, ceiling: -1, loudness: 2.5 },
+  { preset: 'Lo-Fi', low: 2, mid: 2, high: -7, glue: 0.8, ceiling: -2, loudness: 3 },
+  { preset: 'Gentle', low: 0.5, mid: 0, high: 0.8, glue: 0.2, ceiling: -1.5, loudness: 0 },
+];
 
 export function faderGain(v: number): number {
   return Math.pow(Math.max(0, v) / 0.8, 2);
@@ -74,7 +86,12 @@ export class Channel {
   instrument: Instrument | null = null;
   instrumentKey = '';
   private lastDrive = -1;
+  /** Optional connections that are only made while the stage is in use (saves CPU). */
+  private links = new Map<string, boolean>();
+  private preOut!: AudioNode;
+  private postOut!: AudioNode;
   private ctx: BaseAudioContext;
+  private chains: InsertChain[];
 
   constructor(ctx: BaseAudioContext, mixer: Mixer) {
     this.ctx = ctx;
@@ -127,25 +144,32 @@ export class Channel {
     this.reverbSend = ctx.createGain();
     this.delaySend = ctx.createGain();
 
-    this.input.connect(this.filter);
+    const pre = new InsertChain(ctx, PRE_INSERTS);
+    const mid = new InsertChain(ctx, MID_INSERTS);
+    const post = new InsertChain(ctx, POST_INSERTS);
+    const stereo = new InsertChain(ctx, STEREO_INSERTS);
+    this.chains = [pre, mid, post, stereo];
+    this.input.connect(pre.input);
+    this.preOut = pre.output;
     this.filter.connect(this.eqLow);
     this.eqLow.connect(this.eqMid);
     this.eqMid.connect(this.eqHigh);
-    this.eqHigh.connect(this.comp);
+    this.eqHigh.connect(mid.input);
+    mid.output.connect(this.comp);
     this.comp.connect(this.compMakeup);
     this.compMakeup.connect(this.driveDry);
-    this.compMakeup.connect(this.shaper);
     this.shaper.connect(this.driveWet);
     this.driveDry.connect(driveSum);
     this.driveWet.connect(driveSum);
-    driveSum.connect(chorusSum);
-    driveSum.connect(this.chorusL);
-    driveSum.connect(this.chorusR);
+    driveSum.connect(post.input);
+    post.output.connect(chorusSum);
+    this.postOut = post.output;
     this.chorusL.connect(merger, 0, 0);
     this.chorusR.connect(merger, 0, 1);
     merger.connect(this.chorusWet);
     this.chorusWet.connect(chorusSum);
-    chorusSum.connect(this.autoGain);
+    chorusSum.connect(stereo.input);
+    stereo.output.connect(this.autoGain);
     this.autoGain.connect(this.fader);
     this.fader.connect(this.panner);
     this.panner.connect(this.muteGain);
@@ -177,11 +201,31 @@ export class Channel {
     smooth(this.driveWet.gain, fx.drive * 0.6);
     smooth(this.driveDry.gain, 1 - fx.drive * 0.7);
     smooth(this.chorusWet.gain, fx.chorus * 0.9);
+    // Bypass idle stages entirely: an open filter, zero drive or zero chorus cost nothing.
+    const filterOn = fx.filterCutoff < 0.999;
+    this.link('filter', this.preOut, this.filter, filterOn);
+    this.link('nofilter', this.preOut, this.eqLow, !filterOn);
+    this.link('drive', this.compMakeup, this.shaper, fx.drive > 0.001);
+    this.link('chorusL', this.postOut, this.chorusL, fx.chorus > 0.001);
+    this.link('chorusR', this.postOut, this.chorusR, fx.chorus > 0.001);
     smooth(this.fader.gain, faderGain(t.volume));
     if (!hasPanAutomation) smooth(this.panner.pan, t.pan);
     smooth(this.muteGain.gain, audible ? 1 : 0);
     smooth(this.reverbSend.gain, fx.reverb * 0.9);
     smooth(this.delaySend.gain, fx.delay * 0.8);
+    for (const c of this.chains) c.update(fx.inserts);
+  }
+
+  private link(id: string, from: AudioNode, to: AudioNode, on: boolean): void {
+    if ((this.links.get(id) ?? false) === on) return;
+    this.links.set(id, on);
+    if (on) from.connect(to);
+    else
+      try {
+        from.disconnect(to);
+      } catch {
+        /* not connected */
+      }
   }
 
   setInstrument(inst: Instrument | null, key: string): void {
@@ -197,6 +241,7 @@ export class Channel {
 
   dispose(): void {
     this.setInstrument(null, '');
+    for (const c of this.chains) c.dispose();
     this.chorusLfo.stop();
     this.muteGain.disconnect();
     this.reverbSend.disconnect();
@@ -219,6 +264,13 @@ export class Mixer {
   private delayFb: GainNode;
   readonly channels = new Map<string, Channel>();
   private reverbKey = '';
+  private mEqLow: BiquadFilterNode;
+  private mEqMid: BiquadFilterNode;
+  private mEqHigh: BiquadFilterNode;
+  private glue: DynamicsCompressorNode;
+  private loud: GainNode;
+  private limiter: DynamicsCompressorNode;
+  private ceiling: GainNode;
   /** Output node (connect to destination). */
   readonly output: AudioNode;
 
@@ -226,13 +278,23 @@ export class Mixer {
     this.ctx = ctx;
     this.masterIn = ctx.createGain();
     this.masterAuto = ctx.createGain();
-    const glue = ctx.createDynamicsCompressor();
+    this.mEqLow = ctx.createBiquadFilter();
+    this.mEqLow.type = 'lowshelf';
+    this.mEqLow.frequency.value = 110;
+    this.mEqMid = ctx.createBiquadFilter();
+    this.mEqMid.type = 'peaking';
+    this.mEqMid.frequency.value = 900;
+    this.mEqMid.Q.value = 0.6;
+    this.mEqHigh = ctx.createBiquadFilter();
+    this.mEqHigh.type = 'highshelf';
+    this.mEqHigh.frequency.value = 7000;
+    const glue = (this.glue = ctx.createDynamicsCompressor());
     glue.threshold.value = -14;
     glue.ratio.value = 2;
     glue.attack.value = 0.02;
     glue.release.value = 0.25;
     glue.knee.value = 8;
-    const limiter = ctx.createDynamicsCompressor();
+    const limiter = (this.limiter = ctx.createDynamicsCompressor());
     limiter.threshold.value = -1.5;
     limiter.ratio.value = 20;
     limiter.attack.value = 0.002;
@@ -240,9 +302,14 @@ export class Mixer {
     limiter.knee.value = 0;
     this.masterVol = ctx.createGain();
     this.masterIn.connect(this.masterAuto);
-    this.masterAuto.connect(glue);
+    this.masterAuto.connect(this.mEqLow);
+    this.mEqLow.connect(this.mEqMid);
+    this.mEqMid.connect(this.mEqHigh);
+    this.mEqHigh.connect(glue);
     glue.connect(this.masterVol);
-    this.masterVol.connect(limiter);
+    this.loud = ctx.createGain();
+    this.masterVol.connect(this.loud);
+    this.loud.connect(limiter);
     // Soft clipper after the limiter: transparent below ~-1 dBFS, rounds off overs.
     const clipper = ctx.createWaveShaper();
     clipper.curve = softClipCurve();
@@ -251,15 +318,17 @@ export class Mixer {
     clipIn.gain.value = 0.5;
     limiter.connect(clipIn);
     clipIn.connect(clipper);
+    this.ceiling = ctx.createGain();
+    clipper.connect(this.ceiling);
     const splitter = ctx.createChannelSplitter(2);
-    clipper.connect(splitter);
+    this.ceiling.connect(splitter);
     this.analyserL = ctx.createAnalyser();
     this.analyserR = ctx.createAnalyser();
     this.analyserL.fftSize = 1024;
     this.analyserR.fftSize = 1024;
     splitter.connect(this.analyserL, 0);
     splitter.connect(this.analyserR, 1);
-    this.output = clipper;
+    this.output = this.ceiling;
 
     // Reverb bus
     this.reverbIn = ctx.createGain();
@@ -326,6 +395,18 @@ export class Mixer {
     this.delayL.delayTime.setTargetAtTime(dt / 2, now, 0.05);
     this.delayR.delayTime.setTargetAtTime(dt / 2, now, 0.05);
     this.delayFb.gain.setTargetAtTime(Math.min(0.85, p.delayFeedback), now, 0.02);
+    const m = { ...DEFAULT_MASTERING, ...p.mastering };
+    const tc = 0.05;
+    this.mEqLow.gain.setTargetAtTime(m.low, now, tc);
+    this.mEqMid.gain.setTargetAtTime(m.mid, now, tc);
+    this.mEqHigh.gain.setTargetAtTime(m.high, now, tc);
+    this.glue.threshold.setTargetAtTime(-8 - m.glue * 18, now, tc);
+    this.glue.ratio.setTargetAtTime(1.5 + m.glue * 2.5, now, tc);
+    this.loud.gain.setTargetAtTime(Math.pow(10, m.loudness / 20), now, tc);
+    const ceilLin = Math.pow(10, Math.min(0, m.ceiling) / 20);
+    this.limiter.threshold.setTargetAtTime(Math.min(-0.5, m.ceiling - 0.8), now, tc);
+    // The soft clipper tops out at 0.995, so scale its output to the ceiling.
+    this.ceiling.gain.setTargetAtTime(ceilLin / 0.995, now, tc);
     if (this.reverbKey !== p.reverbType) {
       this.reverbKey = p.reverbType;
       const [s, d, pre, br] = REVERB[p.reverbType];

@@ -8,6 +8,7 @@ import { Mixer } from './mixer';
 import { scheduleRange, type ActiveSource } from './schedule';
 import { addBuffer, ensureClips } from './audioStore';
 import { PcmRecorder } from './pcmRecorder';
+import { useInputSettings } from './inputSettings';
 import { projectAudioIds } from '../state/persistence';
 
 const LOOKAHEAD = 0.12; // seconds scheduled ahead
@@ -46,7 +47,7 @@ class Engine {
   private stream: MediaStream | null = null;
   private micAnalyser: AnalyserNode | null = null;
   private monitorGain: GainNode | null = null;
-  private micSource: MediaStreamAudioSourceNode | null = null;
+  private micSource: GainNode | null = null;
   private countInUntil = -Infinity;
   private liveListeners = new Set<LiveListener>();
   /** Notes currently held by the user, per track (for UI highlighting). */
@@ -461,7 +462,7 @@ class Engine {
         const spb = 60 / p.bpm;
         const recStartCtx = recorder.startTime >= 0 ? recorder.startTime : this.ctx.currentTime;
         const beatAtRecStart = this.beatAtSafe(recStartCtx);
-        const latency = (this.ctx.baseLatency || 0) + (this.ctx.outputLatency || 0);
+        const latency = (this.ctx.baseLatency || 0) + (this.ctx.outputLatency || 0) + useInputSettings.getState().latencyMs / 1000;
         // Seconds of the recording to discard so that audio lines up with startBeat.
         const skip = Math.max(0, (rec.startBeat - beatAtRecStart) * spb + latency);
         const startSample = Math.floor(skip * raw.sampleRate);
@@ -496,10 +497,15 @@ class Engine {
   async startMic(): Promise<boolean> {
     if (this.stream) return true;
     try {
+      const { deviceId, gainDb } = useInputSettings.getState();
       this.stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, ...(deviceId ? { deviceId: { exact: deviceId } } : {}) },
       });
-      const srcNode = this.ctx.createMediaStreamSource(this.stream);
+      const raw = this.ctx.createMediaStreamSource(this.stream);
+      // Input gain stage feeds the meter, monitoring and the recorder.
+      const srcNode = this.ctx.createGain();
+      srcNode.gain.value = Math.pow(10, gainDb / 20);
+      raw.connect(srcNode);
       this.micSource = srcNode;
       this.micAnalyser = this.ctx.createAnalyser();
       this.micAnalyser.fftSize = 512;
@@ -514,6 +520,27 @@ class Engine {
       toast('Microphone access was denied', 'error');
       return false;
     }
+  }
+
+  /** Re-open the microphone (after choosing a different input device). */
+  async restartMic(): Promise<boolean> {
+    if (!this.stream) return false;
+    this.stream.getTracks().forEach((t) => t.stop());
+    this.micSource?.disconnect();
+    this.monitorGain?.disconnect();
+    this.stream = null;
+    this.micSource = null;
+    this.micAnalyser = null;
+    return this.startMic();
+  }
+
+  setInputGain(db: number): void {
+    this.micSource?.gain.setTargetAtTime(Math.pow(10, db / 20), this.ctx.currentTime, 0.02);
+  }
+
+  /** The microphone signal after the input gain stage (for tuners / meters). */
+  get micNode(): AudioNode | null {
+    return this.micSource;
   }
 
   setMonitoring(on: boolean): void {

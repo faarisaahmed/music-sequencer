@@ -146,14 +146,14 @@ const env = (attack: number, decay: number, sustain: number, release: number) =>
 
 export const PRESETS: InstrumentPreset[] = [
   // ---------------- Keyboards
-  sampler('grand-piano', 'Grand Piano', 'Keyboards', 'piano', 'Concert grand (Salamander samples)', { samples: salamander(), release: 0.9, gain: 1.1 }, [21, 108], 0.9),
+  sampler('grand-piano', 'Grand Piano', 'Keyboards', 'piano', 'Concert grand (Salamander samples)', { samples: salamander(), release: 0.9, gain: 1.1, spread: 0.55 }, [21, 108], 0.9),
   sampler(
     'bright-piano',
     'Bright Piano',
     'Keyboards',
     'piano',
     'Punchy upright piano',
-    { samples: nbSamples('piano', ['A1', 'C2', 'D#2', 'F#2', 'A2', 'C3', 'D#3', 'F#3', 'A3', 'C4', 'D#4', 'F#4', 'A4', 'C5', 'D#5', 'F#5', 'A5', 'C6', 'D#6', 'F#6', 'A6', 'C7']), release: 0.7, gain: 1 },
+    { samples: nbSamples('piano', ['A1', 'C2', 'D#2', 'F#2', 'A2', 'C3', 'D#3', 'F#3', 'A3', 'C4', 'D#4', 'F#4', 'A4', 'C5', 'D#5', 'F#5', 'A5', 'C6', 'D#6', 'F#6', 'A6', 'C7']), release: 0.7, gain: 1, spread: 0.45 },
     [21, 108],
     0.7,
   ),
@@ -298,7 +298,7 @@ export const PRESETS: InstrumentPreset[] = [
     'Strings',
     'harp',
     'Concert harp',
-    { samples: nbSamples('harp', ['E1', 'G1', 'B1', 'D2', 'F2', 'A2', 'C3', 'E3', 'G3', 'B3', 'D4', 'F4', 'A4', 'C5', 'E5', 'G5', 'B5', 'D6', 'F6', 'A6', 'D7']), release: 1.2, gain: 1.1 },
+    { samples: nbSamples('harp', ['E1', 'G1', 'B1', 'D2', 'F2', 'A2', 'C3', 'E3', 'G3', 'B3', 'D4', 'F4', 'A4', 'C5', 'E5', 'G5', 'B5', 'D6', 'F6', 'A6', 'D7']), release: 1.2, gain: 1.1, spread: 0.4 },
     [28, 100],
     1.2,
   ),
@@ -340,7 +340,7 @@ export const PRESETS: InstrumentPreset[] = [
   },
 
   // ---------------- Mallets & Bells
-  sampler('xylophone', 'Xylophone', 'Mallets & Bells', 'mallet', 'Wooden xylophone', { samples: nbSamples('xylophone', ['G4', 'C5', 'G5', 'C6', 'G6', 'C7', 'G7', 'C8']), release: 0.8, gain: 1 }, [65, 108], 0.8),
+  sampler('xylophone', 'Xylophone', 'Mallets & Bells', 'mallet', 'Wooden xylophone', { samples: nbSamples('xylophone', ['G4', 'C5', 'G5', 'C6', 'G6', 'C7', 'G7', 'C8']), release: 0.8, gain: 1, spread: 0.35 }, [65, 108], 0.8),
   {
     ...synth('marimba', 'Marimba', 'mallet', 'Soft marimba', {
       oscs: [{ type: 'sine', gain: 1 }, { type: 'sine', octave: 2, gain: 0.12 }],

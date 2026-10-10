@@ -554,3 +554,56 @@
 .help-steps b {
   color: var(--text);
 }
+
+/* ---- insert effects ---- */
+.fx-add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 120px;
+  border: 1px dashed var(--border) !important;
+  background: transparent !important;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.fx-add:hover {
+  color: var(--text);
+  border-color: var(--accent) !important;
+}
+.amp-models {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.amp-model {
+  border: 1px solid var(--border-soft);
+  background: #1a1a1e;
+  color: var(--text-dim);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.amp-model.on {
+  background: #4a2414;
+  border-color: #ff6b3d;
+  color: #ffd3c2;
+}
+.strip.mastering {
+  width: 190px;
+}
+.master-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 8px;
+}
+.master-knobs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px 2px;
+  padding: 4px 6px 10px;
+  justify-items: center;
+}

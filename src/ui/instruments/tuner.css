@@ -1,0 +1,42 @@
+.tuner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 14px 18px;
+  background: #18181c;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  align-self: flex-start;
+  flex-shrink: 0;
+}
+.tuner-note {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1;
+  color: #ff9f0a;
+}
+.tuner.in-tune .tuner-note {
+  color: #30d158;
+}
+.tuner-sub {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.input-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 420px;
+}
+.input-setup .is-label {
+  width: 56px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.input-setup .is-val {
+  width: 62px;
+  text-align: right;
+  font-size: 11px;
+  flex-shrink: 0;
+}

@@ -9,6 +9,7 @@ import { getPreset } from '../../audio/presets';
 import { Knob, VFader } from '../common/controls';
 import { TrackIcon } from '../common/icons';
 import './mixer.css';
+import MasteringCard from './MasteringCard';
 
 export function gainToDb(g: number): string {
   if (g <= 0.0001) return '-∞';
@@ -175,6 +176,7 @@ export default function MixerPanel() {
         <Plus size={20} />
       </button>
       <div className="spacer" style={{ minWidth: 8 }} />
+      <MasteringCard p={p} />
       <MasterStrip p={p} />
     </div>
   );
