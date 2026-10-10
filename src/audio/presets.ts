@@ -40,6 +40,15 @@ function nbSamples(inst: string, notes: string[]): Record<number, string> {
   return out;
 }
 
+const SOUNDFONT = 'https://gleitz.github.io/midi-js-soundfonts/MusyngKite/';
+
+/** Samples from the MusyngKite General MIDI soundfont (note names use flats, e.g. "Bb1"). */
+function soundfont(inst: string, notes: string[]): Record<number, string> {
+  const out: Record<number, string> = {};
+  for (const n of notes) out[parseNote(n)] = `${SOUNDFONT}${inst}-mp3/${n}.mp3`;
+  return out;
+}
+
 function salamander(): Record<number, string> {
   const out: Record<number, string> = {};
   const names = ['A', 'C', 'Ds', 'Fs'];
@@ -349,8 +358,18 @@ export const PRESETS: InstrumentPreset[] = [
     'Upright Bass',
     'Guitars & Bass',
     'bass',
-    'Acoustic double bass',
-    { samples: nbSamples('contrabass', ['F#1', 'A#1', 'C2', 'E2', 'G#2', 'C#3', 'E3', 'G#3', 'B3']), release: 0.35, gain: 1.2 },
+    'Plucked double bass (pizzicato) for jazz, pop & folk',
+    { samples: soundfont('acoustic_bass', ['E1', 'G1', 'Bb1', 'Db2', 'E2', 'G2', 'Bb2', 'Db3', 'E3', 'G3', 'Bb3', 'Db4']), release: 0.18, gain: 3.6 },
+    [28, 67],
+    0.18,
+  ),
+  sampler(
+    'upright-bass-bowed',
+    'Upright Bass (Bowed)',
+    'Guitars & Bass',
+    'bass',
+    'Bowed (arco) double bass',
+    { samples: nbSamples('contrabass', ['F#1', 'A#1', 'C2', 'E2', 'G#2', 'C#3', 'E3', 'G#3', 'B3']), attack: 0.04, release: 0.35, gain: 1.2 },
     [28, 64],
     0.35,
   ),
@@ -396,6 +415,16 @@ export const PRESETS: InstrumentPreset[] = [
     { samples: nbSamples('cello', ['C2', 'D2', 'E2', 'F2', 'A2', 'C3', 'D3', 'E3', 'F#3', 'A3', 'C4', 'D4', 'E4', 'F#4', 'A4', 'C5']), attack: 0.06, release: 0.5, gain: 1 },
     [36, 76],
     0.5,
+  ),
+  sampler(
+    'pizzicato-strings',
+    'Pizzicato Strings',
+    'Strings',
+    'violin',
+    'Plucked string section',
+    { samples: soundfont('pizzicato_strings', ['G2', 'C3', 'E3', 'G3', 'C4', 'E4', 'G4', 'C5', 'E5', 'G5', 'C6']), release: 0.25, gain: 5, spread: 0.35 },
+    [36, 96],
+    0.25,
   ),
   sampler(
     'harp',

@@ -1,7 +1,7 @@
 // BandForge service worker: offline app shell + cache-first instrument samples.
 const SHELL = 'bandforge-shell';
 const SAMPLES = 'bandforge-samples-v1';
-const SAMPLE_HOSTS = ['tonejs.github.io', 'nbrosowsky.github.io'];
+const SAMPLE_HOSTS = ['tonejs.github.io', 'nbrosowsky.github.io', 'gleitz.github.io'];
 const CORE = ['./', './index.html', './manifest.webmanifest', './favicon.svg', './icon-192.png', './icon-512.png'];
 
 async function readManifest(fromNetwork) {

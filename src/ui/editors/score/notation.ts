@@ -321,7 +321,7 @@ export const SPLIT = 60;
 // ------------------------------------------------------------------ instrument → notation
 
 const GRAND = new Set(['grand-piano', 'bright-piano', 'electric-piano', 'organ', 'harmonium', 'clav', 'harp']);
-const BASS = new Set(['cello', 'electric-bass', 'upright-bass', 'synth-bass', 'sub-808', 'wobble-bass', 'tuba', 'bassoon', 'trombone']);
+const BASS = new Set(['cello', 'electric-bass', 'upright-bass', 'upright-bass-bowed', 'synth-bass', 'sub-808', 'wobble-bass', 'tuba', 'bassoon', 'trombone']);
 const GUITAR = new Set(['acoustic-guitar', 'electric-guitar', 'nylon-guitar']);
 /** Written pitch is this many semitones above sounding pitch. */
 export const TRANSPOSING: Record<string, { semis: number; label: string }> = {
