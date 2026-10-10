@@ -684,6 +684,9 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
           const gi = partFirst + curPart.placement.staffOf(sounding);
           doInsert(cursor.t, sounding, gi, false);
         }
+      } else if (/^[a-z]$/i.test(key) && !e.altKey) {
+        // Swallow other plain letters so typing in the score never fires global
+        // shortcuts (W/X/P would switch panels away mid-entry).
       } else {
         handled = false;
       }

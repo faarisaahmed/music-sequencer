@@ -12,6 +12,7 @@ import {
   generatePart,
   layChords,
   parseProgression,
+  STYLES,
   type DrumStyle,
   type StyleId,
 } from '../../model/accompaniment';
@@ -203,7 +204,8 @@ function hash(s: string): number {
 }
 
 function styleLabel(s: string): string {
-  return s === 'melody' ? 'Melody' : s.replace(/^[a-z]+-/, '').replace(/^\w/, (c) => c.toUpperCase());
+  if (s === 'melody') return 'Melody';
+  return STYLES.find((x) => x.id === s)?.name ?? s.replace(/^[a-z]+-/, '').replace(/^\w/, (c) => c.toUpperCase());
 }
 
 export function drumStyleForKit(kit: string): DrumStyle {

@@ -46,7 +46,18 @@ export function migrate(p: Project): Project {
   return {
     ...base,
     ...p,
-    tracks: p.tracks.map((t) => ({ ...createTrack(t.type, t.instrument, t.name), ...t, automation: { ...{ volume: [], pan: [] }, ...t.automation } })),
+    chords: p.chords ?? [],
+    tracks: (p.tracks ?? []).map((t) => {
+      const fresh = createTrack(t.type, t.instrument, t.name);
+      return {
+        ...fresh,
+        ...t,
+        fx: { ...fresh.fx, ...t.fx },
+        instrumentParams: t.instrumentParams ?? {},
+        regions: (t.regions ?? []).map((r) => (r.kind === 'midi' ? { ...r, notes: r.notes ?? [] } : r)),
+        automation: { ...{ volume: [], pan: [] }, ...t.automation },
+      };
+    }),
   };
 }
 
@@ -405,6 +416,11 @@ export function setKey(tonic: number, mode: 'major' | 'minor', transposeContent:
       for (const t of d.tracks) {
         if (t.type !== 'instrument') continue;
         for (const r of t.regions) if (r.kind === 'midi') for (const n of r.notes) n.pitch = Math.max(0, Math.min(127, n.pitch + delta));
+      }
+      // Keep the chord track in step with the transposed notes.
+      for (const c of d.chords ?? []) {
+        c.root = (((c.root + delta) % 12) + 12) % 12;
+        if (c.bass !== undefined) c.bass = (((c.bass + delta) % 12) + 12) % 12;
       }
     }
   });
