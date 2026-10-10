@@ -6,6 +6,7 @@ import TopBar from './TopBar';
 import TracksView from './tracks/TracksView';
 import Dock from './Dock';
 import LibraryPanel from './library/LibraryPanel';
+import { addLoopToSong } from './library/loops';
 import { useGlobalShortcuts } from './shortcuts';
 import { useMusicalTyping } from './instruments/musicalTyping';
 import { startDrag } from './common/drag';
@@ -42,6 +43,8 @@ export default function ProjectScreen() {
       onDrop={(e) => {
         // Files dropped anywhere not handled by a more specific target.
         e.preventDefault();
+        const loopId = e.dataTransfer.getData('application/x-bandforge-loop');
+        if (loopId) return addLoopToSong(loopId);
         for (const f of Array.from(e.dataTransfer.files)) {
           if (/\.midi?$/i.test(f.name)) void importMidiFile(f, true);
           else if (f.type.startsWith('audio') || /\.(wav|mp3|ogg|m4a|aac|flac|webm)$/i.test(f.name)) void importAudioFile(f);
