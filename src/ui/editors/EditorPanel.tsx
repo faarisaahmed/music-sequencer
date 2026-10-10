@@ -2,7 +2,10 @@ import { Plus } from 'lucide-react';
 import { findRegion, findTrack, useStore, type EditorMode } from '../../state/store';
 import { createEmptyRegion } from '../../state/actions';
 import PianoRoll from './PianoRoll';
-import ScoreEditor from './ScoreEditor';
+import { lazy, Suspense } from 'react';
+import { PanelLoading } from '../common/Lazy';
+
+const ScoreEditor = lazy(() => import('./ScoreEditor'));
 import StepSequencer from './StepSequencer';
 import AudioEditor from './AudioEditor';
 import DrummerEditor from './drummer/DrummerEditor';
@@ -44,7 +47,9 @@ export default function EditorPanel() {
           <div id="editor-toolbar-slot" className="editor-toolbar-slot" />
         </div>
         <div className="editor-body">
-          <ScoreEditor full />
+          <Suspense fallback={<PanelLoading label="Loading score…" />}>
+            <ScoreEditor full />
+          </Suspense>
         </div>
       </div>
     );
@@ -108,7 +113,11 @@ export default function EditorPanel() {
       </div>
       <div className="editor-body">
         {active === 'pianoroll' && r.kind === 'midi' && <PianoRoll key={r.id} trackId={t.id} regionId={r.id} />}
-        {active === 'score' && r.kind === 'midi' && <ScoreEditor key={r.id} trackId={t.id} regionId={r.id} />}
+        {active === 'score' && r.kind === 'midi' && (
+          <Suspense fallback={<PanelLoading label="Loading score…" />}>
+            <ScoreEditor key={r.id} trackId={t.id} regionId={r.id} />
+          </Suspense>
+        )}
         {active === 'steps' && r.kind === 'midi' && <StepSequencer key={r.id} trackId={t.id} regionId={r.id} />}
         {active === 'drummer' && r.kind === 'midi' && <DrummerEditor key={r.id} trackId={t.id} regionId={r.id} />}
         {active === 'audio' && r.kind === 'audio' && <AudioEditor key={r.id} trackId={t.id} regionId={r.id} />}

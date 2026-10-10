@@ -4,7 +4,9 @@ import ExportDialog from './ExportDialog';
 import SettingsDialog from './SettingsDialog';
 import HelpDialog from './HelpDialog';
 import TemplatesDialog from '../home/TemplatesDialog';
-import SongWizardDialog from '../assistant/SongWizardDialog';
+import { lazy, Suspense } from 'react';
+
+const SongWizardDialog = lazy(() => import('../assistant/SongWizardDialog'));
 
 export default function ModalHost() {
   const modal = useStore((s) => s.modal);
@@ -21,7 +23,11 @@ export default function ModalHost() {
     case 'templates':
       return <TemplatesDialog />;
     case 'songWizard':
-      return <SongWizardDialog />;
+      return (
+        <Suspense fallback={null}>
+          <SongWizardDialog />
+        </Suspense>
+      );
     default:
       return null;
   }

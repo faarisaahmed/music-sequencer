@@ -39,7 +39,7 @@ export default function ExportDialog() {
   const run = async () => {
     try {
       if (format === 'midi') {
-        download(projectToMidi(p), file + '.mid');
+        download(await projectToMidi(p), file + '.mid');
       } else if (format === 'project') {
         setBusy({ label: 'Packing project…', f: 0.5 });
         download(await exportProjectFile(p), file + '.bandforge.json');

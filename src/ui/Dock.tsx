@@ -4,7 +4,10 @@ import EditorPanel from './editors/EditorPanel';
 import InstrumentPanel from './instruments/InstrumentPanel';
 import MixerPanel from './mixer/MixerPanel';
 import FxPanel from './mixer/FxPanel';
-import AssistantPanel from './assistant/AssistantPanel';
+import { lazy, Suspense } from 'react';
+import { PanelLoading } from './common/Lazy';
+
+const AssistantPanel = lazy(() => import('./assistant/AssistantPanel'));
 
 const TABS: { id: DockTab; label: string }[] = [
   { id: 'fx', label: 'Smart Controls' },
@@ -38,7 +41,11 @@ export default function Dock() {
         {tab === 'instrument' && <InstrumentPanel />}
         {tab === 'mixer' && <MixerPanel />}
         {tab === 'fx' && <FxPanel />}
-        {tab === 'assistant' && <AssistantPanel />}
+        {tab === 'assistant' && (
+          <Suspense fallback={<PanelLoading />}>
+            <AssistantPanel />
+          </Suspense>
+        )}
       </div>
     </div>
   );
