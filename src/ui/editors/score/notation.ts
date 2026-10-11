@@ -294,6 +294,8 @@ export interface PartInput {
   drums: boolean;
   notes: RawNote[];
   marks: DisplayMark[];
+  /** Rest boundaries (display beats) per staff-within-part & voice. */
+  splits?: { t: number; staff: number; voice: 1 | 2 }[];
 }
 
 export interface PartModel extends Omit<PartInput, 'notes'> {
@@ -491,9 +493,14 @@ function inferMarks(notes: QNote[], staves: number): { marks: DisplayMark[]; acc
   return { marks, accents };
 }
 
-function buildVoice(list: QNote[], ms: number, bpb: number, win: Map<number, WinKind>, idPrefix: string, accents: Set<string>): Piece[] {
+function buildVoice(list: QNote[], ms: number, bpb: number, win: Map<number, WinKind>, idPrefix: string, accents: Set<string>, splits: number[] = []): Piece[] {
   const me = ms + bpb;
   const inM = list.filter((n) => n.s < me - 1e-6 && n.e > ms + 1e-6);
+  // Stored rest boundaries that fall in silence (never inside a sounding note).
+  const hard = splits
+    .map((t) => t - ms)
+    .filter((b) => b > 1e-6 && b < bpb - 1e-6 && !inM.some((n) => n.s - ms < b - 1e-6 && n.e - ms > b + 1e-6));
+  const isHard = (b: number) => hard.some((h) => Math.abs(h - b) < 1e-6);
   const mk = (start: number, dur: number, disp: number, extra: Partial<Piece> = {}): Piece => ({
     start,
     dur,
@@ -508,8 +515,8 @@ function buildVoice(list: QNote[], ms: number, bpb: number, win: Map<number, Win
     artic: [],
     ...extra,
   });
-  if (!inM.length) return [mk(0, bpb, bpb, { wholeMeasure: true })];
-  const bset = new Set<number>([0, bpb]);
+  if (!inM.length && !hard.length) return [mk(0, bpb, bpb, { wholeMeasure: true })];
+  const bset = new Set<number>([0, bpb, ...hard]);
   for (const n of inM) {
     bset.add(Math.max(0, n.s - ms));
     bset.add(Math.min(bpb, n.e - ms));
@@ -535,7 +542,7 @@ function buildVoice(list: QNote[], ms: number, bpb: number, win: Map<number, Win
       .sort((x, y) => x.wpitch - y.wpitch);
     const prev = slices[slices.length - 1];
     const sameWin = prev && windowOf(ms + Math.floor(prev.a + 1e-6), win)?.w0 === windowOf(ms + Math.floor(a + 1e-6), win)?.w0;
-    if (!active.length && prev && !prev.active.length && sameWin) prev.b = b;
+    if (!active.length && prev && !prev.active.length && sameWin && !isHard(a)) prev.b = b;
     else slices.push({ a, b, active });
   }
   const pieces: Piece[] = [];
@@ -731,8 +738,9 @@ export function buildScore(inputs: PartInput[], bpb: number, totalBeats: number,
       const win1 = part._win?.get(`${ref.staff}:1`) ?? new Map();
       const win2 = part._win?.get(`${ref.staff}:2`) ?? new Map();
       const has2 = v2.some((n) => n.s < ms + bpb - 1e-6 && n.e > ms + 1e-6);
-      const voices = [buildVoice(v1, ms, bpb, win1, `${ref.part}.${ref.staff}.1`, part.inferredAccents)];
-      if (has2) voices.push(buildVoice(v2, ms, bpb, win2, `${ref.part}.${ref.staff}.2`, part.inferredAccents));
+      const sp = (v: 1 | 2) => (part.splits ?? []).filter((x) => x.staff === ref.staff && x.voice === v && x.t > ms && x.t < ms + bpb).map((x) => x.t);
+      const voices = [buildVoice(v1, ms, bpb, win1, `${ref.part}.${ref.staff}.1`, part.inferredAccents, sp(1))];
+      if (has2) voices.push(buildVoice(v2, ms, bpb, win2, `${ref.part}.${ref.staff}.2`, part.inferredAccents, sp(2)));
       return { voices };
     });
     measures.push({ index: m, start: ms, staves: sm });

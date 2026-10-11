@@ -52,6 +52,22 @@ export interface HeadHit {
   lyric?: string;
 }
 
+/** One rhythmic element (a note/chord or a rest) of a voice — what Flat-style selection works on. */
+export interface ElemHit {
+  x0: number;
+  x1: number;
+  t: number; // display beat where it starts
+  t1: number; // display beat where it ends
+  staff: number; // global staff index
+  voice: 1 | 2;
+  system: number;
+  measure: number;
+  rest: boolean;
+  /** A tied continuation of a note that started earlier. */
+  cont: boolean;
+  noteIds: string[];
+}
+
 export interface MeasureGeom {
   index: number;
   x: number;
@@ -79,6 +95,7 @@ export interface SystemGeom {
 export interface ScoreLayout {
   systems: SystemGeom[];
   heads: HeadHit[];
+  elems: ElemHit[];
   width: number;
   height: number;
   bpb: number;
@@ -299,7 +316,7 @@ export function emptyLayout(plan: ScorePlan): ScoreLayout {
       measures,
     };
   });
-  return { systems, heads: [], width: plan.logicalW * zoom, height: plan.height * zoom, bpb: model.bpb };
+  return { systems, heads: [], elems: [], width: plan.logicalW * zoom, height: plan.height * zoom, bpb: model.bpb };
 }
 
 /** Render the whole score into one SVG (used for printing). */
@@ -529,6 +546,37 @@ function drawSystem(ctx: DrawCtx, plan: ScorePlan, li: number, layout: ScoreLayo
           continue;
         }
         if (!piece.wholeMeasure) anchors.push({ x: nx, t: piece.start });
+        // Hidden voice-2 filler rests aren't selectable.
+        if (!(piece.rest && voice === 2)) {
+          let ex0 = nx;
+          let ex1 = nx + 12;
+          try {
+            if (piece.rest) ex1 = nx + Math.max(10, note.getWidth());
+            else {
+              ex0 = note.getNoteHeadBeginX();
+              ex1 = note.getNoteHeadEndX();
+            }
+          } catch {
+            /* noop */
+          }
+          if (piece.wholeMeasure) {
+            ex0 = noteX0;
+            ex1 = noteX1;
+          }
+          layout.elems.push({
+            x0: ex0,
+            x1: ex1,
+            t: mm.start + piece.start,
+            t1: mm.start + piece.start + piece.dur,
+            staff,
+            voice,
+            system: li,
+            measure: m,
+            rest: piece.rest,
+            cont: !piece.rest && piece.tied.length > 0 && piece.tied.every(Boolean),
+            noteIds: piece.noteIds,
+          });
+        }
         if (piece.rest) continue;
         let ys: number[] = [];
         let hx0 = nx;

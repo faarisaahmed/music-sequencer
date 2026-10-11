@@ -125,6 +125,44 @@ export function insertRest(pl: Placement, t: number, dur: number, staff: number,
   });
 }
 
+/** Remember rest boundaries so the rests keep their values. */
+function addSplits(r: DRegion, beats: number[], staff: number, voice: 1 | 2): void {
+  const list = r.restSplits ?? [];
+  for (const b of beats) {
+    if (b <= 1e-6) continue;
+    if (!list.some((x) => Math.abs(x.beat - b) < 1e-6 && x.staff === staff && x.voice === voice)) list.push({ beat: Math.round(b * 1e6) / 1e6, staff, voice });
+  }
+  if (list.length) r.restSplits = list;
+}
+
+/**
+ * Change the value of a rest (Flat/Noteflight): shorter leaves the remainder as rests,
+ * longer writes over whatever follows in the same voice.
+ */
+export function setRestValue(pl: Placement, t: number, newDur: number, staff: number, voice: 1 | 2, protect?: Set<string>): void {
+  commit((d) => {
+    const res = resolve(d, pl, t, newDur);
+    if (!res) return;
+    clearSpan(res.r, res.cT, newDur, staff, voice, pl.staffOf, protect);
+    addSplits(res.r, [res.cT, res.cT + newDur], staff, voice);
+  });
+}
+
+/** Turn notes into rests of the same value (Delete / 0 on a note), as in Flat. */
+export function notesToRests(ids: string[], staffOf: (p: number) => number): void {
+  const set = new Set(ids);
+  commit((d) => {
+    for (const t of d.tracks)
+      for (const reg of t.regions) {
+        if (reg.kind !== 'midi' || !reg.notes.some((n) => set.has(n.id))) continue;
+        const r = reg as DRegion;
+        for (const n of r.notes.filter((x) => set.has(x.id))) addSplits(r, [n.start, n.start + n.duration], staffOf(n.pitch), (n.voice ?? 1) as 1 | 2);
+        r.notes = r.notes.filter((n) => !set.has(n.id));
+      }
+  });
+  useStore.setState((s) => ({ selectedNoteIds: s.selectedNoteIds.filter((i) => !set.has(i)) }));
+}
+
 function eachNote(d: Draft<Project>, ids: Set<string>, fn: (n: Draft<Note>, r: DRegion) => void): void {
   for (const t of d.tracks)
     for (const r of t.regions) if (r.kind === 'midi') for (const n of r.notes) if (ids.has(n.id)) fn(n, r as DRegion);
@@ -148,7 +186,8 @@ export function mapNotes(ids: string[], fn: (n: Draft<Note>) => void): void {
  * same voice, making it shorter leaves a rest. `sameVoice` = ids of the notes shown in the
  * same staff & voice as each selected note (keyed by selected id).
  */
-export function setDuration(ids: string[], dur: number, sameVoice?: Map<string, Set<string>>): void {
+export function setDuration(ids: string[], dur: number, sameVoice?: Map<string, Set<string>>, staffOf?: (p: number) => number): void {
+  const staffOfNote = (n: Note) => (staffOf ? staffOf(n.pitch) : 0);
   const eps = 1e-3;
   commit((d) => {
     for (const t of d.tracks)
@@ -166,6 +205,7 @@ export function setDuration(ids: string[], dur: number, sameVoice?: Map<string, 
           const chord = r.notes.filter((x) => x.id === n.id || (inVoice(x) && Math.abs(x.start - n.start) < eps && Math.abs(x.duration - oldDur) < 0.05));
           for (const c of chord) c.duration = dur;
           const end = n.start + dur;
+          if (dur < oldDur - 1e-6) addSplits(r, [end, n.start + oldDur], staffOfNote(n as Note), (n.voice ?? 1) as 1 | 2);
           for (const x of r.notes) {
             if (!inVoice(x) || chord.includes(x) || ids.includes(x.id)) continue;
             if (x.start > n.start + eps && x.start < end - eps) {

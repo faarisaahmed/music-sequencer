@@ -62,6 +62,11 @@ export interface MidiRegion extends RegionBase {
    * (FL Studio-style): editing one edits them all. Only used while `loop` is on.
    */
   patternId?: string;
+  /**
+   * Score: rest boundaries (content beats, staff within the part, voice) so rests keep the
+   * values you give them — e.g. a whole rest changed to a quarter shows as quarter + rests.
+   */
+  restSplits?: { beat: number; staff: number; voice: 1 | 2 }[];
   /** Swing for this region; undefined = follow the song's groove, null = straight. */
   groove?: Groove | null;
 }

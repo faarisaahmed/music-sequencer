@@ -39,6 +39,7 @@ import {
   topLineDiatonic,
   xToBeat,
   type ChordLabel,
+  type ElemHit,
   type HeadHit,
   type ScoreLayout,
   type ScorePlan,
@@ -50,7 +51,8 @@ import {
   clearMarks,
   deleteNotes,
   insertNote,
-  insertRest,
+  notesToRests,
+  setRestValue,
   addToChords,
   mapNotes,
   pasteNotes,
@@ -137,7 +139,7 @@ function rawFromNote(n: Note, regionId: string, s: number, e: number, key: strin
 /** Build the notation source for a single region or the whole song. */
 function buildSource(project: Project, full: boolean, regionId: string | undefined, grid: number, clefMode: ClefMode, concert: boolean): Source | null {
   const bpb = beatsPerBar(project.timeSig);
-  const mkPart = (track: Track, raw: RawNote[], marks: DisplayMark[], mode: ClefMode, placementBase: Omit<Placement, 'staffOf'>) => {
+  const mkPart = (track: Track, raw: RawNote[], marks: DisplayMark[], mode: ClefMode, placementBase: Omit<Placement, 'staffOf'>, splits: PartInput['splits'] = []) => {
     const drums = track.type === 'drums';
     const preset = getPreset(track.instrument);
     const nt = notationFor(track.instrument, drums, raw.map((n) => n.pitch), mode, concert, preset.range);
@@ -154,6 +156,7 @@ function buildSource(project: Project, full: boolean, regionId: string | undefin
       drums,
       notes: raw,
       marks,
+      splits,
     };
     const meta: PartMeta = { track, placement: { ...placementBase, staffOf }, transpose: nt.transpose, writtenKey, drums };
     return { input, meta, label: track.name + (nt.transLabel ? ` ${nt.transLabel}` : '') };
@@ -172,7 +175,8 @@ function buildSource(project: Project, full: boolean, regionId: string | undefin
       raw.push(rawFromNote(n, region.id, t, t + n.duration, n.id));
     }
     const marks: DisplayMark[] = (region.marks ?? []).map((m) => ({ kind: m.kind, t: m.beat - viewStart, end: m.end !== undefined ? m.end - viewStart : undefined, value: m.value, staff: m.staff ?? 0, id: m.id, regionId: region.id }));
-    const p = mkPart(track, raw, marks, clefMode, { mode: 'region', trackId: track.id, regionId: region.id });
+    const splits = (region.restSplits ?? []).map((x) => ({ t: x.beat - viewStart, staff: x.staff, voice: x.voice })).filter((x) => x.t > 0 && x.t < viewLen + bpb);
+    const p = mkPart(track, raw, marks, clefMode, { mode: 'region', trackId: track.id, regionId: region.id }, splits);
     const toAbs = (t: number) => region.start + t - (region.loop ? region.offset : 0);
     const fromAbs = (a: number) => a - region.start + (region.loop ? region.offset : 0);
     const chords: ChordLabel[] = (project.chords ?? [])
@@ -202,8 +206,15 @@ function buildSource(project: Project, full: boolean, regionId: string | undefin
   const built = tracks.map((track) => {
     const raw: RawNote[] = [];
     const marks: DisplayMark[] = [];
+    const splits: NonNullable<PartInput['splits']> = [];
     for (const r of track.regions) {
       if (r.kind !== 'midi' || r.muted) continue;
+      const iters = r.loop ? Math.ceil((r.offset + r.length) / r.contentLength) + 1 : 1;
+      for (const sp of r.restSplits ?? [])
+        for (let k = 0; k < iters; k++) {
+          const t = r.start - r.offset + k * (r.loop ? r.contentLength : 0) + sp.beat;
+          if (t > r.start && t < r.start + r.length) splits.push({ t, staff: sp.staff, voice: sp.voice });
+        }
       total = Math.max(total, r.start + r.length);
       for (const pn of placedNotes(r)) raw.push(rawFromNote(pn.note, r.id, pn.start, pn.start + pn.duration, `${pn.note.id}@${pn.iteration}`));
       for (const m of r.marks ?? []) {
@@ -216,7 +227,7 @@ function buildSource(project: Project, full: boolean, regionId: string | undefin
         }
       }
     }
-    return mkPart(track, raw, marks, 'auto', { mode: 'song', trackId: track.id });
+    return mkPart(track, raw, marks, 'auto', { mode: 'song', trackId: track.id }, splits);
   });
   const model = buildScore(
     built.map((b) => b.input),
@@ -269,6 +280,8 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
   const [cursor, setCursor] = useState<{ t: number; staff: number }>({ t: 0, staff: 0 });
   const [ghost, setGhost] = useState<Ghost | null>(null);
   const [box, setBox] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+  /** A selected rest (Flat-style): staff, voice and the beat it starts on. */
+  const [restSel, setRestSel] = useState<{ gi: number; voice: 1 | 2; t: number } | null>(full ? null : { gi: 0, voice: 1, t: 0 });
   const [overNote, setOverNote] = useState(false);
   const [width, setWidth] = useState<number | null>(lastScoreWidth);
   // Systems are drawn into the (mutable) layout outside React; this tiny store re-renders the overlays.
@@ -455,13 +468,7 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
     [layout, model, zoom, bpb],
   );
 
-  /** Nearest rhythmic position for the chosen value; long notes may run over the barline (shown tied). */
-  const snapInput = (tm: number) => {
-    const g = triplet ? effDur : Math.min(effDur, 1);
-    let t = Math.round(tm / g) * g;
-    t = Math.max(0, Math.min(t, bpb - g));
-    return Math.round(t * 1e6) / 1e6;
-  };
+
 
   const headAt = (lx: number, ly: number) => {
     if (!layout) return null;
@@ -508,18 +515,72 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
   };
 
 
-  const doInsert = (t: number, pitch: number, gi: number, chord: boolean, d = effDur) => {
+  const doInsert = (t: number, pitch: number, gi: number, chord: boolean, d = effDur, vIn?: 1 | 2) => {
     const pl = placementFor(gi);
     const part = partOfStaff(gi);
     if (!pl || !part) return;
-    const v: 1 | 2 = part.drums ? (pitch === 35 || pitch === 36 || pitch === 44 ? 2 : 1) : voice;
+    const v: 1 | 2 = part.drums ? (pitch === 35 || pitch === 36 || pitch === 44 ? 2 : 1) : (vIn ?? voice);
     const id = insertNote(pl, t, d, pitch, velocity, v, chord, part.drums ? undefined : protectFor(gi, v));
     getEngine().preview(part.track.id, pitch, velocity, d);
-    useStore.setState({ selectedNoteIds: [id] });
     lastInsert.current = { t, dur: d, pitch, staff: gi };
+    // Move on to what follows (usually the next rest), ready for the next note.
+    useStore.setState({ selectedNoteIds: [] });
+    setRestSel({ gi, voice: v, t: t + d });
     setCursor({ t: t + d, staff: gi });
     setAcc(null);
+    void id;
   };
+
+  // ------------------------------------------------------------ elements (notes & rests)
+
+  const voiceForPitch = (gi: number, pitch: number): 1 | 2 => (partOfStaff(gi)?.drums ? (pitch === 35 || pitch === 36 || pitch === 44 ? 2 : 1) : voice);
+  /** Elements of one staff & voice, in time order (tied continuations included). */
+  const elemsOf = (gi: number, v: 1 | 2): ElemHit[] => (layout?.elems ?? []).filter((e) => e.staff === gi && e.voice === v).sort((a, b) => a.t - b.t);
+  const elemAt = (gi: number, v: 1 | 2, t: number): ElemHit | undefined => elemsOf(gi, v).find((e) => Math.abs(e.t - t) < 1e-3);
+  /** The note or rest under the pointer in a measure (a voice with nothing there is one whole-bar rest). */
+  const elemUnder = (gi: number, v: 1 | 2, measure: number, lx: number): ElemHit | null => {
+    const list = elemsOf(gi, v).filter((e) => e.measure === measure);
+    if (!list.length) {
+      const sys = layout?.systems.find((sy) => sy.measures.some((m) => m.index === measure));
+      const mg = sys?.measures.find((m) => m.index === measure);
+      if (!mg) return null;
+      return { x0: mg.noteX0, x1: mg.noteX1, t: measure * bpb, t1: (measure + 1) * bpb, staff: gi, voice: v, system: layout!.systems.indexOf(sys!), measure, rest: true, cont: false, noteIds: [] };
+    }
+    let pick = list[0];
+    for (const e of list) if (e.x0 <= lx + 6) pick = e;
+    return pick;
+  };
+  /** Show a value on the palette (when you select something, its value is shown, like Noteflight). */
+  const syncValue = (v: number) => {
+    for (const d of DURATIONS) {
+      if (Math.abs(d.v - v) < 1e-3) return setDur(d.v), setDotted(false), setTriplet(false);
+      if (Math.abs(d.v * 1.5 - v) < 1e-3) return setDur(d.v), setDotted(true), setTriplet(false);
+      if (Math.abs((d.v * 2) / 3 - v) < 1e-3) return setDur(d.v), setDotted(false), setTriplet(true);
+    }
+  };
+  const selectElem = (e: ElemHit, sync = true) => {
+    if (e.rest) {
+      useStore.setState({ selectedNoteIds: [] });
+      setRestSel({ gi: e.staff, voice: e.voice, t: e.t });
+    } else {
+      setRestSel(null);
+      // A tied continuation selects the note it belongs to.
+      useStore.setState({ selectedNoteIds: [...e.noteIds] });
+    }
+    setCursor({ t: e.t, staff: e.staff });
+    if (sync) {
+      const start = e.cont ? (layout?.elems.find((x) => !x.cont && x.noteIds.some((id) => e.noteIds.includes(id))) ?? e) : e;
+      syncValue(start.t1 - start.t);
+    }
+  };
+  /** The element that holds the current selection (a rest, or the first selected note). */
+  const currentElem = (): ElemHit | undefined => {
+    if (restSel) return elemAt(restSel.gi, restSel.voice, restSel.t);
+    const ids = useStore.getState().selectedNoteIds;
+    return layout?.elems.filter((e) => !e.rest && !e.cont && e.noteIds.some((id) => ids.includes(id))).sort((a, b) => a.t - b.t)[0];
+  };
+  /** Fill the selected rest (or the given one) with a note of the current value. */
+  const fillRest = (gi: number, v: 1 | 2, t: number, pitch: number) => doInsert(t, pitch, gi, false, effDur, v);
 
   const allNotes = (): Note[] => {
     if (!src) return [];
@@ -586,15 +647,15 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
 
   /** Toggle a dot on the selection (or for the next notes). */
   const toggleDot = () => {
-    const ids = useStore.getState().selectedNoteIds;
-    const sel = selectedNotes();
-    if (!sel.length) {
+    const e = currentElem();
+    if (!e) {
       setDotted((d) => !d);
       return;
     }
-    const d0 = sel[0].duration;
+    const d0 = e.t1 - e.t;
     const isDotted = [3, 1.5, 0.75, 0.375, 0.1875].some((x) => Math.abs(d0 - x) < 1e-3);
-    setDuration(ids, isDotted ? d0 / 1.5 : d0 * 1.5, voiceMates(ids));
+    setDotted(!isDotted);
+    applyValue(isDotted ? d0 / 1.5 : d0 * 1.5);
   };
 
   /** Sharp / flat / natural on the selection: ♯ raises, ♭ lowers, ♮ removes the accidental. */
@@ -621,10 +682,22 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
     if (ids.length) addDynamic(ids, mark, staffFnForSelection());
   };
 
+  /** Give the selected notes or rest a new value. */
+  const applyValue = (val: number) => {
+    const ids = useStore.getState().selectedNoteIds;
+    if (ids.length) {
+      setDuration(ids, val, voiceMates(ids), staffFnForSelection());
+      return;
+    }
+    if (restSel) {
+      const pl = placementFor(restSel.gi);
+      const ref = staffRef(restSel.gi);
+      if (pl && ref) setRestValue(pl, restSel.t, val, ref.staff, restSel.voice, protectFor(restSel.gi, restSel.voice));
+    }
+  };
   const chooseDuration = (v: number) => {
     setDur(v);
-    const ids = useStore.getState().selectedNoteIds;
-    if (ids.length) setDuration(ids, v * (dotted ? 1.5 : 1) * (triplet ? 2 / 3 : 1), voiceMates(ids));
+    applyValue(v * (dotted ? 1.5 : 1) * (triplet ? 2 / 3 : 1));
   };
 
   const seekTo = (t: number) => {
@@ -781,11 +854,12 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
       } else if (key === '.') {
         toggleDot();
       } else if (key === '0') {
-        const pl = placementFor(cursor.staff);
-        if (mode === 'input' && pl) {
-          insertRest(pl, cursor.t, effDur, staffRef(cursor.staff)!.staff, voice);
-          setCursor({ t: cursor.t + effDur, staff: cursor.staff });
-        } else if (ids.length) deleteNotes(ids);
+        // Turn the selected notes into rests of the same value.
+        if (ids.length) {
+          const first = currentElem();
+          notesToRests(ids, staffFnForSelection());
+          if (first) setRestSel({ gi: first.staff, voice: first.voice, t: first.t });
+        }
       } else if (key === '+' || key === '=') {
         if (ids.length) tieNotes(ids, effDur);
       } else if (key === 'ArrowUp' || key === 'ArrowDown') {
@@ -793,89 +867,66 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
         if (e.altKey) diatonicSel(dir);
         else transposeSel((p) => p + dir);
       } else if (key === 'ArrowLeft' || key === 'ArrowRight') {
+        // Step through the notes and rests of the voice, one element at a time.
         const dir = key === 'ArrowLeft' ? -1 : 1;
-        const heads = [...(layout?.heads ?? [])].sort((a, b) => a.t - b.t || a.staff - b.staff || b.pitch - a.pitch);
-        const uniq = heads.filter((h, i) => heads.findIndex((x) => x.noteId === h.noteId) === i);
-        if (ids.length) {
-          const cur = uniq.findIndex((h) => h.noteId === ids[ids.length - 1]);
-          const curH = uniq[cur];
-          const sameStaff = uniq.filter((h) => !curH || h.staff === curH.staff);
-          const ci = sameStaff.findIndex((h) => h.noteId === ids[ids.length - 1]);
-          const next = sameStaff[Math.max(0, Math.min(sameStaff.length - 1, ci + dir))];
+        const cur = currentElem();
+        if (cur) {
+          const list = elemsOf(cur.staff, cur.voice).filter((x) => !x.cont);
+          const i = list.findIndex((x) => Math.abs(x.t - cur.t) < 1e-3);
+          const next = list[i + dir];
           if (next) {
-            const extend = e.shiftKey ? ids.filter((i) => i !== next.noteId) : [];
-            useStore.setState({ selectedNoteIds: [...extend, next.noteId] });
-            setCursor({ t: next.t1, staff: next.staff });
+            if (e.shiftKey && !next.rest && !cur.rest) useStore.setState({ selectedNoteIds: [...new Set([...ids, ...next.noteIds])] });
+            else selectElem(next);
             if (!s.playing) seekTo(next.t);
           }
-        } else setCursor({ t: Math.max(0, cursor.t + dir * effDur), staff: cursor.staff });
-      } else if (key === 'Delete' || key === 'Backspace') {
-        if (ids.length) deleteNotes(ids);
-        else if (mode === 'input' && layout) {
-          const prev = layout.heads.filter((h) => h.staff === cursor.staff && h.t < cursor.t - 1e-6).sort((a, b) => b.t - a.t)[0];
-          if (prev) {
-            deleteNotes([prev.noteId]);
-            setCursor({ t: prev.t, staff: cursor.staff });
-          }
         }
-      } else if (/^[a-g]$/.test(lower) && !e.altKey && curPart && !curPart.drums) {
+      } else if (key === 'Delete' || key === 'Backspace') {
+        // Deleting a note leaves a rest of the same value (Flat / Noteflight).
+        if (ids.length) {
+          const first = currentElem();
+          notesToRests(ids, staffFnForSelection());
+          if (first) setRestSel({ gi: first.staff, voice: first.voice, t: first.t });
+        }
+      } else if (/^[a-g]$/.test(lower) && !e.altKey && (restSel || ids.length) && (restSel ? partOfStaff(restSel.gi) : curPart) && !(restSel ? partOfStaff(restSel.gi)! : curPart!).drums) {
+        const target = restSel ? partOfStaff(restSel.gi)! : curPart!;
         const letter = 'cdefgab'.indexOf(lower);
-        const wk = curPart.writtenKey;
-        const tr = curPart.transpose;
-        const nearestWritten = (refW: number) => {
+        const wk = target.writtenKey;
+        const tr = target.transpose;
+        const nearestWritten = (refW: number, above = false) => {
           let b = refW;
           let bd2 = Infinity;
           for (let oct = 0; oct < 10; oct++) {
             const p = pitchFromDiatonic(oct * 7 + letter, wk, acc);
-            if (Math.abs(p - refW) < bd2) {
-              bd2 = Math.abs(p - refW);
+            const dd = above ? (p > refW ? p - refW : Infinity) : Math.abs(p - refW);
+            if (dd < bd2) {
+              bd2 = dd;
               b = p;
             }
           }
           return b;
         };
-        if (mode === 'select' && ids.length && !e.shiftKey) {
-          // Re-pitch the selected notes, keeping their rhythm.
+        if (ids.length && e.shiftKey) {
+          // ⇧+letter: add that note above each selected note (build a chord).
+          const newIds = addToChords(ids, (n) => nearestWritten(n.pitch + tr, true) - tr);
+          if (newIds.length) useStore.setState({ selectedNoteIds: newIds });
+          setTimeout(() => newIds.forEach((id) => preview(id)), 0);
+        } else if (ids.length) {
+          // A note is selected: change its pitch, keeping its rhythm.
           mapNotes(ids, (n) => {
             n.pitch = nearestWritten(n.pitch + tr) - tr;
           });
           setTimeout(() => preview(ids[0]), 0);
-          setAcc(null);
-          e.preventDefault();
-          e.stopPropagation();
-          return;
-        }
-        if (mode === 'select') setMode('input');
-        const clef = staffRef(cursor.staff)!.clef;
-        const refW = (lastInsert.current && lastInsert.current.staff === cursor.staff ? lastInsert.current.pitch + tr : clef === 'bass' ? 50 : clef === 'treble8vb' ? 64 : 67);
-        let best = 0;
-        let bd = Infinity;
-        for (let oct = 0; oct < 10; oct++) {
-          const p = pitchFromDiatonic(oct * 7 + letter, wk, acc);
-          const d = e.shiftKey ? (p > refW ? p - refW : Infinity) : Math.abs(p - refW);
-          if (d < bd) {
-            bd = d;
-            best = p;
-          }
-        }
-        const sounding = best - tr;
-        if (e.shiftKey && lastInsert.current) {
+        } else if (restSel) {
+          // A rest is selected: it becomes a note (current value), then we move on.
+          const clef = staffRef(restSel.gi)!.clef;
           const li = lastInsert.current;
-          const pl = placementFor(li.staff);
-          if (pl) {
-            const id = insertNote(pl, li.t, li.dur, sounding, velocity, voice, true);
-            getEngine().preview(curPart.track.id, sounding, velocity, li.dur);
-            useStore.setState({ selectedNoteIds: [id] });
-            lastInsert.current = { ...li, pitch: sounding };
-          }
-          setAcc(null);
-        } else {
-          // Grand staff: letters go to the staff the pitch belongs to, within the cursor's part.
-          const ref = staffRef(cursor.staff)!;
-          const partFirst = model.parts[ref.part].firstStaff;
-          const gi = partFirst + curPart.placement.staffOf(sounding);
-          doInsert(cursor.t, sounding, gi, false);
+          const refW = li && li.staff === restSel.gi ? li.pitch + tr : clef === 'bass' ? 50 : clef === 'treble8vb' ? 64 : 67;
+          const sounding = nearestWritten(refW) - tr;
+          const ref = staffRef(restSel.gi)!;
+          const gi = model.parts[ref.part].firstStaff + target.placement.staffOf(sounding);
+          fillRest(gi === restSel.gi ? gi : gi, restSel.voice, restSel.t, sounding);
         }
+        setAcc(null);
       } else if (/^[a-z]$/i.test(key) && !e.altKey) {
         // Swallow other plain letters so typing in the score never fires global
         // shortcuts (W/X/P would switch panels away mid-entry).
@@ -906,17 +957,20 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
       return;
     }
     if (!loc) return setGhost(null);
-    const t = snapInput(loc.tm);
     const pitch = soundingAt(loc.staff, loc.dIdx);
     const part = partOfStaff(loc.staff)!;
-    const x = beatToX(loc.mg, t, bpb);
+    // Notes go at the start of the rest or chord under the pointer — never in the middle of a rest.
+    const el = elemUnder(loc.staff, voiceForPitch(loc.staff, pitch), loc.mg.index, loc.lx);
+    if (!el || el.cont) return setGhost(null);
+    const chordPitches = el.rest ? [] : chordPitchesAt(el);
+    if (!el.rest && chordPitches.includes(pitch + part.transpose)) return setGhost(null);
+    const x = el.rest && el.t1 - el.t >= bpb - 1e-6 ? el.x0 + 2 : el.x0;
     const y = loc.sg.topLineY + loc.step * (loc.sg.spacing / 2);
     const ledger: number[] = [];
     if (loc.step < 0) for (let s = -2; s >= loc.step; s -= 2) ledger.push(loc.sg.topLineY + s * (loc.sg.spacing / 2));
     if (loc.step > 8) for (let s = 10; s <= loc.step; s += 2) ledger.push(loc.sg.topLineY + s * (loc.sg.spacing / 2));
     const label = part.drums ? (({ 36: 'Kick', 35: 'Kick 2', 38: 'Snare', 42: 'Hi-hat', 49: 'Crash', 51: 'Ride', 48: 'High Tom', 45: 'Mid Tom', 41: 'Low Tom', 43: 'Floor Tom', 44: 'Pedal Hat', 70: 'Shaker' }) as Record<number, string>)[pitch] ?? 'Drum' : noteName(pitch + part.transpose, acc === -1);
-    const chordHit = !part.drums && !e.altKey ? chordAtClick(loc.staff, loc.mg.index * bpb + t) : null;
-    setGhost({ x, y, ledger, label: chordHit && !chordHit.pitches.includes(pitch + part.transpose) ? `+ ${label} (add to chord)` : label });
+    setGhost({ x, y, ledger, label: el.rest ? label : e.altKey || part.drums ? `${label} (replace)` : `+ ${label} (add to chord)` });
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -938,7 +992,10 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
       if (e.shiftKey) ids = ids.includes(head.noteId) ? ids.filter((i) => i !== head.noteId) : [...ids, head.noteId];
       else if (!ids.includes(head.noteId)) ids = [head.noteId];
       useStore.setState({ selectedNoteIds: ids });
-      setCursor({ t: head.t1, staff: head.staff });
+      setRestSel(null);
+      setCursor({ t: head.t, staff: head.staff });
+      const own = layout?.elems.find((x) => !x.cont && !x.rest && x.noteIds.includes(head.noteId));
+      if (own) syncValue(own.t1 - own.t);
       preview(head.noteId);
       const part = partOfStaff(head.staff)!;
       const notes = allNotes();
@@ -989,6 +1046,7 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
         const p1 = toLocal(x, y);
         const r = { x0: Math.min(p0.x, p1.x), y0: Math.min(p0.y, p1.y), x1: Math.max(p0.x, p1.x), y1: Math.max(p0.y, p1.y) };
         setGhost(null);
+        setRestSel(null);
         setBox(r);
         const inside = (layout?.heads ?? []).filter((h) => h.x1 >= r.x0 && h.x0 <= r.x1 && h.y >= r.y0 - 3 && h.y <= r.y1 + 3).map((h) => h.noteId);
         useStore.setState({ selectedNoteIds: [...new Set([...before, ...inside])] });
@@ -1001,59 +1059,67 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
           if (h) setCursor({ t: h.t1, staff: h.staff });
           return;
         }
-        const loc2 = loc;
-        const t = loc2.mg.index * bpb + snapInput(loc2.tm);
-        if (mode !== 'input') {
-          if (!e.shiftKey) useStore.setState({ selectedNoteIds: [] });
-          setCursor({ t, staff: loc2.staff });
-          if (!useStore.getState().playing) seekTo(t);
+        const pitch = soundingAt(loc.staff, loc.dIdx);
+        const part = partOfStaff(loc.staff)!;
+        const el = elemUnder(loc.staff, voiceForPitch(loc.staff, pitch), loc.mg.index, loc.lx);
+        if (!el) return;
+        if (mode !== 'input' || el.cont) {
+          // Select mode: click picks the note or rest under the pointer (a whole rest is one thing).
+          selectElem(el);
+          if (!useStore.getState().playing) seekTo(el.t);
           return;
         }
-        const pitch = soundingAt(loc2.staff, loc2.dIdx);
-        const part = partOfStaff(loc2.staff)!;
-        // Clicking above/below a note or chord adds to it (Flat-style), unless Alt replaces it.
-        const at = chordAtClick(loc2.staff, t);
-        if (at && !e.altKey && !part.drums) {
-          const n = allNotes().find((x) => x.id === at.noteId);
-          if (n && !at.pitches.includes(pitch + part.transpose)) {
-            const pl = placementFor(loc2.staff)!;
-            const id = insertNote(pl, at.t, n.duration, pitch, n.velocity, (n.voice ?? 1) as 1 | 2, true);
-            getEngine().preview(part.track.id, pitch, n.velocity, Math.min(1, n.duration));
-            useStore.setState({ selectedNoteIds: [id] });
-            lastInsert.current = { t: at.t, dur: n.duration, pitch, staff: loc2.staff };
-            setCursor({ t: at.t + n.duration, staff: loc2.staff });
-            setAcc(null);
-            return;
-          }
+        if (el.rest) {
+          // Write mode on a rest: it becomes a note of the chosen value.
+          fillRest(loc.staff, el.voice, el.t, pitch);
+          return;
         }
-        doInsert(t, pitch, loc2.staff, e.shiftKey);
+        // Write mode on a note: click above/below adds to its chord; ⌥-click replaces it.
+        if (chordPitchesAt(el).includes(pitch + part.transpose)) {
+          selectElem(el);
+          return;
+        }
+        if (e.altKey || part.drums) {
+          doInsert(el.t, pitch, loc.staff, part.drums, el.t1 - el.t, el.voice);
+          return;
+        }
+        const n = allNotes().find((x) => x.id === el.noteIds[0]);
+        if (!n) return;
+        const pl = placementFor(loc.staff)!;
+        const id = insertNote(pl, el.t, n.duration, pitch, n.velocity, (n.voice ?? 1) as 1 | 2, true);
+        getEngine().preview(part.track.id, pitch, n.velocity, Math.min(1, n.duration));
+        useStore.setState({ selectedNoteIds: [id] });
+        setRestSel(null);
+        lastInsert.current = { t: el.t, dur: n.duration, pitch, staff: loc.staff };
+        setAcc(null);
       },
       { threshold: 5 },
     );
   };
 
-  /** The note/chord in the current voice that starts at display beat `t` on staff `gi`. */
-  const chordAtClick = (gi: number, t: number) => {
-    if (!layout) return null;
-    const hs = layout.heads.filter((h) => h.staff === gi && Math.abs(h.t - t) < 1e-3 && (partOfStaff(gi)?.drums || h.voice === voice || !layout.heads.some((o) => o.staff === gi && Math.abs(o.t - t) < 1e-3 && o.voice === voice)));
-    if (!hs.length) return null;
-    return { t: hs[0].t, noteId: hs[0].noteId, pitches: hs.map((h) => h.pitch) };
-  };
+  /** Written pitches of the chord an element shows. */
+  const chordPitchesAt = (el: ElemHit) => (layout?.heads ?? []).filter((h) => h.staff === el.staff && h.voice === el.voice && Math.abs(h.t - el.t) < 1e-3).map((h) => h.pitch);
 
   // ------------------------------------------------------------ cursor geometry
 
-  const geomFor = (t: number, gi: number) => {
-    if (!layout) return null;
-    const m = Math.floor(t / bpb + 1e-9);
-    for (const sys of layout.systems) {
-      const mg = sys.measures.find((x) => x.index === m);
-      if (!mg) continue;
-      const sg = sys.staves.find((s) => s.index === gi) ?? sys.staves[0];
-      return { x: beatToX(mg, t - m * bpb, bpb), top: sg.topLineY - 12, h: sg.spacing * 4 + 24, sys };
+
+  // Box around the selected rest.
+  const restEl = restSel ? elemAt(restSel.gi, restSel.voice, restSel.t) : undefined;
+  const restBox = (() => {
+    if (!restEl || !restEl.rest || !layout) return null;
+    const sg = layout.systems[restEl.system]?.staves.find((x) => x.index === restEl.staff);
+    if (!sg) return null;
+    return { x0: restEl.x0, x1: restEl.x1, top: sg.topLineY - 6, h: sg.spacing * 4 + 12 };
+  })();
+  // After writing, the selection moves on; if a note sits where we land, select that note instead.
+  useEffect(() => {
+    if (!restSel || !layout) return;
+    const el = elemAt(restSel.gi, restSel.voice, restSel.t);
+    if (el && !el.rest) {
+      setRestSel(null);
+      useStore.setState({ selectedNoteIds: [...el.noteIds] });
     }
-    return null;
-  };
-  const cursorGeom = mode === 'input' ? geomFor(cursor.t, cursor.staff) : null;
+  });
 
   // ------------------------------------------------------------ export
 
@@ -1195,12 +1261,16 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
           </button>
           <button
             className="pal-btn txt"
-            title="Rest (0)"
+            title="Turn the selected note into a rest (0)"
             onClick={() => {
-              const pl = placementFor(cursor.staff);
-              if (!pl) return;
-              insertRest(pl, cursor.t, effDur, staffRef(cursor.staff)!.staff, voice);
-              setCursor({ t: cursor.t + effDur, staff: cursor.staff });
+              const ids = useStore.getState().selectedNoteIds;
+              if (!ids.length) {
+                toast('Select a note to turn it into a rest');
+                return;
+              }
+              const first = currentElem();
+              notesToRests(ids, staffFnForSelection());
+              if (first) setRestSel({ gi: first.staff, voice: first.voice, t: first.t });
             }}
           >
             Rest
@@ -1309,8 +1379,8 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
         </div>
         <div className="score-hint faint">
           {mode === 'input'
-            ? 'Click to write · click above/below a note to make a chord · click a note to select it · drag empty space to select several · 2–7 note values · ⌥3/⌥5 add 3rd/5th'
-            : 'Click a note to select · drag across notes to select several · drag a note up/down to change pitch · 2–7 change the value · ⌘L lyrics · ⌘K chords'}
+            ? 'Click a rest to write a note there · click above/below a note for a chord · A–G types into the selected rest · 2–7 set the value · ⌥3/⌥5 add 3rd/5th'
+            : 'Click a note or rest to select it · 2–7 change its value · A–G changes a note or fills a rest · Delete leaves a rest · ←/→ step through · drag to select several'}
         </div>
       </div>
       <div className="score-scroll" ref={scrollRef}>
@@ -1329,7 +1399,7 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
                 <div key={'sel' + h.key + h.t} className="score-sel" style={{ left: h.x0 - 2, top: h.y - 6, width: h.x1 - h.x0 + 4 }} />
               ))}
             {box && <div className="score-box" style={{ left: box.x0, top: box.y0, width: box.x1 - box.x0, height: box.y1 - box.y0 }} />}
-            {cursorGeom && <div className="score-cursor" style={{ left: cursorGeom.x - 7, top: cursorGeom.top, height: cursorGeom.h }} />}
+            {restBox && <div className="score-rest-sel" style={{ left: restBox.x0 - 5, top: restBox.top, width: restBox.x1 - restBox.x0 + 10, height: restBox.h }} />}
             {ghost && (
               <>
                 {ghost.ledger.map((y, i) => (
