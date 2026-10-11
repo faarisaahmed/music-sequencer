@@ -264,7 +264,7 @@ export default function HomeScreen() {
                   )}
                   {s.artist && <div className="song-meta song-artist">{s.artist}</div>}
                   <div className="song-meta">
-                    {timeAgo(s.updatedAt)} · {formatDuration((s.lengthBeats * 60) / s.bpm)}
+                    {timeAgo(s.updatedAt)} · {formatDuration(s.seconds ?? (s.lengthBeats * 60) / s.bpm)}
                   </div>
                   <div className="song-meta">
                     {s.bpm} BPM · {keyName(s.key)} · {s.trackCount} track{s.trackCount === 1 ? '' : 's'}

@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { ChevronRight, Download, ImagePlus, MonitorPlay, Trash2 } from 'lucide-react';
 import { closeModal, commit, openModal, toast, useStore } from '../../state/store';
 import { exportProjectFile } from '../../state/actions';
-import { canExport, download, encodeAudio, normalize, projectToMidi, renderProject, safeFileName, type AudioFormat } from '../../audio/export';
+import { canExport, download, encodeAudio, normalize, playSeconds, projectToMidi, renderProject, safeFileName, type AudioFormat } from '../../audio/export';
 import { contentEndBeat } from '../../model/defaults';
 import { formatTime } from '../../model/music';
 import type { SongInfo } from '../../model/types';
 import { Toggle } from '../common/controls';
 import Modal from './Modal';
 import { makeCover } from './coverArt';
+import { hasForm } from '../../model/form';
 import '../mixer/mixer.css';
 import './export.css';
 
@@ -51,8 +52,9 @@ interface Prefs {
   norm: boolean;
   tail: number;
   swing: boolean;
+  repeats: boolean;
 }
-const DEFAULT_PREFS: Prefs = { format: 'mp3', kbps: { mp3: 256, m4a: 256, ogg: 192 }, bits: { wav: 24, flac: 24 }, rate: 44100, norm: true, tail: 2.5, swing: true };
+const DEFAULT_PREFS: Prefs = { format: 'mp3', kbps: { mp3: 256, m4a: 256, ogg: 192 }, bits: { wav: 24, flac: 24 }, rate: 44100, norm: true, tail: 2.5, swing: true, repeats: true };
 const PREFS_KEY = 'bf.export';
 
 function loadPrefs(): Prefs {
@@ -103,7 +105,7 @@ export default function ExportDialog() {
   const end = Math.max(contentEndBeat(p), 4);
   const start = range === 'cycle' ? p.loop.start : 0;
   const stop = range === 'cycle' ? p.loop.end : end;
-  const seconds = ((stop - start) * 60) / p.bpm + (audio ? prefs.tail : 0);
+  const seconds = playSeconds(p, start, stop) + (audio ? prefs.tail : 0);
   const noteTracks = p.tracks.filter((t) => t.type !== 'audio' && t.regions.some((r) => r.kind === 'midi' && r.notes.length));
   const chosenMidi = midiTracks ?? noteTracks.map((t) => t.id);
   const file = safeFileName(name);
@@ -118,7 +120,7 @@ export default function ExportDialog() {
   const run = async () => {
     try {
       if (format === 'midi') {
-        download(await projectToMidi(p, { swing: prefs.swing, trackIds: chosenMidi }), file + '.mid');
+        download(await projectToMidi(p, { swing: prefs.swing, trackIds: chosenMidi, repeats: prefs.repeats }), file + '.mid');
       } else if (format === 'project') {
         setBusy({ label: 'Packing project…', f: 0.5 });
         download(await exportProjectFile(p), file + '.bandforge.json');
@@ -284,6 +286,19 @@ export default function ExportDialog() {
                   As written
                 </button>
               </div>
+              {hasForm(p) && (
+                <>
+                  <span className="label">Repeats</span>
+                  <div className="seg export-seg">
+                    <button className={prefs.repeats ? 'on' : ''} onClick={() => update({ repeats: true })} title="Repeats, endings and D.S./D.C. are written out in full, as they play">
+                      Played out
+                    </button>
+                    <button className={!prefs.repeats ? 'on' : ''} onClick={() => update({ repeats: false })} title="Each bar once, as written">
+                      Written once
+                    </button>
+                  </div>
+                </>
+              )}
               <span className="label export-top">Tracks</span>
               <div className="export-tracks">
                 {noteTracks.length === 0 && <span className="dim">No tracks with notes yet.</span>}

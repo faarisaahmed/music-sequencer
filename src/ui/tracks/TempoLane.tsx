@@ -2,7 +2,7 @@
 // and time-signature flags at bar lines. Tap anything to edit it.
 import { useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Gauge, Plus, Trash2 } from 'lucide-react';
+import { Gauge, Plus, Repeat, Trash2 } from 'lucide-react';
 import { beginGesture, endGesture, useStore } from '../../state/store';
 import { meterOf, tempoOf } from '../../model/timeline';
 import { snap } from '../../model/music';
@@ -24,10 +24,15 @@ import { showContextMenu, type MenuItem } from '../common/menus';
 import { Toggle } from '../common/controls';
 import { isPhone } from '../mobile/device';
 import { Sheet } from '../mobile/Sheet';
+import { hasForm } from '../../model/form';
+import { addEndings, deleteNav, deleteVolta, navLabel, repeatBars, setPlayRepeats, setRepeatTimes, setVoltaLength, setVoltaNumbers, toggleNav } from '../../state/formActions';
+import type { NavMark, Volta } from '../../model/types';
 import { getEngine } from '../../audio/engine';
 
-const LANE_H = 60;
-const PAD = 9;
+const LANE_H = 76;
+/** Top band: repeats, endings and jumps. */
+const FORM_H = 18;
+const PAD = FORM_H + 8;
 /** Room at the bottom of the lane for the time-signature flags. */
 const FLAGS_H = 20;
 export const METERS: [number, number][] = [
@@ -156,6 +161,7 @@ export default function TempoLane({ width, ppb }: { width: number; ppb: number }
         label: `Time Signature from Bar ${bar.bar + 1}`,
         submenu: METERS.map((m) => ({ label: `${m[0]}/${m[1]}`, onClick: () => setMeterFrom(bar.start, m) })),
       },
+      { label: `Repeats & Jumps at Bar ${bar.bar + 1}`, submenu: formMenu(bar.bar) },
     ];
   };
 
@@ -166,7 +172,16 @@ export default function TempoLane({ width, ppb }: { width: number; ppb: number }
     <div className="tempo-row">
       <div className="tempo-corner">
         <Gauge size={14} className="dim" />
-        <span>Tempo &amp; Time</span>
+        <span title="Tempo, time signature, repeats and endings">Tempo &amp; Form</span>
+        {hasForm(project) && (
+          <button
+            className={'btn ghost icon sm' + (project.playRepeats === false ? '' : ' active')}
+            title={project.playRepeats === false ? 'Repeats are ignored when playing. Click to follow them' : 'Playing follows the repeats and jumps. Click to play straight through'}
+            onClick={() => setPlayRepeats(project.playRepeats === false)}
+          >
+            <Repeat size={13} />
+          </button>
+        )}
         <button
           className="btn ghost icon sm"
           title="Add a tempo or time signature change at the playhead"
@@ -187,8 +202,10 @@ export default function TempoLane({ width, ppb }: { width: number; ppb: number }
         onContextMenu={(e) => showContextMenu(e, laneMenu(e.clientX))}
       >
         <svg width={width} height={LANE_H} className="tempo-svg">
+          <line x1={0} x2={width} y1={FORM_H + 0.5} y2={FORM_H + 0.5} className="form-sep" />
           <path d={d} className="tempo-line" />
         </svg>
+        <FormMarks ppb={ppb} />
         <div
           className="tempo-pt base"
           style={{ left: 0, top: yOf(project.bpm) }}
@@ -345,5 +362,99 @@ function MeterEditor({ bar, project, onClose }: { bar: number; project: Project;
       )}
       <div className="faint tempo-edit-note">Notes stay where they are; the bar lines move around them.</div>
     </div>
+  );
+}
+
+/** Everything you can put at a bar: repeats, endings, segno/coda and the jumps. */
+export function formMenu(bar: number): MenuItem[] {
+  const p = useStore.getState().project!;
+  const has = (k: NavMark['kind']) => (p.navMarks ?? []).some((m) => m.kind === k && m.bar === bar);
+  const tick = (on: boolean, label: string) => (on ? `${label}  ✓` : label);
+  return [
+    { label: 'Repeat This Bar', onClick: () => repeatBars(bar, bar) },
+    { label: tick(has('repeatStart'), 'Start Repeat (|:) Here'), onClick: () => toggleNav('repeatStart', bar) },
+    { label: tick(has('repeatEnd'), 'End Repeat (:|) After This Bar'), onClick: () => toggleNav('repeatEnd', bar) },
+    {
+      label: '1st & 2nd Endings From Here',
+      submenu: [1, 2, 4].map((n) => ({ label: `${n} bar${n > 1 ? 's' : ''} each`, onClick: () => addEndings(bar, n) })),
+    },
+    { separator: true },
+    { label: tick(has('segno'), 'Segno Here'), onClick: () => toggleNav('segno', bar) },
+    { label: tick(has('coda'), 'Coda Starts Here'), onClick: () => toggleNav('coda', bar) },
+    { label: tick(has('toCoda'), 'To Coda After This Bar'), onClick: () => toggleNav('toCoda', bar) },
+    { label: tick(has('fine'), 'Fine After This Bar'), onClick: () => toggleNav('fine', bar) },
+    {
+      label: 'Jump After This Bar',
+      submenu: (
+        [
+          ['dc', 'end'],
+          ['dc', 'fine'],
+          ['dc', 'coda'],
+          ['ds', 'end'],
+          ['ds', 'fine'],
+          ['ds', 'coda'],
+        ] as const
+      ).map(([kind, until]) => ({ label: navLabel({ kind, until }), onClick: () => toggleNav(kind, bar, { until }) })),
+    },
+  ];
+}
+
+/** Repeat signs, jumps and ending brackets in the lane's top band. */
+function FormMarks({ ppb }: { ppb: number }) {
+  const project = useStore((s) => s.project)!;
+  const meter = meterOf(project);
+  const marks = project.navMarks ?? [];
+  const voltas = project.voltas ?? [];
+  const atEnd = (m: NavMark) => m.kind === 'repeatEnd' || m.kind === 'toCoda' || m.kind === 'fine' || m.kind === 'dc' || m.kind === 'ds';
+  const markMenu = (m: NavMark): MenuItem[] => [
+    { title: navLabel(m) },
+    ...(m.kind === 'repeatEnd'
+      ? [{ label: 'Play the Passage', submenu: [2, 3, 4, 5, 6].map((n) => ({ label: `${n} times${(m.times ?? 2) === n ? '  ✓' : ''}`, onClick: () => setRepeatTimes(m.id, n) })) }]
+      : []),
+    { label: 'Remove', icon: <Trash2 size={14} />, onClick: () => deleteNav(m.id) },
+  ];
+  const voltaMenu = (v: Volta): MenuItem[] => [
+    { title: `Ending ${v.numbers.join(', ')}` },
+    { label: 'Played On', submenu: [[1], [2], [3], [1, 2], [1, 2, 3], [2, 3]].map((ns) => ({ label: ns.join(', ') + (ns.join() === v.numbers.join() ? '  ✓' : ''), onClick: () => setVoltaNumbers(v.id, ns) })) },
+    { label: 'Length', submenu: [1, 2, 3, 4, 8].map((n) => ({ label: `${n} bar${n > 1 ? 's' : ''}${v.end - v.start === n ? '  ✓' : ''}`, onClick: () => setVoltaLength(v.id, n) })) },
+    { label: 'Remove', icon: <Trash2 size={14} />, onClick: () => deleteVolta(v.id) },
+  ];
+  return (
+    <>
+      {voltas.map((v) => {
+        const x0 = meter.barStart(v.start) * ppb;
+        const x1 = meter.barStart(v.end) * ppb;
+        return (
+          <div
+            key={v.id}
+            className="volta"
+            style={{ left: x0 + 1, width: Math.max(14, x1 - x0 - 3) }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => showContextMenu(e, voltaMenu(v))}
+            onContextMenu={(e) => showContextMenu(e, voltaMenu(v))}
+            title={`Ending ${v.numbers.join(', ')}: played on pass ${v.numbers.join(' and ')}`}
+          >
+            {v.numbers.join(', ')}.
+          </div>
+        );
+      })}
+      {marks.map((m) => {
+        const x = meter.barStart(atEnd(m) ? m.bar + 1 : m.bar) * ppb;
+        const label = m.kind === 'repeatStart' ? '|:' : m.kind === 'repeatEnd' ? `:|${(m.times ?? 2) > 2 ? ' ×' + m.times : ''}` : navLabel(m);
+        return (
+          <div
+            key={m.id}
+            className={'nav-mark ' + m.kind + (atEnd(m) ? ' end' : '')}
+            style={{ left: x }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => showContextMenu(e, markMenu(m))}
+            onContextMenu={(e) => showContextMenu(e, markMenu(m))}
+            title={navLabel(m) + ': click for options'}
+          >
+            {label}
+          </div>
+        );
+      })}
+    </>
   );
 }

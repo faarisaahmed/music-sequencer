@@ -10,15 +10,17 @@ import {
   GraceNoteGroup,
   Modifier,
   Renderer,
+  Repetition,
   Stave,
   StaveConnector,
   StaveNote,
   StaveTie,
   Tuplet,
   Voice,
+  VoltaType,
   SVGContext,
 } from 'vexflow';
-import type { Articulation as Artic, KeySignature } from '../../../model/types';
+import type { Articulation as Artic, KeySignature, NavMark, Volta } from '../../../model/types';
 import { LETTERS, durCode, keyAlters, spell, diatonicIndex, vexKeySpec, type Clef, type Piece, type ScoreModel } from './notation';
 import { measureAt } from './notation';
 
@@ -130,6 +132,8 @@ export interface RenderOpts {
   title?: string;
   subtitle?: string;
   tempo?: number;
+  /** Repeats, endings and jumps; `barOffset` is the song bar of the score's first measure. */
+  form?: { marks: NavMark[]; voltas: Volta[]; barOffset: number };
   /** Tempo changes (display beats): drawn as ♩ = 90, or accel./rit. for gradual ones. */
   tempoMarks?: { t: number; bpm: number; ramp?: boolean; faster?: boolean }[];
   chords: ChordLabel[];
@@ -407,6 +411,7 @@ function drawSystem(ctx: DrawCtx, plan: ScorePlan, li: number, layout: ScoreLayo
           if (si === 0) st.setMeasure(opts.firstBarNumber + m);
         } else if (sigChanged) st.addTimeSignature(`${mm.sig[0]}/${mm.sig[1]}`);
         if (m === model.measures.length - 1) st.setEndBarType(BarlineType.END);
+        if (opts.form) applyForm(st, opts.form, opts.form.barOffset + m, si === 0, m === model.measures.length - 1);
         st.setContext(ctx);
         return st;
       });
@@ -915,4 +920,26 @@ export function beatToX(mg: MeasureGeom, t: number, bpb: number): number {
     if (t <= b.t) return a.x + ((t - a.t) / (b.t - a.t)) * (b.x - a.x);
   }
   return mg.noteX1;
+}
+
+/** Repeat barlines, ending brackets and Segno / Coda / D.S. / Fine on one measure's stave. */
+function applyForm(st: Stave, form: NonNullable<RenderOpts['form']>, bar: number, top: boolean, last: boolean): void {
+  const has = (k: NavMark['kind']) => form.marks.find((m) => m.kind === k && m.bar === bar);
+  if (has('repeatStart')) st.setBegBarType(BarlineType.REPEAT_BEGIN);
+  if (has('repeatEnd')) st.setEndBarType(BarlineType.REPEAT_END);
+  else if (!last && (has('fine') || has('dc') || has('ds'))) st.setEndBarType(BarlineType.DOUBLE);
+  if (!top) return;
+  const v = form.voltas.find((x) => bar >= x.start && bar < x.end);
+  if (v) {
+    const one = v.end - v.start === 1;
+    const type = one ? VoltaType.BEGIN_END : bar === v.start ? VoltaType.BEGIN : bar === v.end - 1 ? VoltaType.END : VoltaType.MID;
+    st.setVoltaType(type, bar === v.start ? `${v.numbers.join(', ')}.` : '', -6);
+  }
+  const R = Repetition.type;
+  if (has('segno')) st.setRepetitionType(R.SEGNO_LEFT);
+  if (has('coda')) st.setRepetitionType(R.CODA_LEFT);
+  if (has('toCoda')) st.setRepetitionType(R.TO_CODA);
+  if (has('fine')) st.setRepetitionType(R.FINE);
+  const j = has('dc') ?? has('ds');
+  if (j) st.setRepetitionType(j.kind === 'dc' ? (j.until === 'fine' ? R.DC_AL_FINE : j.until === 'coda' ? R.DC_AL_CODA : R.DC) : j.until === 'fine' ? R.DS_AL_FINE : j.until === 'coda' ? R.DS_AL_CODA : R.DS);
 }

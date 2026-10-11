@@ -8,6 +8,8 @@ import type { Articulation, MidiRegion, Note, Project, Track } from '../../model
 import { beginGesture, endGesture, findRegion, live, useStore, useTransport, toast } from '../../state/store';
 import { noteName } from '../../model/music';
 import { meterOf } from '../../model/timeline';
+import { formMenu } from '../tracks/TempoLane';
+import { showContextMenu } from '../common/menus';
 import { placedNotes } from '../../model/regions';
 import { getPreset } from '../../audio/presets';
 import { getEngine } from '../../audio/engine';
@@ -47,6 +49,7 @@ import {
   type ScoreLayout,
   type ScorePlan,
 } from './score/render';
+import type { RenderOpts } from './score/render';
 import {
   addBars,
   addDynamic,
@@ -137,6 +140,11 @@ interface Source {
 
 function rawFromNote(n: Note, regionId: string, s: number, e: number, key: string): RawNote {
   return { id: n.id, key, regionId, pitch: n.pitch, s, e, vel: n.velocity, voice: n.voice, artic: n.artic, lyric: n.lyric, grace: n.grace };
+}
+
+function formFor(project: Project, src: Source): RenderOpts['form'] {
+  if (!project.navMarks?.length && !project.voltas?.length) return undefined;
+  return { marks: project.navMarks ?? [], voltas: project.voltas ?? [], barOffset: src.firstBar - 1 };
 }
 
 /** The song's tempo changes in the score's own beats (only those inside what it shows). */
@@ -422,6 +430,7 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
         title: full ? project.name : undefined,
         tempo: full ? project.bpm : undefined,
         tempoMarks: tempoMarksFor(project, src),
+        form: formFor(project, src),
         chords: src.chords,
         partLabels: src.labels,
       });
@@ -429,7 +438,7 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
       console.error('score layout failed', e);
       return null;
     }
-  }, [src, partKeys, width, zoom, project.timeSig, project.name, project.bpm, project.tempoChanges, showDyn, full]);
+  }, [src, partKeys, width, zoom, project.timeSig, project.name, project.bpm, project.tempoChanges, project.navMarks, project.voltas, showDyn, full]);
   const layout = useMemo(() => (plan ? emptyLayout(plan) : null), [plan]);
 
   useLayoutEffect(() => {
@@ -1178,6 +1187,7 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
       title,
       tempo: project.bpm,
       tempoMarks: tempoMarksFor(project, src),
+      form: formFor(project, src),
       chords: src.chords,
       partLabels: src.labels,
     });
@@ -1221,7 +1231,7 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
   };
   const exportXml = () => {
     if (!src) return;
-    const xml = toMusicXml(src.model, project.name, src.labels, partKeys, project.timeSig, project.bpm, tempoMarksFor(project, src));
+    const xml = toMusicXml(src.model, project.name, src.labels, partKeys, project.timeSig, project.bpm, tempoMarksFor(project, src), formFor(project, src));
     download(new Blob([xml], { type: 'application/vnd.recordare.musicxml+xml' }), `${safeFileName(project.name)}${full ? '' : ' - ' + safeFileName(src.parts[0]?.track.name ?? 'part')}.musicxml`);
   };
 
@@ -1362,6 +1372,27 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
               <path d="M8.4 4 q 4 2.5 3 6.5" stroke="currentColor" strokeWidth="1.2" fill="none" />
               <line x1="4" y1="12" x2="13" y2="6" stroke="currentColor" strokeWidth="1.1" />
               <ellipse cx="15.5" cy="18" rx="3.6" ry="2.6" transform="rotate(-22 15.5 18)" fill="currentColor" opacity="0.45" />
+            </svg>
+          </button>
+        </div>
+        <div className="pal-group">
+          <button
+            className="pal-btn txt repeat-btn"
+            data-tip="Repeats, 1st/2nd endings, Segno, Coda, D.S. and D.C. for the selected measure"
+            onClick={(e) => {
+              if (!src) return;
+              const measure = currentElem()?.measure ?? 0;
+              const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+              showContextMenu({ clientX: r.left, clientY: r.bottom + 4 }, [{ title: `Bar ${src.firstBar + measure}` }, ...formMenu(src.firstBar - 1 + measure)]);
+            }}
+          >
+            <svg width="22" height="22" viewBox="0 0 22 22">
+              <line x1="3" y1="4" x2="3" y2="18" stroke="currentColor" strokeWidth="2.4" />
+              <line x1="6.5" y1="4" x2="6.5" y2="18" stroke="currentColor" strokeWidth="1.1" />
+              <circle cx="10" cy="9" r="1.5" fill="currentColor" />
+              <circle cx="10" cy="13" r="1.5" fill="currentColor" />
+              <path d="M13 6 h6 M13 6 v4" stroke="currentColor" strokeWidth="1.1" fill="none" />
+              <text x="14.2" y="17.5" fontSize="7" fontWeight="700" fill="currentColor">1.</text>
             </svg>
           </button>
         </div>

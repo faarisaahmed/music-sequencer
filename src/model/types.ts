@@ -241,6 +241,12 @@ export interface Project {
   tempoChanges?: TempoChange[];
   /** Time-signature changes at bar lines (the song starts in `timeSig`). */
   meterChanges?: MeterChange[];
+  /** Repeat signs, segno/coda and D.S./D.C. jumps (bar numbers, 0-based). */
+  navMarks?: NavMark[];
+  /** 1st/2nd… ending brackets. */
+  voltas?: Volta[];
+  /** Follow repeats and jumps when playing and exporting (default on). */
+  playRepeats?: boolean;
   /** Release details written into exported files (ID3 / MP4 / Vorbis tags, MIDI meta). */
   info?: SongInfo;
 }
@@ -292,6 +298,30 @@ export interface MeterChange {
   timeSig: [number, number];
 }
 
+export type NavKind = 'repeatStart' | 'repeatEnd' | 'segno' | 'coda' | 'toCoda' | 'fine' | 'dc' | 'ds';
+
+/**
+ * A navigation mark on a bar. repeatStart / segno / coda sit at the start of `bar`;
+ * repeatEnd / toCoda / fine / dc / ds sit at its end.
+ */
+export interface NavMark {
+  id: string;
+  kind: NavKind;
+  bar: number;
+  /** repeatEnd: how many times the passage plays in total (default 2). */
+  times?: number;
+  /** dc / ds: where the repeat goes on to after the jump. */
+  until?: 'end' | 'fine' | 'coda';
+}
+
+/** An ending bracket over bars [start, end): played on the listed passes. */
+export interface Volta {
+  id: string;
+  start: number;
+  end: number;
+  numbers: number[];
+}
+
 export interface Section {
   id: string;
   name: string;
@@ -312,5 +342,7 @@ export interface ProjectMeta {
   lengthBeats: number;
   /** Album cover thumbnail (data URL). */
   cover?: string;
+  /** Length in seconds (follows tempo changes). */
+  seconds?: number;
   artist?: string;
 }

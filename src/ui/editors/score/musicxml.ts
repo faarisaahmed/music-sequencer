@@ -1,4 +1,5 @@
 // MusicXML (partwise 3.1) export of a ScoreModel: parts, staves, voices, triplets, ties, lyrics, articulations, dynamics.
+import type { NavMark, Volta } from '../../../model/types';
 import { measureAt } from './notation';
 import type { KeySignature } from '../../../model/types';
 import { C_MAJOR, LETTERS, keyFifths, spell, type Clef, type ScoreModel } from './notation';
@@ -44,7 +45,16 @@ function tempoBefore(tempos: TempoMark[], base: number, t: number): number {
   return v;
 }
 
-export function toMusicXml(model: ScoreModel, title: string, partNames: string[], partKeys: KeySignature[], _timeSig: [number, number], bpm: number, tempos: TempoMark[] = []): string {
+export function toMusicXml(
+  model: ScoreModel,
+  title: string,
+  partNames: string[],
+  partKeys: KeySignature[],
+  _timeSig: [number, number],
+  bpm: number,
+  tempos: TempoMark[] = [],
+  form?: { marks: NavMark[]; voltas: Volta[]; barOffset: number },
+): string {
   const out: string[] = [];
   out.push('<?xml version="1.0" encoding="UTF-8" standalone="no"?>');
   out.push('<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">');
@@ -72,6 +82,20 @@ export function toMusicXml(model: ScoreModel, title: string, partNames: string[]
 
     model.measures.forEach((m, mi) => {
       out.push(`<measure number="${mi + 1}">`);
+      const bar = (form?.barOffset ?? 0) + mi;
+      const fm = (k: NavMark['kind']) => form?.marks.find((x) => x.kind === k && x.bar === bar);
+      const volta = form?.voltas.find((v) => bar >= v.start && bar < v.end);
+      // Left barline: forward repeat and/or an ending bracket starting here.
+      if (fm('repeatStart') || (volta && volta.start === bar)) {
+        out.push('<barline location="left">');
+        if (fm('repeatStart')) out.push('<bar-style>heavy-light</bar-style><repeat direction="forward"/>');
+        if (volta && volta.start === bar) out.push(`<ending number="${volta.numbers.join(', ')}" type="start">${volta.numbers.join(', ')}.</ending>`);
+        out.push('</barline>');
+      }
+      if (pi === 0) {
+        if (fm('segno')) out.push('<direction placement="above"><direction-type><segno/></direction-type><sound segno="s1"/></direction>');
+        if (fm('coda')) out.push('<direction placement="above"><direction-type><coda/></direction-type><sound coda="c1"/></direction>');
+      }
       const prevSig = mi > 0 ? model.measures[mi - 1].sig : null;
       if (mi > 0 && prevSig && (prevSig[0] !== m.sig[0] || prevSig[1] !== m.sig[1])) out.push(`<attributes><time><beats>${m.sig[0]}</beats><beat-type>${m.sig[1]}</beat-type></time></attributes>`);
       if (pi === 0)
@@ -167,6 +191,28 @@ export function toMusicXml(model: ScoreModel, title: string, partNames: string[]
         });
       });
       if (mi === model.measures.length - 1) out.push('<barline location="right"><bar-style>light-heavy</bar-style></barline>');
+      if (form) {
+        const bar = form.barOffset + mi;
+        const fm = (k: NavMark['kind']) => form.marks.find((x) => x.kind === k && x.bar === bar);
+        if (pi === 0) {
+          if (fm('toCoda')) out.push('<direction placement="above"><direction-type><words>To Coda</words></direction-type><sound tocoda="c1"/></direction>');
+          if (fm('fine')) out.push('<direction placement="below"><direction-type><words>Fine</words></direction-type><sound fine="yes"/></direction>');
+          const j = fm('dc') ?? fm('ds');
+          if (j) {
+            const words = j.kind === 'dc' ? (j.until === 'fine' ? 'D.C. al Fine' : j.until === 'coda' ? 'D.C. al Coda' : 'D.C.') : j.until === 'fine' ? 'D.S. al Fine' : j.until === 'coda' ? 'D.S. al Coda' : 'D.S.';
+            out.push(`<direction placement="below"><direction-type><words>${words}</words></direction-type><sound ${j.kind === 'dc' ? 'dacapo="yes"' : 'dalsegno="s1"'}/></direction>`);
+          }
+        }
+        const volta = form.voltas.find((v) => bar >= v.start && bar < v.end);
+        const rep = fm('repeatEnd');
+        if (rep || (volta && volta.end - 1 === bar)) {
+          out.push('<barline location="right">');
+          if (rep) out.push('<bar-style>light-heavy</bar-style>');
+          if (volta && volta.end - 1 === bar) out.push(`<ending number="${volta.numbers.join(', ')}" type="${rep ? 'stop' : 'discontinue'}"/>`);
+          if (rep) out.push(`<repeat direction="backward"${(rep.times ?? 2) > 2 ? ` times="${rep.times}"` : ''}/>`);
+          out.push('</barline>');
+        }
+      }
       out.push('</measure>');
     });
     out.push('</part>');

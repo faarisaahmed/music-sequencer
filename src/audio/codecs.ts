@@ -5,12 +5,32 @@ import { placedNotes } from '../model/regions';
 import { applyGroove, grooveFor } from '../model/groove';
 import { gmProgram } from '../model/gm';
 import { meterOf, tempoOf } from '../model/timeline';
+import { formActive, playSpans } from '../model/form';
 
 export interface MidiExportOptions {
   /** Write swing into the note timing (what you hear) instead of the straight written notes. */
   swing?: boolean;
   /** Only these tracks (default: every instrument and drum track). */
   trackIds?: string[];
+  /** Write repeats out in full (default) or only once, as written. */
+  repeats?: boolean;
+}
+
+/** Song beats [from, to) written at `out` in the file: the play order with repeats unrolled. */
+interface Piece {
+  from: number;
+  to: number;
+  out: number;
+}
+
+function midiPieces(p: Project, opts: MidiExportOptions): Piece[] {
+  if (opts.repeats === false || !formActive(p)) return [{ from: 0, to: Infinity, out: 0 }];
+  let out = 0;
+  return playSpans(p, Math.max(p.lengthBars, 1)).map((s) => {
+    const pc = { from: s.from, to: s.to, out };
+    out += s.to - s.from;
+    return pc;
+  });
 }
 
 // Sharps/flats for each major key, indexed by tonic pitch class.
@@ -20,18 +40,36 @@ const SF_KEYS = ['Cb', 'Gb', 'Db', 'Ab', 'Eb', 'Bb', 'F', 'C', 'G', 'D', 'A', 'E
 export function projectToMidi(p: Project, opts: MidiExportOptions = {}): Blob {
   const midi = new Midi();
   const ppq = midi.header.ppq;
-  midi.header.setTempo(p.bpm);
-  // Tempo changes; gradual ones become a step every eighth note (how MIDI files store them).
+  const pieces = midiPieces(p, opts);
+  const tick = (pc: Piece, beat: number) => Math.max(0, Math.round((pc.out + beat - pc.from) * ppq));
+  // Tempo: the tempo at each piece's start, then the changes inside it. Gradual changes become
+  // a step every eighth note (how MIDI files store them).
   const tm = tempoOf(p);
-  for (const c of [...(p.tempoChanges ?? [])].sort((a, b) => a.beat - b.beat)) {
-    if (c.ramp) {
-      const prevBeat = Math.max(0, ...(p.tempoChanges ?? []).filter((x) => x.beat < c.beat).map((x) => x.beat));
-      for (let b = prevBeat + 0.5; b < c.beat - 1e-6; b += 0.5) midi.header.tempos.push({ ticks: Math.round(b * ppq), bpm: tm.bpmAt(b) });
+  const changes = [...(p.tempoChanges ?? [])].sort((a, b) => a.beat - b.beat);
+  midi.header.tempos = [];
+  for (const pc of pieces) {
+    midi.header.tempos.push({ ticks: tick(pc, pc.from), bpm: tm.bpmAt(pc.from) });
+    for (const c of changes) {
+      if (c.ramp) {
+        const prevBeat = Math.max(0, ...changes.filter((x) => x.beat < c.beat).map((x) => x.beat));
+        for (let b = prevBeat + 0.5; b < c.beat - 1e-6; b += 0.5) if (b > pc.from + 1e-9 && b < pc.to) midi.header.tempos.push({ ticks: tick(pc, b), bpm: tm.bpmAt(b) });
+      }
+      if (c.beat > pc.from + 1e-9 && c.beat < pc.to) midi.header.tempos.push({ ticks: tick(pc, c.beat), bpm: c.bpm });
     }
-    midi.header.tempos.push({ ticks: Math.round(c.beat * ppq), bpm: c.bpm });
   }
+  // Time signatures at each piece's start (when it differs) and where they change inside it.
   const meter = meterOf(p);
-  for (const seg of meter.segs) midi.header.timeSignatures.push({ ticks: Math.round(seg.beat * ppq), timeSignature: [seg.sig[0], seg.sig[1]] });
+  let lastSig = '';
+  const pushSig = (ticks: number, sig: [number, number]) => {
+    const k = sig.join('/');
+    if (k === lastSig) return;
+    lastSig = k;
+    midi.header.timeSignatures.push({ ticks, timeSignature: [sig[0], sig[1]] });
+  };
+  for (const pc of pieces) {
+    pushSig(tick(pc, pc.from), meter.sigAt(pc.from));
+    for (const seg of meter.segs) if (seg.beat > pc.from + 1e-9 && seg.beat < pc.to) pushSig(tick(pc, seg.beat), seg.sig);
+  }
   midi.header.name = p.name;
   const minor = p.key.mode === 'minor';
   const sf = SF[(p.key.tonic + (minor ? 3 : 0)) % 12];
@@ -47,7 +85,7 @@ export function projectToMidi(p: Project, opts: MidiExportOptions = {}): Blob {
     ['Comment', info.comment],
   ] as const)
     if (v) midi.header.meta.push({ ticks: 0, type: 'text', text: `${label}: ${v}` });
-  for (const sec of p.sections ?? []) midi.header.meta.push({ ticks: Math.round(sec.start * ppq), type: 'marker', text: sec.name });
+  for (const pc of pieces) for (const sec of p.sections ?? []) if (sec.start >= pc.from - 1e-9 && sec.start < pc.to) midi.header.meta.push({ ticks: tick(pc, sec.start), type: 'marker', text: sec.name });
   midi.header.update();
 
   let channel = 0;
@@ -70,12 +108,16 @@ export function projectToMidi(p: Project, opts: MidiExportOptions = {}): Blob {
       const groove = opts.swing === false ? undefined : grooveFor(p, r);
       for (const pn of placedNotes(r)) {
         const at = groove ? applyGroove(pn.note, pn.start, pn.duration, groove) : pn;
-        mt.addNote({
-          midi: Math.max(0, Math.min(127, pn.note.pitch + (t.type === 'drums' ? 0 : t.transpose))),
-          ticks: Math.max(0, Math.round(at.start * ppq)),
-          durationTicks: Math.max(1, Math.round(at.duration * ppq)),
-          velocity: pn.note.velocity,
-        });
+        // Each time the play order passes this note (repeats), write it again.
+        for (const pc of pieces) {
+          if (pn.start < pc.from - 1e-9 || pn.start >= pc.to - 1e-9) continue;
+          mt.addNote({
+            midi: Math.max(0, Math.min(127, pn.note.pitch + (t.type === 'drums' ? 0 : t.transpose))),
+            ticks: tick(pc, at.start),
+            durationTicks: Math.max(1, Math.round(Math.min(at.duration, pc.to - pn.start) * ppq)),
+            velocity: pn.note.velocity,
+          });
+        }
       }
     }
   }

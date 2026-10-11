@@ -2,6 +2,7 @@
 import type { Project } from '../model/types';
 import { keyName } from '../model/music';
 import { contentEndBeat } from '../model/defaults';
+import { tempoOf } from '../model/timeline';
 
 function stamp(sec: number): string {
   const s = Math.floor(sec);
@@ -16,13 +17,13 @@ function stamp(sec: number): string {
  * is at 0:00, there are at least three, and each lasts 10 seconds or more.
  */
 export function chapters(p: Project): { at: number; name: string }[] {
-  const spb = 60 / p.bpm;
-  const end = contentEndBeat(p) * spb;
-  const secs = [...(p.sections ?? [])].filter((s) => s.start * spb < end - 1).sort((a, b) => a.start - b.start);
+  const tm = tempoOf(p);
+  const end = tm.sec(contentEndBeat(p));
+  const secs = [...(p.sections ?? [])].filter((s) => tm.sec(s.start) < end - 1).sort((a, b) => a.start - b.start);
   if (!secs.length) return [];
   const out: { at: number; name: string }[] = [];
   for (const s of secs) {
-    const at = s.start * spb;
+    const at = tm.sec(s.start);
     const prev = out[out.length - 1];
     if (prev && at - prev.at < 10) continue; // too short to be its own chapter
     out.push({ at, name: s.name.trim() || 'Section' });

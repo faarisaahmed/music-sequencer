@@ -9,6 +9,7 @@ import TrackRow, { useArmedMic } from './TrackRow';
 import AutomationLane from './AutomationLane';
 import ArrangementLane from './ArrangementLane';
 import TempoLane from './TempoLane';
+import { hasForm } from '../../model/form';
 import ChordLane, { ChordToggleButton } from '../assistant/ChordLane';
 import { HEADER_W, RULER_H, useTracksUi } from './tracksUi';
 import { meterOf, type Meter } from '../../model/timeline';
@@ -395,7 +396,7 @@ export default function TracksView() {
           </div>
 
           {showArrangement && <ArrangementLane width={width} ppb={ppb} />}
-          {(showTempo || (project.tempoChanges?.length ?? 0) > 0 || (project.meterChanges?.length ?? 0) > 0) && <TempoLane width={width} ppb={ppb} />}
+          {(showTempo || (project.tempoChanges?.length ?? 0) > 0 || (project.meterChanges?.length ?? 0) > 0 || hasForm(project)) && <TempoLane width={width} ppb={ppb} />}
           <ChordLane width={width} ppb={ppb} />
 
           {showMaster && (
@@ -483,12 +484,12 @@ function laneGrid(meter: Meter, ppb: number, width: number): Record<string, stri
 function TempoToggleButton() {
   const project = useStore((s) => s.project)!;
   const show = useTracksUi((s) => s.showTempo);
-  const has = (project.tempoChanges?.length ?? 0) > 0 || (project.meterChanges?.length ?? 0) > 0;
+  const has = (project.tempoChanges?.length ?? 0) > 0 || (project.meterChanges?.length ?? 0) > 0 || hasForm(project);
   return (
     <button
       className={'btn sm' + (show || has ? ' active' : '')}
       onClick={() => !has && useTracksUi.setState({ showTempo: !show })}
-      title={has ? 'This song changes tempo or time signature, so the lane stays visible' : 'Show the tempo & time signature lane: speed up, slow down or change meter during the song'}
+      title={has ? 'This song has tempo, time-signature or repeat marks, so the lane stays visible' : 'Show the Tempo & Form lane: tempo and time-signature changes, repeats, endings and D.S./D.C.'}
     >
       <Gauge size={13} /> Tempo
     </button>

@@ -1,4 +1,5 @@
 // Project storage in IndexedDB with debounced autosave.
+import { tempoOf } from '../model/timeline';
 import { get, set, del, createStore } from 'idb-keyval';
 import type { Project, ProjectMeta } from '../model/types';
 import { contentEndBeat } from '../model/defaults';
@@ -23,6 +24,7 @@ function metaOf(p: Project): ProjectMeta {
     createdAt: p.createdAt,
     coverHue: p.coverHue ?? 200,
     lengthBeats: contentEndBeat(p),
+    seconds: tempoOf(p).sec(contentEndBeat(p)),
     cover: p.info?.coverThumb,
     artist: p.info?.artist || undefined,
   };

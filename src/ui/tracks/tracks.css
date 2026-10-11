@@ -815,7 +815,7 @@
 
 .tempo-row {
   display: flex;
-  height: 60px;
+  height: 76px;
   flex-shrink: 0;
 }
 .tempo-corner {
@@ -967,4 +967,48 @@ html.touch .tempo-pt::after {
 }
 .tempo-edit-note {
   font-size: 11px;
+}
+
+.form-sep {
+  stroke: rgba(255, 255, 255, 0.05);
+}
+.nav-mark {
+  position: absolute;
+  top: 2px;
+  height: 14px;
+  line-height: 14px;
+  padding: 0 4px;
+  border-radius: 3px;
+  font: 700 10px var(--font);
+  white-space: nowrap;
+  cursor: pointer;
+  z-index: 4;
+  background: rgba(191, 90, 242, 0.22);
+  color: #e3b8ff;
+  border-left: 2px solid var(--purple);
+}
+.nav-mark.end {
+  transform: translateX(-100%);
+  border-left: none;
+  border-right: 2px solid var(--purple);
+}
+.nav-mark.repeatStart,
+.nav-mark.repeatEnd {
+  font-family: var(--mono);
+  background: rgba(50, 208, 230, 0.18);
+  color: var(--cyan);
+  border-color: var(--cyan);
+}
+.volta {
+  position: absolute;
+  top: 3px;
+  height: 13px;
+  border-top: 1.5px solid #e3b8ff;
+  border-left: 1.5px solid #e3b8ff;
+  color: #e3b8ff;
+  font: 700 10px var(--font);
+  padding-left: 4px;
+  line-height: 13px;
+  cursor: pointer;
+  z-index: 3;
 }

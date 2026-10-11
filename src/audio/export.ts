@@ -1,7 +1,8 @@
 // Offline rendering and file export (MP3, M4A, FLAC, WAV, OGG, MIDI).
 import type { Project } from '../model/types';
 import { contentEndBeat } from '../model/defaults';
-import { tempoOf } from '../model/timeline';
+import { meterOf, tempoOf } from '../model/timeline';
+import { formActive, playSpans, type PlaySpan } from '../model/form';
 import { Mixer } from './mixer';
 import { scheduleRange } from './schedule';
 import { encodeWav } from './wav';
@@ -24,7 +25,10 @@ export async function renderProject(p: Project, opts: RenderOptions = {}): Promi
   const tm = tempoOf(p);
   const sr = opts.sampleRate ?? 44100;
   const tail = opts.tail ?? 2.5;
-  const seconds = tm.span(start, end) + tail;
+  // The bars in play order (repeats, endings, D.S./D.C.), clipped to the range.
+  const pieces = renderPieces(p, start, end);
+  const pieceSec = pieces.map((pc) => tm.span(pc.from, pc.to));
+  const seconds = pieceSec.reduce((a, b) => a + b, 0) + tail;
   // Only build and schedule tracks that can actually be heard (muted/un-soloed tracks
   // cost render time but contribute nothing).
   const anySolo = p.tracks.some((t) => t.solo);
@@ -37,19 +41,32 @@ export async function renderProject(p: Project, opts: RenderOptions = {}): Promi
   mixer.sync(proj);
   await mixer.ready();
   const offset = 0.05;
-  const s0 = tm.sec(start);
-  const toTime = (b: number) => offset + tm.sec(b) - s0;
-  const beatAt = (t: number) => Math.min(end, Math.max(start, tm.beat(s0 + t - offset)));
+  // When each piece starts in the rendered file.
+  const pieceAt: number[] = [];
+  pieceSec.reduce((acc, s, i) => ((pieceAt[i] = acc), acc + s), offset);
   // Schedule incrementally (like live playback) instead of all at once: Chrome's offline
   // renderer pays for every pending node on every render quantum, so pre-scheduling a
   // whole song makes long exports many times slower.
   const CHUNK = 1.5; // seconds
-  let scheduledTo = start;
+  let pi = 0;
+  let scheduledTo = pieces[0]?.from ?? start;
+  let fresh = true;
   const scheduleUntil = (t: number) => {
-    const b1 = beatAt(t);
-    if (b1 <= scheduledTo) return;
-    scheduleRange(proj, mixer, scheduledTo, b1, toTime, { fresh: scheduledTo === start, limit: end });
-    scheduledTo = b1;
+    while (pi < pieces.length) {
+      const pc = pieces[pi];
+      const s0 = tm.sec(pc.from);
+      const toTime = (b: number) => pieceAt[pi] + tm.sec(b) - s0;
+      const b1 = Math.min(pc.to, Math.max(pc.from, tm.beat(s0 + t - pieceAt[pi])));
+      if (b1 > scheduledTo) {
+        scheduleRange(proj, mixer, scheduledTo, b1, toTime, { fresh, limit: pc.to });
+        fresh = false;
+        scheduledTo = b1;
+      }
+      if (b1 < pc.to - 1e-9) return;
+      pi++;
+      scheduledTo = pieces[pi]?.from ?? end;
+      fresh = true;
+    }
   };
   scheduleUntil(CHUNK * 2);
   const chunks = Math.floor(seconds / CHUNK);
@@ -71,6 +88,26 @@ export async function renderProject(p: Project, opts: RenderOptions = {}): Promi
     for (let i = 0; i < fadeLen; i++) d[d.length - 1 - i] *= i / fadeLen;
   }
   return out;
+}
+
+/** How long the song between `start` and `end` plays (tempo changes and repeats included). */
+export function playSeconds(p: Project, start: number, end: number): number {
+  const tm = tempoOf(p);
+  return renderPieces(p, start, end).reduce((a, pc) => a + tm.span(pc.from, pc.to), 0);
+}
+
+/** The song between `start` and `end` in play order: one piece, or the repeats unrolled. */
+function renderPieces(p: Project, start: number, end: number): PlaySpan[] {
+  if (!formActive(p)) return [{ from: start, to: end }];
+  const meter = meterOf(p);
+  const bars = Math.max(p.lengthBars, Math.ceil(meter.barPos(end) - 1e-6));
+  const out: PlaySpan[] = [];
+  for (const s of playSpans(p, bars)) {
+    const from = Math.max(s.from, start);
+    const to = Math.min(s.to, end);
+    if (to > from + 1e-9) out.push({ from, to });
+  }
+  return out.length ? out : [{ from: start, to: end }];
 }
 
 export function normalize(buf: AudioBuffer, target = 0.97): void {

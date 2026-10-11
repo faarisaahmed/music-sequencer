@@ -1,5 +1,6 @@
 // Keeping songs safe: permanent browser storage, version history, and backups (a backup
 // folder that's kept up to date where the browser allows it, or "Back Up All Songs" files).
+import { tempoOf } from '../model/timeline';
 import { createStore, del, get, keys, set } from 'idb-keyval';
 import type { Project } from '../model/types';
 import { contentEndBeat } from '../model/defaults';
@@ -89,7 +90,7 @@ export async function saveVersion(p: Project, opts: { label?: string; auto?: boo
     reason: opts.reason,
     name: p.name,
     trackCount: p.tracks.length,
-    seconds: (contentEndBeat(p) * 60) / p.bpm,
+    seconds: tempoOf(p).sec(contentEndBeat(p)),
     project: p,
   };
   await set(rec.key, rec, versionDb);

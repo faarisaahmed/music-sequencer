@@ -1,6 +1,7 @@
 // Live engine: transport, lookahead scheduler, metronome, live playing & recording.
 import type { Note, Project } from '../model/types';
 import { meterOf, tempoOf, TempoMap } from '../model/timeline';
+import { formActive, playSpans, spanIndexAt, type PlaySpan } from '../model/form';
 import { createMidiRegion, createAudioRegion, uid } from '../model/defaults';
 import { commit, findRegion, findTrack, toast, useStore, useTransport } from '../state/store';
 import { getAudioContext, resumeAudio } from './context';
@@ -41,6 +42,27 @@ class Engine {
   private segments: Segment[] = [];
   private scheduledBeat = 0;
   private freshPending = false;
+  /** Repeats & jumps: the runs of bars in play order, and which one is playing. */
+  private spans: PlaySpan[] | null = null;
+  private endAt: number | null = null;
+  private spanIdx = 0;
+  private spansFor: Project | null = null;
+
+  /** The song's play order (null when it has no repeats or they're switched off). */
+  private formSpans(p: Project): PlaySpan[] | null {
+    if (!formActive(p)) return null;
+    if (this.spansFor !== p || !this.spans) {
+      // Keep the current position in the order when the song is edited mid-play.
+      const cur = this.spans?.[this.spanIdx];
+      this.spans = playSpans(p, Math.max(p.lengthBars, 1));
+      this.spansFor = p;
+      if (cur) {
+        const i = this.spans.findIndex((s) => Math.abs(s.from - cur.from) < 1e-9 && Math.abs(s.to - cur.to) < 1e-9);
+        if (i >= 0) this.spanIdx = i;
+      }
+    }
+    return this.spans;
+  }
   private sources: ActiveSource[] = [];
   private playing = false;
   private rec: RecordingState | null = null;
@@ -158,6 +180,10 @@ class Engine {
     const now = this.ctx.currentTime + 0.06;
     this.segments = [{ ctxTime: now, beat: start }];
     this.scheduledBeat = start;
+    this.spans = null;
+    this.endAt = null;
+    const spans = this.formSpans(p);
+    this.spanIdx = spans ? spanIndexAt(spans, start) : 0;
     this.freshPending = true;
     this.playing = true;
     useStore.setState({ playing: true });
@@ -224,6 +250,8 @@ class Engine {
     const loopStart = pat ? pat.start : p.loop.start;
     const loopEnd = pat ? pat.end : p.loop.end;
     const loopOn = !!pat || (p.loop.enabled && p.loop.end > p.loop.start && !(this.rec?.kind === 'audio'));
+    // Repeats and jumps (the cycle area and recording take priority).
+    const spans = !loopOn && !this.rec ? this.formSpans(p) : null;
     this.sources = this.sources.filter((s) => s.end > now);
     const tm = tempoOf(p);
     let guard = 0;
@@ -231,7 +259,8 @@ class Engine {
       const seg = this.segments[this.segments.length - 1];
       const segSec = tm.sec(seg.beat);
       const horizonBeat = tm.beat(segSec + horizon - seg.ctxTime);
-      const segEnd = loopOn && seg.beat < loopEnd ? loopEnd : Infinity;
+      const span = spans?.[this.spanIdx];
+      const segEnd = loopOn && seg.beat < loopEnd ? loopEnd : span && seg.beat < span.to ? span.to : Infinity;
       const b1 = Math.min(horizonBeat, segEnd);
       const b0 = this.scheduledBeat;
       if (b1 > b0) {
@@ -242,20 +271,35 @@ class Engine {
         this.scheduledBeat = b1;
       }
       if (b1 >= segEnd) {
-        // Wrap to loop start.
         const wrapTime = seg.ctxTime + tm.sec(segEnd) - segSec;
-        this.segments.push({ ctxTime: wrapTime, beat: loopStart });
+        let to = loopStart;
+        if (!loopOn && spans) {
+          // Next run of bars in the play order, or the end of the song.
+          const next = spans[this.spanIdx + 1];
+          if (!next) {
+            this.endAt = wrapTime;
+            break;
+          }
+          this.spanIdx++;
+          to = next.from;
+        }
+        this.segments.push({ ctxTime: wrapTime, beat: to });
         if (this.segments.length > 8) this.segments.splice(0, this.segments.length - 8);
-        this.scheduledBeat = loopStart;
+        this.scheduledBeat = to;
         this.freshPending = true;
         continue;
       }
       break;
     }
-    // Auto-stop at the end of the song when not looping.
+    // Auto-stop at the end of the song (or of the play order) when not looping.
     const pos = this.beatAt(now);
     const endBeat = meterOf(p).barStart(p.lengthBars);
-    if (!loopOn && !this.rec && pos > endBeat) this.stop(false);
+    if (this.endAt !== null && now > this.endAt + 0.05) {
+      this.endAt = null;
+      this.stop(true);
+      return;
+    }
+    if (!loopOn && !this.rec && !spans && pos > endBeat) this.stop(false);
   }
 
   private scheduleMetronome(p: Project, b0: number, b1: number, toTime: (b: number) => number): void {
