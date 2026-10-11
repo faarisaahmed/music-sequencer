@@ -8,7 +8,8 @@ import { AudioLines, Shuffle, ChevronLeft, ChevronRight, ChevronsRight, CopyPlus
 import type { Draft } from 'immer';
 import type { MidiRegion, Note, Project } from '../../model/types';
 import { beginGesture, commit, draftRegion, endGesture, findRegion, live, toast, useStore, useTransport } from '../../state/store';
-import { DRUM_LANES, DRUM_NAMES, beatsPerBar } from '../../model/music';
+import { DRUM_LANES, DRUM_NAMES } from '../../model/music';
+import { meterOf } from '../../model/timeline';
 import { uid } from '../../model/defaults';
 import { PRESETS } from '../../audio/presets';
 import { makePatternUnique, newPatternClip, setClipPattern, setTrackInstrument, updateTrack } from '../../state/actions';
@@ -176,7 +177,7 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
 
   if (!region || !track) return null;
 
-  const bpb = beatsPerBar(project.timeSig);
+  const bpb = meterOf(project).lenAt(found?.region.start ?? 0);
   const cl = region.contentLength;
   const patternSteps = Math.max(1, Math.round(cl / res));
   const displayBars = Math.max(1, Math.ceil(cl / bpb - 1e-6));

@@ -1,5 +1,6 @@
 // Piano roll MIDI editor: canvas-rendered grid & notes with full mouse/keyboard editing,
 // a velocity lane with dynamics tools, and a toolbar portalled into the editor header.
+import { meterOf, type Meter } from '../../model/timeline';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTwoFingerPan } from '../mobile/touchPan';
@@ -8,7 +9,7 @@ import { grooveLabel } from '../../model/groove';
 import GroovePanel from '../groove/GroovePanel';
 import type { MidiRegion, Note, Track } from '../../model/types';
 import { uid } from '../../model/defaults';
-import { DRUM_NAMES, GRID_OPTIONS, beatsPerBar, inScale, isBlackKey, noteName, scaleOfKey, snap, snapFloor, snapToScale } from '../../model/music';
+import { DRUM_NAMES, GRID_OPTIONS, inScale, isBlackKey, noteName, scaleOfKey, snap, snapFloor, snapToScale } from '../../model/music';
 import { beginGesture, endGesture, findRegion, useStore, useTransport } from '../../state/store';
 import { getEngine } from '../../audio/engine';
 import { startDrag, clamp, isTyping } from '../common/drag';
@@ -75,10 +76,11 @@ export default function PianoRoll({ trackId, regionId }: Props) {
   const selectedIds = useStore((s) => s.selectedNoteIds);
 
   if (!region || region.kind !== 'midi' || !track) return <div className="empty-state">Region not found</div>;
-  return <PianoRollInner key={regionId} region={region} track={track} bpb={beatsPerBar(project.timeSig)} selectedIds={selectedIds} />;
+  const meter = meterOf(project);
+  return <PianoRollInner key={regionId} region={region} track={track} meter={meter} bpb={meter.lenAt(region.start)} selectedIds={selectedIds} />;
 }
 
-function PianoRollInner({ region, track, bpb, selectedIds }: { region: MidiRegion; track: Track; bpb: number; selectedIds: string[] }) {
+function PianoRollInner({ region, track, meter, bpb, selectedIds }: { region: MidiRegion; track: Track; meter: Meter; bpb: number; selectedIds: string[] }) {
   const project = useStore((s) => s.project)!;
   const regionId = region.id;
   const isDrums = track.type === 'drums';
@@ -232,10 +234,12 @@ function PianoRollInner({ region, track, bpb, selectedIds }: { region: MidiRegio
     }
     for (let b = b0; b <= b1; b++) {
       const abs = songBase + b;
-      const isBar = Math.abs(((abs % bpb) + bpb) % bpb) < 1e-6;
-      ctx.fillStyle = isBar ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.07)';
+      if (Math.abs(meter.barAt(abs + 1e-6).start - abs) < 1e-6) continue; // drawn as a bar line below
+      ctx.fillStyle = 'rgba(255,255,255,0.07)';
       ctx.fillRect(Math.round(b * ppb - sx), 0, 1, h);
     }
+    ctx.fillStyle = 'rgba(255,255,255,0.18)';
+    for (const bar of meter.bars(songBase + b0, songBase + b1 + 1)) ctx.fillRect(Math.round((bar.start - songBase) * ppb - sx), 0, 1, h);
     // Loop end marker
     if (region.loop) {
       ctx.fillStyle = 'rgba(245,197,24,0.6)';
@@ -288,7 +292,7 @@ function PianoRollInner({ region, track, bpb, selectedIds }: { region: MidiRegio
       ctx.fillRect(x, y, Math.abs(marquee.x1 - marquee.x0), Math.abs(marquee.y1 - marquee.y0));
       ctx.strokeRect(x + 0.5, y + 0.5, Math.abs(marquee.x1 - marquee.x0), Math.abs(marquee.y1 - marquee.y0));
     }
-  }, [size, scroll, ppb, rowH, region, selected, marquee, grid, scaleMode, scale, rgb, isDrums, bpb, songBase, totalBeats, regionVisibleEnd]);
+  }, [size, scroll, ppb, rowH, region, selected, marquee, grid, scaleMode, scale, rgb, isDrums, meter, songBase, totalBeats, regionVisibleEnd]);
 
   // Keyboard
   useEffect(() => {
@@ -373,29 +377,30 @@ function PianoRollInner({ region, track, bpb, selectedIds }: { region: MidiRegio
     const b0 = Math.floor(sx / ppb);
     const b1 = Math.ceil((sx + w) / ppb);
     ctx.font = '600 10.5px -apple-system, sans-serif';
-    for (let b = b0; b <= b1; b++) {
-      const abs = songBase + b;
-      const x = Math.round(b * ppb - sx);
-      const inBar = ((abs % bpb) + bpb) % bpb;
-      if (Math.abs(inBar) < 1e-6) {
-        ctx.fillStyle = '#7a7a84';
-        ctx.fillRect(x, 4, 1, RULER_H - 4);
-        ctx.fillStyle = '#d4d4da';
-        ctx.fillText(String(Math.floor(abs / bpb) + 1), x + 4, 13);
-      } else if (ppb >= 14) {
+    for (const bar of meter.bars(songBase + b0, songBase + b1 + 1)) {
+      const x = Math.round((bar.start - songBase) * ppb - sx);
+      ctx.fillStyle = '#7a7a84';
+      ctx.fillRect(x, 4, 1, RULER_H - 4);
+      ctx.fillStyle = '#d4d4da';
+      const label = String(bar.bar + 1) + (meter.simple || meter.barAt(bar.start - 1e-6).len === bar.len ? '' : `  ${bar.sig[0]}/${bar.sig[1]}`);
+      ctx.fillText(label, x + 4, 13);
+      if (ppb < 14) continue;
+      const beatLen = 4 / bar.sig[1];
+      for (let k = 1; k * beatLen < bar.len - 1e-9; k++) {
+        const bx = Math.round((bar.start + k * beatLen - songBase) * ppb - sx);
         ctx.fillStyle = '#4a4a52';
-        ctx.fillRect(x, RULER_H - 7, 1, 7);
-        if (ppb >= 48) {
+        ctx.fillRect(bx, RULER_H - 7, 1, 7);
+        if (ppb * beatLen >= 48) {
           ctx.fillStyle = '#6a6a72';
           ctx.font = '9.5px -apple-system, sans-serif';
-          ctx.fillText(`${Math.floor(abs / bpb) + 1}.${Math.round(inBar) + 1}`, x + 3, 13);
+          ctx.fillText(`${bar.bar + 1}.${k + 1}`, bx + 3, 13);
           ctx.font = '600 10.5px -apple-system, sans-serif';
         }
       }
     }
     ctx.fillStyle = '#0c0c0e';
     ctx.fillRect(0, RULER_H - 1, w, 1);
-  }, [size.w, scroll.x, ppb, region, contentEnd, songBase, bpb, rgb]);
+  }, [size.w, scroll.x, ppb, region, contentEnd, songBase, meter, rgb]);
 
   // Velocity lane
   useEffect(() => {

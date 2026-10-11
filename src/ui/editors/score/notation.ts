@@ -1,4 +1,5 @@
 // Pure conversion of MIDI notes → notated measures: parts, staves, voices, triplets, ties, rests.
+import { Meter } from '../../../model/timeline';
 import type { Articulation, KeySignature } from '../../../model/types';
 import { parentMajorPc } from '../../../model/music';
 
@@ -247,6 +248,9 @@ export interface StaffMeasure {
 export interface MeasureModel {
   index: number;
   start: number; // display beats
+  /** Length in beats and time signature (they change with meter changes). */
+  len: number;
+  sig: [number, number];
   staves: StaffMeasure[]; // indexed by global staff index
 }
 
@@ -325,8 +329,17 @@ export interface ScoreModel {
   parts: PartModel[];
   staves: StaffRef[];
   measures: MeasureModel[];
+  /** Length of the first measure (most songs: every measure). */
   bpb: number;
+  /** Where every measure falls, in display beats. */
+  meter: Meter;
   grid: number;
+}
+
+/** The measure containing display beat `t` (clamped to the score). */
+export function measureAt(model: ScoreModel, t: number): MeasureModel {
+  const i = Math.max(0, Math.min(model.measures.length - 1, model.meter.barAt(t + 1e-9).bar));
+  return model.measures[i];
 }
 
 export const SPLIT = 60;
@@ -697,7 +710,8 @@ function autoVoices(list: { n: RawNote; wpitch: number; staff: number; voice: 1 
   }
 }
 
-export function buildScore(inputs: PartInput[], bpb: number, totalBeats: number, extraMeasures: number, grid: number): ScoreModel {
+export function buildScore(inputs: PartInput[], meterIn: Meter | number, totalBeats: number, extraMeasures: number, grid: number): ScoreModel {
+  const meter = typeof meterIn === 'number' ? new Meter([Math.round(meterIn), 4]) : meterIn;
   const parts: PartModel[] = [];
   const staves: StaffRef[] = [];
   for (const [pi, inp] of inputs.entries()) {
@@ -764,7 +778,8 @@ export function buildScore(inputs: PartInput[], bpb: number, totalBeats: number,
         const onsets = [...new Set(list.map((n) => n.s))].sort((a, b) => a - b);
         for (const n of list) {
           const next = onsets.find((o) => o > n.s + 1e-6) ?? Infinity;
-          const barEnd = (Math.floor(n.s / bpb + 1e-9) + 1) * bpb;
+          const bar = meter.barAt(n.s + 1e-9);
+          const barEnd = bar.start + bar.len;
           const beatEnd = Math.floor(n.s + 1e-6) + 1;
           n.e = Math.max(n.e, Math.min(next, barEnd, Math.max(beatEnd, n.s + 0.25), n.s + 1));
         }
@@ -778,22 +793,23 @@ export function buildScore(inputs: PartInput[], bpb: number, totalBeats: number,
   }
 
   const lastEnd = Math.max(totalBeats, ...parts.flatMap((p) => p.notes.map((n) => n.e)));
-  const count = Math.max(1, Math.ceil(lastEnd / bpb - 1e-6)) + extraMeasures;
+  const count = Math.max(1, Math.ceil(meter.barPos(lastEnd) - 1e-6)) + extraMeasures;
   // Bucket every note into the measures it overlaps, per staff & voice (avoids rescanning all notes per measure).
   const buckets = staves.map((ref) => {
     const per: [QNote[][], QNote[][]] = [[], []];
     for (const n of parts[ref.part].notes) {
       if (n.staff !== ref.staff) continue;
       const lists = per[n.voice === 2 ? 1 : 0];
-      const m0 = Math.max(0, Math.floor(n.s / bpb + 1e-9));
-      const m1 = Math.min(count - 1, Math.ceil(n.e / bpb - 1e-6) - 1);
+      const m0 = Math.max(0, meter.barAt(n.s + 1e-9).bar);
+      const m1 = Math.min(count - 1, meter.barAt(n.e - 1e-6).bar);
       for (let m = m0; m <= m1; m++) (lists[m] ??= []).push(n);
     }
     return per;
   });
   const measures: MeasureModel[] = [];
   for (let m = 0; m < count; m++) {
-    const ms = m * bpb;
+    const ms = meter.barStart(m);
+    const { len: bpb, sig } = meter.barAt(ms + 1e-9);
     const sm: StaffMeasure[] = staves.map((ref, si) => {
       const part = parts[ref.part] as PartModel & { _win?: Map<string, Map<number, WinKind>> };
       const v1 = buckets[si][0][m] ?? [];
@@ -806,9 +822,9 @@ export function buildScore(inputs: PartInput[], bpb: number, totalBeats: number,
       if (has2) voices.push(buildVoice(v2, ms, bpb, win2, `${ref.part}.${ref.staff}.2`, part.inferredAccents, sp(2)));
       return { voices };
     });
-    measures.push({ index: m, start: ms, staves: sm });
+    measures.push({ index: m, start: ms, len: bpb, sig, staves: sm });
   }
-  return { parts, staves, measures, bpb, grid };
+  return { parts, staves, measures, bpb: measures[0]?.len ?? 4, meter, grid };
 }
 
 // ------------------------------------------------------------------ dynamics

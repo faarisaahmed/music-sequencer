@@ -237,6 +237,10 @@ export interface Project {
   groove?: Groove | null;
   /** Arrangement markers (Intro, Verse, Chorus…). */
   sections?: Section[];
+  /** Tempo changes after the start (the song starts at `bpm`). */
+  tempoChanges?: TempoChange[];
+  /** Time-signature changes at bar lines (the song starts in `timeSig`). */
+  meterChanges?: MeterChange[];
   /** Release details written into exported files (ID3 / MP4 / Vorbis tags, MIDI meta). */
   info?: SongInfo;
 }
@@ -270,6 +274,22 @@ export interface YouTubeInfo {
   videoId?: string;
   channel?: string;
   publishedAt?: number;
+}
+
+export interface TempoChange {
+  id: string;
+  /** Where the new tempo is reached (beats). */
+  beat: number;
+  bpm: number;
+  /** Speed up / slow down gradually from the previous tempo (accelerando / ritardando). */
+  ramp?: boolean;
+}
+
+export interface MeterChange {
+  id: string;
+  /** Bar number (0-based) where the new time signature starts. */
+  bar: number;
+  timeSig: [number, number];
 }
 
 export interface Section {

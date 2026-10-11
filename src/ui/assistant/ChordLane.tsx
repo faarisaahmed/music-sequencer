@@ -1,8 +1,9 @@
 // Chord track lane shown under the ruler in the Tracks view.
+import { meterOf } from '../../model/timeline';
 import { memo, useState } from 'react';
 import { Music4, Wand2, EyeOff } from 'lucide-react';
 import type { ChordSymbol } from '../../model/types';
-import { beatsPerBar, snap } from '../../model/music';
+import { snap } from '../../model/music';
 import { PROGRESSIONS, chordName } from '../../model/accompaniment';
 import { beginGesture, endGesture, live, useStore } from '../../state/store';
 import { startDrag } from '../common/drag';
@@ -53,7 +54,7 @@ function ChordLane({ width, ppb }: { width: number; ppb: number }) {
   const [picker, setPicker] = useState<null | { x: number; y: number; beat: number; chord?: ChordSymbol }>(null);
   if (!chordsVisible(project, show)) return null;
   const chords = project.chords ?? [];
-  const bpb = beatsPerBar(project.timeSig);
+  const meter = meterOf(project);
   const g = grid || 1;
 
   const prevOf = (beat: number) => [...chords].filter((c) => c.beat < beat - 1e-6).sort((a, b) => b.beat - a.beat)[0] ?? null;
@@ -61,7 +62,7 @@ function ChordLane({ width, ppb }: { width: number; ppb: number }) {
   const onLaneDown = (e: React.PointerEvent) => {
     if (e.button !== 0 || e.target !== e.currentTarget) return;
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const beat = Math.max(0, Math.floor((e.clientX - rect.left) / ppb / bpb) * bpb);
+    const beat = Math.max(0, meter.floorBar((e.clientX - rect.left) / ppb));
     setPicker({ x: e.clientX, y: e.clientY + 12, beat });
   };
 
@@ -129,7 +130,7 @@ function ChordLane({ width, ppb }: { width: number; ppb: number }) {
         onPointerDown={onLaneDown}
         onContextMenu={(e) => {
           const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-          const beat = Math.max(0, Math.floor((e.clientX - rect.left) / ppb / bpb) * bpb);
+          const beat = Math.max(0, meter.floorBar((e.clientX - rect.left) / ppb));
           if (e.target !== e.currentTarget) return;
           const at = { clientX: e.clientX, clientY: e.clientY };
           showContextMenu(e, [

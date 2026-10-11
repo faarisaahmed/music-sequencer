@@ -1,15 +1,17 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Plus, ZoomIn, ZoomOut, Maximize, Magnet, Crown, LayoutList } from 'lucide-react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Plus, ZoomIn, ZoomOut, Maximize, Magnet, Crown, LayoutList, Gauge } from 'lucide-react';
 import { beginGesture, commit, endGesture, live, openModal, useStore, useTransport } from '../../state/store';
-import { beatsPerBar, GRID_OPTIONS, snap } from '../../model/music';
+import { GRID_OPTIONS, snap } from '../../model/music';
 import { contentEndBeat } from '../../model/defaults';
 import { getEngine } from '../../audio/engine';
 import { startDrag } from '../common/drag';
 import TrackRow, { useArmedMic } from './TrackRow';
 import AutomationLane from './AutomationLane';
 import ArrangementLane from './ArrangementLane';
+import TempoLane from './TempoLane';
 import ChordLane, { ChordToggleButton } from '../assistant/ChordLane';
 import { HEADER_W, RULER_H, useTracksUi } from './tracksUi';
+import { meterOf, type Meter } from '../../model/timeline';
 import { useTwoFingerPan } from '../mobile/touchPan';
 import { shortcutLabel } from '../keys/keymap';
 import './tracks.css';
@@ -53,29 +55,34 @@ function Ruler({ width, ppb }: { width: number; ppb: number }) {
   usePlayhead((b) => {
     if (headRef.current) headRef.current.style.transform = `translateX(${Math.max(0, b) * ppb}px)`;
   });
-  const bpb = beatsPerBar(project.timeSig);
-  const beatLen = 4 / project.timeSig[1];
-  const barPx = bpb * ppb;
-  const totalBars = Math.ceil(width / barPx) + 1;
-  const every = [1, 2, 4, 8, 16, 32].find((n) => n * barPx >= 34) ?? 64;
+  const meter = meterOf(project);
+  const minBar = Math.min(...meter.segs.map((g) => g.len)) * ppb;
+  const every = [1, 2, 4, 8, 16, 32].find((n) => n * minBar >= 34) ?? 64;
   const ticks: React.ReactNode[] = [];
-  for (let bar = 0; bar < totalBars; bar++) {
-    const x = bar * barPx;
-    const labeled = bar % every === 0;
+  let prevSig = '';
+  for (const b of meter.bars(0, width / ppb)) {
+    const { bar, len, sig } = b;
+    const x = b.start * ppb;
+    const sigText = `${sig[0]}/${sig[1]}`;
+    const changed = bar > 0 && sigText !== prevSig;
+    prevSig = sigText;
+    const labeled = bar % every === 0 || changed;
     ticks.push(<line key={'b' + bar} x1={x + 0.5} x2={x + 0.5} y1={labeled ? CYCLE_H + 2 : RULER_H - 10} y2={RULER_H} className="rt-bar" />);
     if (labeled)
       ticks.push(
         <text key={'t' + bar} x={x + 4} y={CYCLE_H + 13} className="rt-num">
           {bar + 1}
+          {changed && <tspan className="rt-sig"> {sigText}</tspan>}
         </text>,
       );
+    const beatLen = 4 / sig[1];
     if (beatLen * ppb >= 7)
-      for (let b = 1; b < bpb / beatLen; b++) {
-        const bx = x + b * beatLen * ppb;
-        ticks.push(<line key={`k${bar}_${b}`} x1={bx + 0.5} x2={bx + 0.5} y1={RULER_H - 6} y2={RULER_H} className="rt-beat" />);
+      for (let k = 1; k * beatLen < len - 1e-9; k++) {
+        const bx = x + k * beatLen * ppb;
+        ticks.push(<line key={`k${bar}_${k}`} x1={bx + 0.5} x2={bx + 0.5} y1={RULER_H - 6} y2={RULER_H} className="rt-beat" />);
       }
     if (ppb >= 60)
-      for (let s = 0.25; s < bpb; s += 0.25) {
+      for (let s = 0.25; s < len - 1e-9; s += 0.25) {
         if (Math.abs(s % beatLen) < 1e-6) continue;
         const sx = x + s * ppb;
         ticks.push(<line key={`s${bar}_${s}`} x1={sx + 0.5} x2={sx + 0.5} y1={RULER_H - 3} y2={RULER_H} className="rt-beat" />);
@@ -134,7 +141,7 @@ function Ruler({ width, ppb }: { width: number; ppb: number }) {
           }
           if (!moved && mode === 'create') {
             // Click outside the brace: move the cycle to start at this bar.
-            const bar = Math.floor(beat / bpb) * bpb;
+            const bar = meter.floorBar(beat);
             const len = o.end - o.start;
             live((d) => {
               d.loop.start = bar;
@@ -172,10 +179,10 @@ function Ruler({ width, ppb }: { width: number; ppb: number }) {
       onDoubleClick={(e) => {
         // Double-click a bar: loop just that bar for review.
         const { x } = local(e);
-        const bar = Math.floor(x / ppb / bpb) * bpb;
+        const b = meter.barAt(x / ppb);
         commit((d) => {
-          d.loop.start = bar;
-          d.loop.end = bar + bpb;
+          d.loop.start = b.start;
+          d.loop.end = b.start + b.len;
           d.loop.enabled = true;
         });
       }}
@@ -206,7 +213,7 @@ function Toolbar({ viewW }: { viewW: number }) {
   const zoomTo = (v: number) => useStore.setState({ pxPerBeat: Math.max(3, Math.min(240, v)) });
   const fit = () => {
     const p = useStore.getState().project!;
-    const end = Math.max(contentEndBeat(p), beatsPerBar(p.timeSig) * 4);
+    const end = Math.max(contentEndBeat(p), meterOf(p).barStart(4));
     zoomTo((viewW - HEADER_W - 40) / end);
   };
   return (
@@ -259,6 +266,7 @@ function Toolbar({ viewW }: { viewW: number }) {
       <button className={'btn sm' + (showArrangement ? ' active' : '')} onClick={() => useTracksUi.setState({ showArrangement: !showArrangement })} title="Show the arrangement track (song sections)">
         <LayoutList size={13} /> Arrangement
       </button>
+      <TempoToggleButton />
       <ChordToggleButton />
       <div className="spacer" />
       <div className="tv-hint faint">
@@ -274,6 +282,7 @@ export default function TracksView() {
   const trackHeight = useStore((s) => s.trackHeight);
   const showMaster = useTracksUi((s) => s.showMaster);
   const showArrangement = useTracksUi((s) => s.showArrangement);
+  const showTempo = useTracksUi((s) => s.showTempo);
   const marquee = useTracksUi((s) => s.marquee);
   const dropIndicator = useTracksUi((s) => s.dropIndicator);
   const snapLine = useTracksUi((s) => s.snapLine);
@@ -283,10 +292,9 @@ export default function TracksView() {
   const [viewW, setViewW] = useState(1200);
   useArmedMic(project.tracks);
 
-  const bpb = beatsPerBar(project.timeSig);
-  const beatLen = 4 / project.timeSig[1];
-  const songBeats = Math.max(project.lengthBars, Math.ceil(contentEndBeat(project) / bpb) + 4) * bpb;
-  const width = Math.max(viewW - HEADER_W, (songBeats + bpb * 8) * ppb);
+  const meter = meterOf(project);
+  const songBars = Math.max(project.lengthBars, Math.ceil(meter.barPos(contentEndBeat(project)) - 1e-6) + 4);
+  const width = Math.max(viewW - HEADER_W, meter.barStart(songBars + 8) * ppb);
 
   useLayoutEffect(() => {
     const el = scrollRef.current;
@@ -363,10 +371,7 @@ export default function TracksView() {
   }, []);
 
   const loop = project.loop;
-  const gridVars = {
-    ['--bar' as string]: `${bpb * ppb}px`,
-    ['--beat' as string]: `${(beatLen * ppb >= 8 ? beatLen : bpb) * ppb}px`,
-  };
+  const gridVars = useMemo(() => laneGrid(meter, ppb, width), [meter, ppb, width]);
 
   return (
     <div className="tv-root" onPointerDownCapture={() => useStore.setState({ focusArea: 'tracks' })}>
@@ -376,7 +381,7 @@ export default function TracksView() {
         ref={scrollRef}
         onScroll={(e) => contentRef.current?.style.setProperty('--sx', `${(e.currentTarget as HTMLElement).scrollLeft}px`)}
       >
-        <div className="tv-content" ref={contentRef} style={{ width: HEADER_W + width, ...gridVars }}>
+        <div className={'tv-content' + (meter.simple ? '' : ' custom-grid')} ref={contentRef} style={{ width: HEADER_W + width, ...gridVars }}>
           <div className="tv-toprow">
             <div className="tv-corner">
               <button className="btn sm ghost" onClick={() => openModal('newTrack')} title="New track (⌥⌘N)">
@@ -390,6 +395,7 @@ export default function TracksView() {
           </div>
 
           {showArrangement && <ArrangementLane width={width} ppb={ppb} />}
+          {(showTempo || (project.tempoChanges?.length ?? 0) > 0 || (project.meterChanges?.length ?? 0) > 0) && <TempoLane width={width} ppb={ppb} />}
           <ChordLane width={width} ppb={ppb} />
 
           {showMaster && (
@@ -450,5 +456,41 @@ export default function TracksView() {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Lane grid lines. One time signature: a repeating CSS background. With changes: an image of
+ * the exact bar and beat lines.
+ */
+function laneGrid(meter: Meter, ppb: number, width: number): Record<string, string> {
+  if (meter.simple) {
+    const g = meter.segs[0];
+    const beatLen = 4 / g.sig[1];
+    return { ['--bar']: `${g.len * ppb}px`, ['--beat']: `${(beatLen * ppb >= 8 ? beatLen : g.len) * ppb}px` };
+  }
+  const W = Math.ceil(width);
+  let rects = '';
+  for (const b of meter.bars(0, width / ppb)) {
+    rects += `<rect x='${Math.round(b.start * ppb)}' width='1' height='10' fill='rgba(255,255,255,0.075)'/>`;
+    const beatLen = 4 / b.sig[1];
+    if (beatLen * ppb >= 8) for (let k = 1; k * beatLen < b.len - 1e-9; k++) rects += `<rect x='${Math.round((b.start + k * beatLen) * ppb)}' width='1' height='10' fill='rgba(255,255,255,0.028)'/>`;
+  }
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${W}' height='10' viewBox='0 0 ${W} 10' preserveAspectRatio='none'>${rects}</svg>`;
+  return { ['--lane-grid']: `url("data:image/svg+xml,${encodeURIComponent(svg)}")`, ['--grid-w']: `${W}px` };
+}
+
+function TempoToggleButton() {
+  const project = useStore((s) => s.project)!;
+  const show = useTracksUi((s) => s.showTempo);
+  const has = (project.tempoChanges?.length ?? 0) > 0 || (project.meterChanges?.length ?? 0) > 0;
+  return (
+    <button
+      className={'btn sm' + (show || has ? ' active' : '')}
+      onClick={() => !has && useTracksUi.setState({ showTempo: !show })}
+      title={has ? 'This song changes tempo or time signature, so the lane stays visible' : 'Show the tempo & time signature lane: speed up, slow down or change meter during the song'}
+    >
+      <Gauge size={13} /> Tempo
+    </button>
   );
 }

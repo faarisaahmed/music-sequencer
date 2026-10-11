@@ -19,6 +19,8 @@ export interface Marquee {
 export const useTracksUi = create<{
   showMaster: boolean;
   showArrangement: boolean;
+  /** Tempo & time-signature lane (shown automatically once a song has changes). */
+  showTempo: boolean;
   renamingRegionId: string | null;
   renamingTrackId: string | null;
   marquee: Marquee | null;
@@ -27,6 +29,7 @@ export const useTracksUi = create<{
 }>(() => ({
   showMaster: false,
   showArrangement: true,
+  showTempo: false,
   renamingRegionId: null,
   renamingTrackId: null,
   marquee: null,

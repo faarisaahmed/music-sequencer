@@ -31,7 +31,8 @@ import {
 import { commit, openModal, redo, undo, useStore, useTransport, type DockTab } from '../../state/store';
 import { closeProject } from '../../state/actions';
 import { getEngine } from '../../audio/engine';
-import { formatPosition, keyName } from '../../model/music';
+import { keyName } from '../../model/music';
+import { meterOf, tempoOf } from '../../model/timeline';
 import TracksView from '../tracks/TracksView';
 import Dock from '../Dock';
 import LibraryPanel from '../library/LibraryPanel';
@@ -215,9 +216,9 @@ function MobileTransport() {
   return (
     <div className="m-transport">
       <button className="m-lcd" onClick={() => openModal('settings')} aria-label="Tempo and key">
-        <b className="mono">{countingIn ? 'COUNT' : formatPosition(Math.max(0, pos), project.timeSig)}</b>
+        <b className="mono">{countingIn ? 'COUNT' : meterOf(project).format(Math.max(0, pos))}</b>
         <span>
-          {Math.round(project.bpm)} · {keyName(project.key).replace(' major', '').replace(' minor', 'm')}
+          {Math.round(tempoOf(project).bpmAt(Math.max(0, pos)))} · {meterOf(project).sigAt(Math.max(0, pos)).join('/')} · {keyName(project.key).replace(' major', '').replace(' minor', 'm')}
         </span>
       </button>
       <button className="m-t" onClick={() => engine.seek(0)} aria-label="Go to beginning">

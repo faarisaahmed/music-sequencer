@@ -6,7 +6,8 @@ import { useToolbarSlot } from './useToolbarSlot';
 import { MousePointer2, PenLine, Plus, Minus, Printer, FileDown, ZoomIn, ZoomOut, ArrowUp, ArrowDown, Type, Hash, Eraser } from 'lucide-react';
 import type { Articulation, MidiRegion, Note, Project, Track } from '../../model/types';
 import { beginGesture, endGesture, findRegion, live, useStore, useTransport, toast } from '../../state/store';
-import { beatsPerBar, noteName } from '../../model/music';
+import { noteName } from '../../model/music';
+import { meterOf } from '../../model/timeline';
 import { placedNotes } from '../../model/regions';
 import { getPreset } from '../../audio/presets';
 import { getEngine } from '../../audio/engine';
@@ -30,6 +31,7 @@ import {
   type RawNote,
   type ScoreModel,
 } from './score/notation';
+import { measureAt } from './score/notation';
 import {
   beatToX,
   emptyLayout,
@@ -137,9 +139,25 @@ function rawFromNote(n: Note, regionId: string, s: number, e: number, key: strin
   return { id: n.id, key, regionId, pitch: n.pitch, s, e, vel: n.velocity, voice: n.voice, artic: n.artic, lyric: n.lyric, grace: n.grace };
 }
 
+/** The song's tempo changes in the score's own beats (only those inside what it shows). */
+function tempoMarksFor(project: Project, src: Source): { t: number; bpm: number; ramp?: boolean; faster?: boolean }[] {
+  const out: { t: number; bpm: number; ramp?: boolean; faster?: boolean }[] = [];
+  let prev = project.bpm;
+  let prevBeat = 0;
+  for (const c of [...(project.tempoChanges ?? [])].sort((a, b) => a.beat - b.beat)) {
+    // A gradual change is marked where it starts ("accel." … to the new tempo).
+    const t = src.fromAbs(c.ramp ? prevBeat : c.beat);
+    if (t !== null) out.push({ t, bpm: c.bpm, ramp: c.ramp, faster: c.bpm > prev });
+    prev = c.bpm;
+    prevBeat = c.beat;
+  }
+  return out;
+}
+
 /** Build the notation source for a single region or the whole song. */
 function buildSource(project: Project, full: boolean, regionId: string | undefined, grid: number, clefMode: ClefMode, concert: boolean): Source | null {
-  const bpb = beatsPerBar(project.timeSig);
+  const meter = meterOf(project);
+  let bpb = meter.lenAt(0);
   const mkPart = (track: Track, raw: RawNote[], marks: DisplayMark[], mode: ClefMode, placementBase: Omit<Placement, 'staffOf'>, splits: PartInput['splits'] = []) => {
     const drums = track.type === 'drums';
     const preset = getPreset(track.instrument);
@@ -169,6 +187,10 @@ function buildSource(project: Project, full: boolean, regionId: string | undefin
     const region = found.region;
     const track = found.track;
     const { viewStart, viewLen } = viewOf(region);
+    // Bars counted from where this region's score starts.
+    const origin = region.start - (region.loop ? region.offset : 0);
+    const rm = meter.relativeTo(origin);
+    bpb = rm.lenAt(0);
     const raw: RawNote[] = [];
     for (const n of region.notes) {
       const t = n.start - viewStart;
@@ -183,11 +205,11 @@ function buildSource(project: Project, full: boolean, regionId: string | undefin
     const chords: ChordLabel[] = (project.chords ?? [])
       .map((c) => ({ t: fromAbs(c.beat), name: chordName(c, p.meta.writtenKey) }))
       .filter((c) => c.t >= -1e-6 && c.t < viewLen + bpb);
-    const model = buildScore([p.input], bpb, viewLen, 1, grid);
+    const model = buildScore([p.input], rm, viewLen, 1, grid);
     return {
       model,
       parts: [p.meta],
-      firstBar: Math.floor(region.start / bpb + 1e-6) + 1,
+      firstBar: meter.barAt(origin + 1e-9).bar + 1,
       chords,
       toAbs,
       fromAbs: (a) => {
@@ -203,7 +225,7 @@ function buildSource(project: Project, full: boolean, regionId: string | undefin
 
   const tracks = project.tracks.filter((t) => t.type !== 'audio');
   if (!tracks.length) return null;
-  let total = 4 * bpb;
+  let total = meter.barStart(4);
   const built = tracks.map((track) => {
     const raw: RawNote[] = [];
     const marks: DisplayMark[] = [];
@@ -232,7 +254,7 @@ function buildSource(project: Project, full: boolean, regionId: string | undefin
   });
   const model = buildScore(
     built.map((b) => b.input),
-    bpb,
+    meter,
     total,
     1,
     grid,
@@ -314,7 +336,6 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
   const lastInsert = useRef<{ t: number; dur: number; pitch: number; staff: number } | null>(null);
 
   const effDur = dur * (dotted ? 1.5 : 1) * (triplet ? 2 / 3 : 1);
-  const bpb = beatsPerBar(project.timeSig);
   const velocity = DYNAMICS.find((d) => d.mark === dyn)?.vel ?? 0.64;
 
   useLayoutEffect(() => {
@@ -400,6 +421,7 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
         showNames: full,
         title: full ? project.name : undefined,
         tempo: full ? project.bpm : undefined,
+        tempoMarks: tempoMarksFor(project, src),
         chords: src.chords,
         partLabels: src.labels,
       });
@@ -407,7 +429,7 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
       console.error('score layout failed', e);
       return null;
     }
-  }, [src, partKeys, width, zoom, project.timeSig, project.name, project.bpm, showDyn, full]);
+  }, [src, partKeys, width, zoom, project.timeSig, project.name, project.bpm, project.tempoChanges, showDyn, full]);
   const layout = useMemo(() => (plan ? emptyLayout(plan) : null), [plan]);
 
   useLayoutEffect(() => {
@@ -463,10 +485,11 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
       if (b.d > 120) return null;
       const mg = sys.measures.find((m) => lx >= m.x && lx < m.x + m.w) ?? (lx < sys.measures[0].x ? sys.measures[0] : sys.measures[sys.measures.length - 1]);
       const dIdx = topLineDiatonic(sg.clef) - step;
-      const tm = xToBeat(mg, lx, bpb);
+      const mm = model?.measures[mg.index];
+      const tm = mm ? mm.start + xToBeat(mg, lx, mm.len) : 0;
       return { lx, ly, sys, sg, staff: sg.index, mg, step, dIdx, tm };
     },
-    [layout, model, zoom, bpb],
+    [layout, model, zoom],
   );
 
 
@@ -545,7 +568,8 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
       const sys = layout?.systems.find((sy) => sy.measures.some((m) => m.index === measure));
       const mg = sys?.measures.find((m) => m.index === measure);
       if (!mg) return null;
-      return { x0: mg.noteX0, x1: mg.noteX1, t: measure * bpb, t1: (measure + 1) * bpb, staff: gi, voice: v, system: layout!.systems.indexOf(sys!), measure, rest: true, cont: false, noteIds: [] };
+      const mm = model!.measures[measure];
+      return { x0: mg.noteX0, x1: mg.noteX1, t: mm.start, t1: mm.start + mm.len, staff: gi, voice: v, system: layout!.systems.indexOf(sys!), measure, rest: true, cont: false, noteIds: [] };
     }
     let pick = list[0];
     for (const e of list) if (e.x0 <= lx + 6) pick = e;
@@ -762,14 +786,16 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
 
   const chordGeom = (t: number) => {
     if (!layout) return null;
-    const m = Math.floor(t / bpb + 1e-9);
+    if (!model) return null;
+    const mm = measureAt(model, t);
+    const m = mm.index;
     for (const sys of layout.systems) {
       const mg = sys.measures.find((x) => x.index === m);
       if (mg) {
         const top = sys.staves[0];
         let minY = top.topLineY;
         for (const h of layout.heads) if (h.staff === top.index && layout.systems[h.system] === sys) minY = Math.min(minY, h.y - (h.voice === 2 ? 0 : 34));
-        return { x: beatToX(mg, t - m * bpb, bpb), y: Math.min(top.topLineY - 24, minY - 10) - 18 };
+        return { x: beatToX(mg, t - mm.start, mm.len), y: Math.min(top.topLineY - 24, minY - 10) - 18 };
       }
     }
     return null;
@@ -810,7 +836,8 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
         return;
       }
       if (advance === 'next' || advance === 'bar') {
-        const nt = advance === 'bar' ? (Math.floor(entry.t / bpb + 1e-9) + 1) * bpb : entry.t + 4 / project.timeSig[1];
+        const mm = model ? measureAt(model, entry.t) : null;
+        const nt = advance === 'bar' ? (mm ? mm.start + mm.len : entry.t + 4) : entry.t + 4 / (mm?.sig[1] ?? 4);
         startChord(nt);
         return;
       }
@@ -978,7 +1005,7 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
     if (!el || el.cont) return setGhost(null);
     const chordPitches = el.rest ? [] : chordPitchesAt(el);
     if (!el.rest && chordPitches.includes(pitch + part.transpose)) return setGhost(null);
-    const x = el.rest && el.t1 - el.t >= bpb - 1e-6 ? el.x0 + 2 : el.x0;
+    const x = el.rest && el.t1 - el.t >= (model?.measures[loc.mg.index]?.len ?? 4) - 1e-6 ? el.x0 + 2 : el.x0;
     const y = loc.sg.topLineY + loc.step * (loc.sg.spacing / 2);
     const ledger: number[] = [];
     if (loc.step < 0) for (let s = -2; s >= loc.step; s -= 2) ledger.push(loc.sg.topLineY + s * (loc.sg.spacing / 2));
@@ -1150,6 +1177,7 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
       showNames: full,
       title,
       tempo: project.bpm,
+      tempoMarks: tempoMarksFor(project, src),
       chords: src.chords,
       partLabels: src.labels,
     });
@@ -1193,7 +1221,7 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
   };
   const exportXml = () => {
     if (!src) return;
-    const xml = toMusicXml(src.model, project.name, src.labels, partKeys, project.timeSig, project.bpm);
+    const xml = toMusicXml(src.model, project.name, src.labels, partKeys, project.timeSig, project.bpm, tempoMarksFor(project, src));
     download(new Blob([xml], { type: 'application/vnd.recordare.musicxml+xml' }), `${safeFileName(project.name)}${full ? '' : ' - ' + safeFileName(src.parts[0]?.track.name ?? 'part')}.musicxml`);
   };
 
@@ -1438,7 +1466,7 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
                 </div>
               </>
             )}
-            <Playhead src={src} layout={layout} bpb={bpb} scrollRef={scrollRef} zoom={zoom} />
+            <Playhead src={src} layout={layout} scrollRef={scrollRef} zoom={zoom} />
             {entry && (
               <input
                 autoFocus
@@ -1478,7 +1506,7 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
   );
 }
 
-function Playhead({ src, layout, bpb, scrollRef, zoom }: { src: Source; layout: ScoreLayout | null; bpb: number; scrollRef: React.RefObject<HTMLDivElement | null>; zoom: number }) {
+function Playhead({ src, layout, scrollRef, zoom }: { src: Source; layout: ScoreLayout | null; scrollRef: React.RefObject<HTMLDivElement | null>; zoom: number }) {
   const position = useTransport((s) => s.position);
   const playing = useStore((s) => s.playing);
   const cursor = useStore((s) => s.cursor);
@@ -1486,11 +1514,11 @@ function Playhead({ src, layout, bpb, scrollRef, zoom }: { src: Source; layout: 
   const tView = src.fromAbs(pos);
   let geom: { x: number; top: number; h: number } | null = null;
   if (tView !== null && layout) {
-    const m = Math.floor(tView / bpb + 1e-9);
+    const mm = measureAt(src.model, tView);
     for (const sys of layout.systems) {
-      const mg = sys.measures.find((x) => x.index === m);
+      const mg = sys.measures.find((x) => x.index === mm.index);
       if (mg) {
-        geom = { x: beatToX(mg, tView - m * bpb, bpb), top: sys.staves[0].topLineY - 20, h: sys.staves[sys.staves.length - 1].topLineY + 60 - sys.staves[0].topLineY };
+        geom = { x: beatToX(mg, tView - mm.start, mm.len), top: sys.staves[0].topLineY - 20, h: sys.staves[sys.staves.length - 1].topLineY + 60 - sys.staves[0].topLineY };
         break;
       }
     }

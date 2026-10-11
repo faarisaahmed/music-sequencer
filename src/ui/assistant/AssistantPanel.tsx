@@ -1,8 +1,9 @@
 // "Chord Track" dock panel: chord track tools — progressions and next-chord ideas.
+import { meterOf } from '../../model/timeline';
 import { useMemo, useState } from 'react';
 import { Music4, Plus, ListMusic } from 'lucide-react';
 import { toast, useStore } from '../../state/store';
-import { beatsPerBar, keyName } from '../../model/music';
+import { keyName } from '../../model/music';
 import { PROGRESSIONS, chordName, suggestNext } from '../../model/accompaniment';
 import { addChord, auditionChord, fillProgression, rangesFor, useAssistantUi } from './assistantActions';
 import './assistant.css';
@@ -13,7 +14,7 @@ export default function AssistantPanel() {
   const [barsPerChord, setBarsPerChord] = useState(1);
   const ranges = useMemo(() => rangesFor(project), [project]);
   const pRange = ranges.find((r) => r.id === progRange) ?? ranges[0];
-  const bpb = beatsPerBar(project.timeSig);
+  const meter = meterOf(project);
   const chords = project.chords ?? [];
   const last = [...chords].sort((a, b) => b.beat - a.beat)[0] ?? null;
 
@@ -73,7 +74,7 @@ export default function AssistantPanel() {
               title={c.why + ' — click to add after the last chord'}
               onClick={() => {
                 const at = last ? last.beat + last.length : 0;
-                addChord(at, c.root, c.quality, bpb * barsPerChord);
+                addChord(at, c.root, c.quality, meter.addBars(at, barsPerChord) - at);
                 auditionChord(c);
                 useAssistantUi.setState({ showChords: true });
               }}

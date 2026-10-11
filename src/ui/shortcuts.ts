@@ -1,10 +1,10 @@
 // Global keyboard shortcuts (GarageBand-style).
+import { meterOf } from '../model/timeline';
 import { useEffect } from 'react';
 import { commit, openModal, redo, undo, useStore, toast } from '../state/store';
 import { copySelection, deleteRegions, loopPlaybackOver, duplicateRegions, joinRegions, pasteRegions, splitRegionsAt, toggleLoopRegions } from '../state/actions';
 import { getEngine } from '../audio/engine';
 import { flushSave } from '../state/persistence';
-import { beatsPerBar } from '../model/music';
 import { isTyping } from './common/drag';
 import { comboOf, isKey } from './keys/keymap';
 import { openFullScore } from './editors/score/FullScoreButton';
@@ -22,7 +22,7 @@ export function useGlobalShortcuts(): void {
       const mod = e.metaKey || e.ctrlKey;
       const key = e.key.toLowerCase();
       const engine = getEngine();
-      const bpb = beatsPerBar(p.timeSig);
+      const meter = meterOf(p);
       const combo = comboOf(e);
       if (!combo) return;
       const is = (id: string) => isKey(e, id, combo);
@@ -39,8 +39,9 @@ export function useGlobalShortcuts(): void {
           const t = d.tracks.find((x) => x.id === s.selectedTrackId);
           if (t) t[field] = !t[field];
         });
-      const prevBar = () => engine.seek(Math.max(0, Math.ceil(engine.position / bpb - 1.0001) * bpb));
-      const nextBar = () => engine.seek(Math.floor(engine.position / bpb + 1.0001) * bpb);
+      // Previous / next bar line (a little past a bar line counts as "on" it).
+      const prevBar = () => engine.seek(Math.max(0, meter.floorBar(engine.position - 0.05)));
+      const nextBar = () => engine.seek(meter.ceilBar(engine.position + 0.05));
       const selectTrack = (dir: number) => {
         const i = p.tracks.findIndex((t) => t.id === s.selectedTrackId);
         const j = Math.max(0, Math.min(p.tracks.length - 1, i + dir));

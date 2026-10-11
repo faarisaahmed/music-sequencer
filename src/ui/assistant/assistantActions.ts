@@ -1,8 +1,8 @@
 // Editing actions for the chord track.
+import { meterOf } from '../../model/timeline';
 import { create } from 'zustand';
 import type { ChordQuality, ChordSymbol, Project } from '../../model/types';
 import { contentEndBeat, uid } from '../../model/defaults';
-import { beatsPerBar } from '../../model/music';
 import { chordPcs, layChords, parseProgression } from '../../model/accompaniment';
 import { getEngine } from '../../audio/engine';
 import { commit, useStore } from '../../state/store';
@@ -20,7 +20,7 @@ export function chordsVisible(p: Project, show: boolean | null): boolean {
 
 export function addChord(beat: number, root: number, quality: ChordQuality, length?: number): string {
   const p = useStore.getState().project!;
-  const bpb = beatsPerBar(p.timeSig);
+  const bpb = meterOf(p).lenAt(beat);
   const id = uid('c');
   commit((d) => {
     d.chords ??= [];
@@ -59,7 +59,8 @@ export function fillProgression(roman: string, start: number, length: number, ba
   const p = useStore.getState().project!;
   const chords = parseProgression(roman, p.key);
   if (!chords.length) return 0;
-  const laid = layChords(chords, start, length, barsPerChord * beatsPerBar(p.timeSig));
+  const meter = meterOf(p);
+  const laid = layChords(chords, start, length, (b) => meter.addBars(b, barsPerChord));
   commit((d) => {
     d.chords = (d.chords ?? []).filter((c) => c.beat + c.length <= start + 1e-6 || c.beat >= start + length - 1e-6);
     d.chords.push(...laid);
@@ -99,11 +100,13 @@ export interface ChordRange {
 
 /** Ranges a progression can fill: whole song, cycle area and each section. */
 export function rangesFor(p: Project): ChordRange[] {
-  const bpb = beatsPerBar(p.timeSig);
+  const meter = meterOf(p);
+  const firstBar = (b: number) => Math.floor(meter.barPos(b) + 1e-6) + 1;
+  const lastBar = (b: number) => Math.ceil(meter.barPos(b) - 1e-6);
   const chordEnd = Math.max(0, ...(p.chords ?? []).map((c) => c.beat + c.length));
-  const songEnd = Math.max(chordEnd, contentEndBeat(p), bpb * 8);
-  const out: ChordRange[] = [{ id: 'song', label: `Whole song (bars 1–${Math.ceil(songEnd / bpb)})`, start: 0, end: songEnd }];
-  if (p.loop.end > p.loop.start) out.push({ id: 'cycle', label: `Cycle area (bars ${Math.floor(p.loop.start / bpb) + 1}–${Math.ceil(p.loop.end / bpb)})`, start: p.loop.start, end: p.loop.end });
-  for (const s of p.sections ?? []) out.push({ id: 's:' + s.id, label: `${s.name} (bar ${Math.floor(s.start / bpb) + 1})`, start: s.start, end: s.start + s.length });
+  const songEnd = Math.max(chordEnd, contentEndBeat(p), meter.barStart(8));
+  const out: ChordRange[] = [{ id: 'song', label: `Whole song (bars 1–${lastBar(songEnd)})`, start: 0, end: songEnd }];
+  if (p.loop.end > p.loop.start) out.push({ id: 'cycle', label: `Cycle area (bars ${firstBar(p.loop.start)}–${lastBar(p.loop.end)})`, start: p.loop.start, end: p.loop.end });
+  for (const s of p.sections ?? []) out.push({ id: 's:' + s.id, label: `${s.name} (bar ${firstBar(s.start)})`, start: s.start, end: s.start + s.length });
   return out;
 }

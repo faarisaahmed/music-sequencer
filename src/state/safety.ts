@@ -120,17 +120,25 @@ export async function deleteAllVersions(projectId: string): Promise<void> {
 // Which edit each song was last versioned at, so auto versions are only made after changes.
 const lastVersioned = new Map<string, { at: number; updatedAt: number }>();
 
-/** Called as you work: makes an automatic version every ten minutes of editing. */
-export async function maybeAutoVersion(p: Project, reason = 'Autosave'): Promise<void> {
-  let last = lastVersioned.get(p.id);
-  if (!last) {
-    const newest = (await listVersions(p.id))[0];
-    last = newest ? { at: newest.at, updatedAt: (await loadVersion(newest.key))?.updatedAt ?? 0 } : { at: 0, updatedAt: 0 };
-    lastVersioned.set(p.id, last);
-  }
-  if (p.updatedAt === last.updatedAt) return;
-  if (Date.now() - last.at < AUTO_EVERY && reason === 'Autosave') return;
-  await saveVersion(p, { auto: true, reason });
+let versionQueue: Promise<void> = Promise.resolve();
+
+/**
+ * Called as you work: makes an automatic version every ten minutes of editing (the first one
+ * ten minutes in). Calls run one at a time so two can't race into duplicates.
+ */
+export function maybeAutoVersion(p: Project, reason = 'Autosave'): Promise<void> {
+  versionQueue = versionQueue.then(async () => {
+    let last = lastVersioned.get(p.id);
+    if (!last) {
+      const newest = (await listVersions(p.id))[0];
+      last = newest ? { at: newest.at, updatedAt: (await loadVersion(newest.key))?.updatedAt ?? 0 } : { at: reason === 'Autosave' ? Date.now() : 0, updatedAt: reason === 'Autosave' ? -1 : 0 };
+      lastVersioned.set(p.id, last);
+    }
+    if (p.updatedAt === last.updatedAt) return;
+    if (Date.now() - last.at < AUTO_EVERY && reason === 'Autosave') return;
+    await saveVersion(p, { auto: true, reason });
+  }).catch((e) => console.warn('[versions]', e));
+  return versionQueue;
 }
 
 // ---------------------------------------------------------------- backups

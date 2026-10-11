@@ -12,6 +12,7 @@ import { getAudioContext } from '../../audio/context';
 import InputSetup from '../instruments/InputSetup';
 import { NumberField, Toggle } from '../common/controls';
 import Modal from './Modal';
+import { useTracksUi } from '../tracks/tracksUi';
 import { SafetySettings } from './SafetyPanels';
 import '../mixer/mixer.css';
 
@@ -46,19 +47,37 @@ export default function SettingsDialog() {
             if (v && v !== p.name) edit((d) => void (d.name = v));
           }}
         />
-        <span className="label">Tempo</span>
+        <span className="label">{p.tempoChanges?.length ? 'Starting tempo' : 'Tempo'}</span>
         <div className="row">
           <NumberField value={p.bpm} min={30} max={300} onCommit={setBpm} />
           <span className="dim">BPM</span>
           <input type="range" min={40} max={220} value={p.bpm} onChange={(e) => setBpm(Number(e.target.value))} style={{ flex: 1 }} />
         </div>
-        <span className="label">Time signature</span>
+        <span className="label">{p.meterChanges?.length ? 'Starting time' : 'Time signature'}</span>
         <div className="seg" style={{ justifySelf: 'start', flexWrap: 'wrap' }}>
           {TIME_SIGS.map(([n, d]) => (
             <button key={`${n}/${d}`} className={p.timeSig[0] === n && p.timeSig[1] === d ? 'on' : ''} onClick={() => setTimeSig(n, d)}>
               {n}/{d}
             </button>
           ))}
+        </div>
+        <span className="label">Changes</span>
+        <div className="row">
+          <span className="dim" style={{ fontSize: 12, flex: 1 }}>
+            {(p.tempoChanges?.length ?? 0) + (p.meterChanges?.length ?? 0)
+              ? `${p.tempoChanges?.length ?? 0} tempo and ${p.meterChanges?.length ?? 0} time-signature change${(p.meterChanges?.length ?? 0) === 1 ? '' : 's'} during the song.`
+              : 'Speed up, slow down or switch meter during the song in the Tempo lane.'}
+          </span>
+          <button
+            className="btn sm"
+            onClick={() => {
+              useTracksUi.setState({ showTempo: true });
+              useStore.setState({ dockTab: null });
+              closeModal();
+            }}
+          >
+            Show Tempo Lane
+          </button>
         </div>
         <span className="label">Key</span>
         <div className="row">

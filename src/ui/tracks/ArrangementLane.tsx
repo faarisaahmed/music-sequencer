@@ -1,9 +1,9 @@
 // Arrangement track: song sections (Intro, Verse, Chorus…) that move, copy and delete whole song parts.
+import { meterOf } from '../../model/timeline';
 import { useRef, useState } from 'react';
 import { Plus, LayoutList } from 'lucide-react';
 import type { Section } from '../../model/types';
 import { useStore } from '../../state/store';
-import { beatsPerBar } from '../../model/music';
 import { SECTION_COLORS } from '../../model/sections';
 import { addSection, cycleToSection, deleteSection, duplicateSection, moveSection, regionsInSection, resizeSection, updateSection } from '../../state/sectionActions';
 import { startDrag } from '../common/drag';
@@ -15,7 +15,8 @@ const PRESET_NAMES = ['Intro', 'Verse', 'Pre-Chorus', 'Chorus', 'Bridge', 'Break
 export default function ArrangementLane({ width, ppb }: { width: number; ppb: number }) {
   const project = useStore((s) => s.project)!;
   const sections = project.sections ?? [];
-  const bpb = beatsPerBar(project.timeSig);
+  const meter = meterOf(project);
+  const barsIn = (start: number, len: number) => Math.round(meter.barPos(start + len) - meter.barPos(start));
   const laneRef = useRef<HTMLDivElement>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [drag, setDrag] = useState<{ id: string; dx: number; target: number | null } | null>(null);
@@ -35,11 +36,11 @@ export default function ArrangementLane({ width, ppb }: { width: number; ppb: nu
       bounds.add(s.start);
       bounds.add(s.start + s.length);
     }
-    let best = Math.round(beat / bpb) * bpb;
+    let best = meter.snapToBar(beat);
     let bestD = Infinity;
     for (const b of bounds) {
       const d = Math.abs(b - beat);
-      if (d < bestD && d < bpb * 2) {
+      if (d < bestD && d < meter.lenAt(beat) * 2) {
         bestD = d;
         best = b;
       }
@@ -68,8 +69,8 @@ export default function ArrangementLane({ width, ppb }: { width: number; ppb: nu
     { label: 'Move Playhead Here', onClick: () => getEngine().seek(s.start) },
     { separator: true },
     { label: 'Duplicate Section', onClick: () => duplicateSection(s.id) },
-    { label: 'Add 4 Bars', onClick: () => resizeSection(s.id, s.length + 4 * bpb, true) },
-    { label: 'Remove 4 Bars', disabled: s.length <= 4 * bpb, onClick: () => resizeSection(s.id, s.length - 4 * bpb, true) },
+    { label: 'Add 4 Bars', onClick: () => resizeSection(s.id, meter.addBars(s.start + s.length, 4) - s.start, true) },
+    { label: 'Remove 4 Bars', disabled: barsIn(s.start, s.length) <= 4, onClick: () => resizeSection(s.id, meter.addBars(s.start + s.length, -4) - s.start, true) },
     { separator: true },
     { label: 'Delete Section & Content', onClick: () => deleteSection(s.id) },
     { label: 'Delete Marker Only', onClick: () => deleteSection(s.id, true) },
@@ -107,7 +108,7 @@ export default function ArrangementLane({ width, ppb }: { width: number; ppb: nu
     startDrag(
       e,
       ({ x }) => {
-        const end = Math.max(s.start + bpb, Math.round(beatAt(x) / bpb) * bpb);
+        const end = Math.max(s.start + meter.lenAt(s.start), meter.snapToBar(beatAt(x)));
         resizeRef.current = { id: s.id, len: end - s.start };
         setResize(resizeRef.current);
       },
@@ -135,12 +136,12 @@ export default function ArrangementLane({ width, ppb }: { width: number; ppb: nu
         style={{ width }}
         onDoubleClick={(e) => {
           if (e.target !== e.currentTarget) return;
-          const bar = Math.floor(beatAt(e.clientX) / bpb) * bpb;
+          const bar = meter.floorBar(beatAt(e.clientX));
           addSection(undefined, sections.some((s) => bar >= s.start && bar < s.start + s.length) ? undefined : bar);
         }}
         onContextMenu={(e) => {
           if (e.target !== e.currentTarget) return;
-          const bar = Math.floor(beatAt(e.clientX) / bpb) * bpb;
+          const bar = meter.floorBar(beatAt(e.clientX));
           showContextMenu(e, [
             { title: 'Add Section' },
             ...PRESET_NAMES.map((n) => ({ label: n, onClick: () => addSection(n, sections.some((s) => bar >= s.start && bar < s.start + s.length) ? undefined : bar) })),
@@ -166,7 +167,7 @@ export default function ArrangementLane({ width, ppb }: { width: number; ppb: nu
                 cycleToSection(s.id);
               }}
               onContextMenu={(e) => showContextMenu(e, menu(s))}
-              title={`${s.name} — ${Math.round(s.length / bpb)} bars · drag to move · double-click to cycle · right-click for options`}
+              title={`${s.name} — ${barsIn(s.start, s.length)} bars · drag to move · double-click to cycle · right-click for options`}
             >
               {renaming === s.id ? (
                 <input
@@ -190,7 +191,7 @@ export default function ArrangementLane({ width, ppb }: { width: number; ppb: nu
                   {s.name}
                 </span>
               )}
-              <span className="arr-bars">{Math.round(len / bpb)}</span>
+              <span className="arr-bars">{barsIn(s.start, len)}</span>
               <div className="arr-resize" onPointerDown={(e) => onResizeDown(e, s)} title="Drag to lengthen/shorten (moves later sections; hold ⌥ to resize the marker only)" />
             </div>
           );

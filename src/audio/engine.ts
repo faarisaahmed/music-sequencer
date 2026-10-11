@@ -1,6 +1,6 @@
 // Live engine: transport, lookahead scheduler, metronome, live playing & recording.
 import type { Note, Project } from '../model/types';
-import { beatsPerBar } from '../model/music';
+import { meterOf, tempoOf, TempoMap } from '../model/timeline';
 import { createMidiRegion, createAudioRegion, uid } from '../model/defaults';
 import { commit, findRegion, findTrack, toast, useStore, useTransport } from '../state/store';
 import { getAudioContext, resumeAudio } from './context';
@@ -76,9 +76,9 @@ class Engine {
     }
     if (prev && prev.id !== p.id) this.stop();
     // Tempo change while playing: re-anchor the transport.
-    if (prev && this.playing && prev.bpm !== p.bpm) {
+    if (prev && this.playing && (prev.bpm !== p.bpm || prev.tempoChanges !== p.tempoChanges)) {
       const now = this.ctx.currentTime;
-      const beat = this.beatAt(now, prev.bpm);
+      const beat = this.beatAt(now, new TempoMap(prev.bpm, prev.tempoChanges));
       this.segments = [{ ctxTime: now, beat }];
       this.scheduledBeat = Math.max(this.scheduledBeat, beat);
     }
@@ -92,15 +92,20 @@ class Engine {
 
   // ----------------------------------------------------------- transport math
 
-  private get spb(): number {
-    return 60 / (this.project?.bpm ?? 120);
+  private get tempo(): TempoMap {
+    return this.project ? tempoOf(this.project) : new TempoMap(120);
   }
 
-  private beatAt(ctxTime: number, bpm = this.project?.bpm ?? 120): number {
+  /** Seconds into the song at `beat` (for the time display). */
+  private secondsAt(beat: number): number {
+    return Math.max(0, this.tempo.sec(Math.max(0, beat)));
+  }
+
+  private beatAt(ctxTime: number, map = this.tempo): number {
     let seg = this.segments[0];
     for (const s of this.segments) if (s.ctxTime <= ctxTime + 1e-9) seg = s;
     if (!seg) return 0;
-    return seg.beat + ((ctxTime - seg.ctxTime) * bpm) / 60;
+    return map.beat(map.sec(seg.beat) + ctxTime - seg.ctxTime);
   }
 
   get position(): number {
@@ -116,7 +121,7 @@ class Engine {
   timeOfBeat(beat: number): number {
     const seg = this.segments[this.segments.length - 1];
     if (!seg) return this.ctx.currentTime;
-    return seg.ctxTime + ((beat - seg.beat) * 60) / (this.project?.bpm ?? 120);
+    return seg.ctxTime + this.tempo.span(seg.beat, beat);
   }
 
   // ----------------------------------------------------------- playback
@@ -175,7 +180,7 @@ class Engine {
     this.patternRegion = null;
     useStore.setState({ playing: false, recording: false, countingIn: false, patternPlay: null });
     const resume = returnToCursor ? s.cursor : Math.max(0, pos);
-    useTransport.setState({ position: resume, seconds: resume * this.spb });
+    useTransport.setState({ position: resume, seconds: this.secondsAt(resume) });
     if (!returnToCursor) useStore.setState({ cursor: resume });
   }
 
@@ -188,7 +193,7 @@ class Engine {
   seek(beat: number): void {
     const b = Math.max(0, beat);
     useStore.setState({ cursor: b });
-    useTransport.setState({ position: b, seconds: b * this.spb });
+    useTransport.setState({ position: b, seconds: this.secondsAt(b) });
     if (this.playing && !this.rec) void this.play(b);
   }
 
@@ -220,15 +225,17 @@ class Engine {
     const loopEnd = pat ? pat.end : p.loop.end;
     const loopOn = !!pat || (p.loop.enabled && p.loop.end > p.loop.start && !(this.rec?.kind === 'audio'));
     this.sources = this.sources.filter((s) => s.end > now);
+    const tm = tempoOf(p);
     let guard = 0;
     while (guard++ < 8) {
       const seg = this.segments[this.segments.length - 1];
-      const horizonBeat = seg.beat + ((horizon - seg.ctxTime) * p.bpm) / 60;
+      const segSec = tm.sec(seg.beat);
+      const horizonBeat = tm.beat(segSec + horizon - seg.ctxTime);
       const segEnd = loopOn && seg.beat < loopEnd ? loopEnd : Infinity;
       const b1 = Math.min(horizonBeat, segEnd);
       const b0 = this.scheduledBeat;
       if (b1 > b0) {
-        const toTime = (b: number) => seg.ctxTime + ((b - seg.beat) * 60) / p.bpm;
+        const toTime = (b: number) => seg.ctxTime + tm.sec(b) - segSec;
         scheduleRange(p, this.mixer, b0, b1, toTime, { fresh: this.freshPending, limit: segEnd, sources: this.sources, onlyTrack: pat?.trackId });
         this.scheduleMetronome(p, b0, b1, toTime);
         this.freshPending = false;
@@ -236,7 +243,7 @@ class Engine {
       }
       if (b1 >= segEnd) {
         // Wrap to loop start.
-        const wrapTime = seg.ctxTime + ((segEnd - seg.beat) * 60) / p.bpm;
+        const wrapTime = seg.ctxTime + tm.sec(segEnd) - segSec;
         this.segments.push({ ctxTime: wrapTime, beat: loopStart });
         if (this.segments.length > 8) this.segments.splice(0, this.segments.length - 8);
         this.scheduledBeat = loopStart;
@@ -247,19 +254,22 @@ class Engine {
     }
     // Auto-stop at the end of the song when not looping.
     const pos = this.beatAt(now);
-    const endBeat = p.lengthBars * beatsPerBar(p.timeSig);
+    const endBeat = meterOf(p).barStart(p.lengthBars);
     if (!loopOn && !this.rec && pos > endBeat) this.stop(false);
   }
 
   private scheduleMetronome(p: Project, b0: number, b1: number, toTime: (b: number) => number): void {
     const counting = b0 < this.countInUntil;
     if (!p.metronome && !counting && !(this.rec && p.metronome)) return;
-    const beatLen = 4 / p.timeSig[1];
-    const bpb = beatsPerBar(p.timeSig);
-    for (let b = Math.ceil(b0 / beatLen - 1e-9) * beatLen; b < b1; b += beatLen) {
-      if (!p.metronome && b >= this.countInUntil) continue;
-      const accent = Math.abs(((b % bpb) + bpb) % bpb) < 1e-6;
-      this.click(toTime(b), accent);
+    // Click every beat of each bar (eighths in 6/8 count as the beat), accenting the downbeat.
+    for (const bar of meterOf(p).bars(b0, b1)) {
+      const beatLen = 4 / bar.sig[1];
+      for (let k = 0; k * beatLen < bar.len - 1e-9; k++) {
+        const b = bar.start + k * beatLen;
+        if (b < b0 - 1e-9 || b >= b1) continue;
+        if (!p.metronome && b >= this.countInUntil) continue;
+        this.click(toTime(b), k === 0);
+      }
     }
   }
 
@@ -283,7 +293,7 @@ class Engine {
     const loop = () => {
       if (!this.playing) return;
       const pos = this.beatAt(this.ctx.currentTime - (this.ctx.outputLatency || 0));
-      useTransport.setState({ position: pos, seconds: Math.max(0, pos) * this.spb });
+      useTransport.setState({ position: pos, seconds: this.secondsAt(pos) });
       if (this.countInUntil > -Infinity && pos >= this.countInUntil && useStore.getState().countingIn) {
         useStore.setState({ countingIn: false });
       }
@@ -380,7 +390,7 @@ class Engine {
     const rec = this.rec;
     if (rec && rec.kind === 'midi' && rec.trackId === trackId && this.playing) {
       const start = this.beatAt(time);
-      if (start >= rec.startBeat - 1e-6) this.pushRecordedNote(pitch, start, start + seconds / this.spb, velocity);
+      if (start >= rec.startBeat - 1e-6) this.pushRecordedNote(pitch, start, this.tempo.beat(this.tempo.sec(start) + seconds), velocity);
     }
   }
 
@@ -400,7 +410,8 @@ class Engine {
     const t = findTrack(this.project, trackId);
     if (!ch?.instrument || !t) return;
     const transpose = t.type === 'drums' ? 0 : t.transpose;
-    ch.instrument.playNote(pitch + transpose, velocity, this.ctx.currentTime + 0.005, beats * this.spb);
+    const at = useStore.getState().cursor;
+    ch.instrument.playNote(pitch + transpose, velocity, this.ctx.currentTime + 0.005, this.tempo.span(at, at + beats));
   }
 
   // ----------------------------------------------------------- recording
@@ -419,10 +430,10 @@ class Engine {
       return;
     }
     await resumeAudio();
-    const bpb = beatsPerBar(p.timeSig);
     const cycle = p.loop.enabled && track.type !== 'audio';
     const startBeat = cycle ? p.loop.start : s.cursor;
-    const preroll = p.countIn ? bpb : 0;
+    // Count in one bar of the meter you're about to play in.
+    const preroll = p.countIn ? meterOf(p).lenAt(startBeat) : 0;
     this.rec = {
       trackId: track.id,
       startBeat,
@@ -460,15 +471,16 @@ class Engine {
     if (rec.kind === 'midi') {
       for (const [pitch, pend] of rec.pending) this.pushRecordedNote(pitch, pend.start, endPos, pend.velocity);
       if (!rec.notes.length) return;
-      const bpb = beatsPerBar(p.timeSig);
+      const meter = meterOf(p);
       let lo = Math.min(...rec.notes.map((n) => n.start));
       let hi = Math.max(...rec.notes.map((n) => n.start + n.duration));
       if (rec.cycle) {
         lo = p.loop.start;
         hi = p.loop.end;
       } else {
-        lo = Math.floor(lo / bpb) * bpb;
-        hi = Math.ceil(hi / bpb) * bpb;
+        lo = meter.floorBar(lo);
+        const last = meter.barAt(hi - 1e-6);
+        hi = last.start + last.len;
       }
       const notes = rec.notes;
       commit((d) => {
@@ -486,7 +498,7 @@ class Engine {
           r.notes = notes.map((n) => ({ ...n, start: n.start - lo }));
           t.regions.push(r);
         }
-        const bars = Math.ceil(hi / bpb) + 4;
+        const bars = Math.ceil(meter.barPos(hi) - 1e-6) + 4;
         if (bars > d.lengthBars) d.lengthBars = bars;
       });
       toast(`Recorded ${notes.length} notes`, 'success');
@@ -499,12 +511,12 @@ class Engine {
           toast('Nothing was recorded — check your microphone', 'error');
           return;
         }
-        const spb = 60 / p.bpm;
+        const tm = tempoOf(p);
         const recStartCtx = recorder.startTime >= 0 ? recorder.startTime : this.ctx.currentTime;
         const beatAtRecStart = this.beatAtSafe(recStartCtx);
         const latency = (this.ctx.baseLatency || 0) + (this.ctx.outputLatency || 0) + useInputSettings.getState().latencyMs / 1000;
         // Seconds of the recording to discard so that audio lines up with startBeat.
-        const skip = Math.max(0, (rec.startBeat - beatAtRecStart) * spb + latency);
+        const skip = Math.max(0, tm.span(beatAtRecStart, rec.startBeat) + latency);
         const startSample = Math.floor(skip * raw.sampleRate);
         const len = raw.length - startSample;
         if (len < raw.sampleRate * 0.1) return;
@@ -512,14 +524,13 @@ class Engine {
         for (let c = 0; c < raw.numberOfChannels; c++) trimmed.copyToChannel(raw.getChannelData(c).subarray(startSample), c);
         const id = uid('a');
         await addBuffer(id, trimmed, 'Recording');
-        const lengthBeats = trimmed.duration / spb;
+        const lengthBeats = tm.beat(tm.sec(rec.startBeat) + trimmed.duration) - rec.startBeat;
         commit((d) => {
           const t = d.tracks.find((x) => x.id === rec.trackId);
           if (!t) return;
           const r = createAudioRegion(rec.startBeat, lengthBeats, id, t.name);
           t.regions.push(r);
-          const bpb = beatsPerBar(d.timeSig);
-          const bars = Math.ceil((rec.startBeat + lengthBeats) / bpb) + 4;
+          const bars = Math.ceil(meterOf(p).barPos(rec.startBeat + lengthBeats) - 1e-6) + 4;
           if (bars > d.lengthBars) d.lengthBars = bars;
         });
         toast('Audio recorded', 'success');

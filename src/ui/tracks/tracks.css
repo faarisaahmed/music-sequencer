@@ -794,3 +794,177 @@
   border-radius: 6px;
   background: rgba(0, 0, 0, 0.32);
 }
+
+/* Time-signature changes: exact bar lines drawn as an image instead of a repeating grid. */
+.custom-grid .track-lane {
+  background-image: var(--lane-grid);
+  background-size: var(--grid-w) 100%;
+  background-repeat: no-repeat;
+}
+.custom-grid .automation-lane {
+  background-image: var(--lane-grid);
+  background-size: var(--grid-w) 100%;
+  background-repeat: no-repeat;
+}
+.rt-sig {
+  fill: var(--orange);
+  font-weight: 700;
+}
+
+/* ---------------------------------------------------------- tempo & time lane */
+
+.tempo-row {
+  display: flex;
+  height: 60px;
+  flex-shrink: 0;
+}
+.tempo-corner {
+  position: sticky;
+  left: 0;
+  z-index: 25;
+  width: var(--hw, 236px);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px 0 10px;
+  background: #1c1c21;
+  border-right: 1px solid #0d0d10;
+  border-bottom: 1px solid #0d0d10;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.tempo-corner span {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tempo-lane {
+  position: relative;
+  background: #141418;
+  border-bottom: 1px solid #0d0d10;
+}
+.tempo-svg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.tempo-line {
+  fill: none;
+  stroke: var(--orange);
+  stroke-width: 1.6;
+  opacity: 0.85;
+}
+.tempo-pt {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  margin: -5.5px 0 0 -5.5px;
+  border-radius: 50%;
+  background: var(--orange);
+  border: 2px solid #141418;
+  cursor: grab;
+  touch-action: none;
+  z-index: 2;
+}
+.tempo-pt.base {
+  margin-left: 0;
+}
+.tempo-pt.ramp {
+  border-radius: 2px;
+  transform: rotate(45deg);
+}
+.tempo-pt span {
+  position: absolute;
+  left: 12px;
+  top: -14px;
+  font: 600 10px var(--mono);
+  color: var(--orange);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.tempo-pt span.below {
+  top: 6px;
+}
+.tempo-pt.ramp span {
+  transform: rotate(-45deg);
+  transform-origin: left bottom;
+}
+html.touch .tempo-pt::after {
+  content: '';
+  position: absolute;
+  inset: -12px;
+}
+.meter-flag {
+  position: absolute;
+  bottom: 3px;
+  padding: 0 5px;
+  height: 16px;
+  line-height: 16px;
+  border-radius: 3px;
+  background: #2b2b33;
+  border-left: 2px solid var(--cyan);
+  color: var(--text);
+  font: 700 10.5px var(--mono);
+  cursor: pointer;
+  touch-action: none;
+  z-index: 3;
+  white-space: nowrap;
+}
+.meter-flag.base {
+  opacity: 0.7;
+}
+.tempo-pop {
+  position: fixed;
+  z-index: 950;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  padding: 10px;
+  width: 250px;
+}
+.tempo-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 2px;
+}
+.m-sheet .tempo-edit {
+  padding: 4px 10px 10px;
+}
+.tempo-edit-head {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+.tempo-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+}
+.tempo-edit-row input {
+  width: 90px;
+  font: 600 16px var(--mono);
+}
+.tempo-del {
+  align-self: flex-start;
+  color: var(--record);
+}
+.meter-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+}
+.meter-grid .btn {
+  justify-content: center;
+  font-family: var(--mono);
+}
+.tempo-edit-note {
+  font-size: 11px;
+}

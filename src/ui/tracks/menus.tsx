@@ -1,4 +1,5 @@
 // Context menus for regions, lanes and track headers.
+import { meterOf } from '../../model/timeline';
 import { Copy, Scissors, Trash2, ClipboardPaste, Repeat, SquarePen, Plus, FileAudio, Palette, Pencil, Music, Play, Unlink, Repeat1, Shuffle } from 'lucide-react';
 import { GROOVE_PRESETS, grooveLabel, swingPercent } from '../../model/groove';
 import { isLinkedClip, patternUseCounts } from '../../model/patterns';
@@ -28,7 +29,6 @@ import {
   updateTrack,
 } from '../../state/actions';
 import { getEngine } from '../../audio/engine';
-import { beatsPerBar } from '../../model/music';
 import type { MenuItem } from '../common/menus';
 import { useTracksUi } from './tracksUi';
 
@@ -84,7 +84,8 @@ export function regionMenu(regionId: string, clickBeat: number): MenuItem[] {
   const isAudio = r.kind === 'audio';
   const grid = useStore.getState().snapGrid || 0.25;
   const splitBeat = Math.round(clickBeat / grid) * grid;
-  const bpb = beatsPerBar(p.timeSig);
+  const meter = meterOf(p);
+  const bpb = meter.lenAt(r.start);
   const items: MenuItem[] = [
     { label: 'Open in Editor', icon: <SquarePen size={14} />, onClick: () => openRegionEditor(regionId) },
     ...(isLinkedClip(r)
@@ -115,7 +116,7 @@ export function regionMenu(regionId: string, clickBeat: number): MenuItem[] {
             x.loop = true;
             x.contentLength = Math.max(0.25, x.offset + x.length);
           }
-          x.length = Math.max(x.length, p.lengthBars * bpb - 4 * bpb - x.start);
+          x.length = Math.max(x.length, meter.barStart(p.lengthBars - 4) - x.start);
         }),
     },
     { label: 'Rename', icon: <Pencil size={14} />, onClick: () => useTracksUi.setState({ renamingRegionId: regionId }) },
@@ -259,8 +260,7 @@ export function pickAudioFile(trackId: string | undefined, beat: number): void {
 }
 
 export function laneMenu(track: Track, beat: number): MenuItem[] {
-  const bpb = beatsPerBar(useStore.getState().project!.timeSig);
-  const barBeat = Math.floor(beat / bpb) * bpb;
+  const barBeat = meterOf(useStore.getState().project!).floorBar(beat);
   const pattern = track.type === 'drums' ? currentPatternClip(useStore.getState().project!, track.id) : undefined;
   return [
     {

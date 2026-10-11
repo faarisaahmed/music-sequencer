@@ -1,6 +1,7 @@
 // Offline rendering and file export (MP3, M4A, FLAC, WAV, OGG, MIDI).
 import type { Project } from '../model/types';
 import { contentEndBeat } from '../model/defaults';
+import { tempoOf } from '../model/timeline';
 import { Mixer } from './mixer';
 import { scheduleRange } from './schedule';
 import { encodeWav } from './wav';
@@ -20,10 +21,10 @@ export async function renderProject(p: Project, opts: RenderOptions = {}): Promi
   await ensureClips(projectAudioIds(p));
   const start = opts.start ?? 0;
   const end = opts.end ?? Math.max(contentEndBeat(p), 4);
-  const spb = 60 / p.bpm;
+  const tm = tempoOf(p);
   const sr = opts.sampleRate ?? 44100;
   const tail = opts.tail ?? 2.5;
-  const seconds = (end - start) * spb + tail;
+  const seconds = tm.span(start, end) + tail;
   // Only build and schedule tracks that can actually be heard (muted/un-soloed tracks
   // cost render time but contribute nothing).
   const anySolo = p.tracks.some((t) => t.solo);
@@ -36,8 +37,9 @@ export async function renderProject(p: Project, opts: RenderOptions = {}): Promi
   mixer.sync(proj);
   await mixer.ready();
   const offset = 0.05;
-  const toTime = (b: number) => offset + (b - start) * spb;
-  const beatAt = (t: number) => Math.min(end, Math.max(start, start + (t - offset) / spb));
+  const s0 = tm.sec(start);
+  const toTime = (b: number) => offset + tm.sec(b) - s0;
+  const beatAt = (t: number) => Math.min(end, Math.max(start, tm.beat(s0 + t - offset)));
   // Schedule incrementally (like live playback) instead of all at once: Chrome's offline
   // renderer pays for every pending node on every render quantum, so pre-scheduling a
   // whole song makes long exports many times slower.

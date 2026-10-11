@@ -1,4 +1,5 @@
 // Mouse-driven region editing: move / copy, trim, loop-extend, fades.
+import { tempoOf } from '../../model/timeline';
 import type { Draft } from 'immer';
 import type { Project, Region } from '../../model/types';
 import { snap } from '../../model/music';
@@ -31,11 +32,14 @@ function trackRows(): { id: string; top: number; bottom: number }[] {
   });
 }
 
-function audioMaxBeats(r: Region, bpm: number): number {
+/** How many beats of the song the whole recording lasts, from where its content starts. */
+function audioMaxBeats(r: Region, p: Project): number {
   if (r.kind !== 'audio') return Infinity;
   const buf = getBuffer(r.audioId);
   if (!buf) return Infinity;
-  return buf.duration / (60 / bpm);
+  const tm = tempoOf(p);
+  const origin = r.start - r.offset;
+  return tm.beat(tm.sec(origin) + buf.duration) - origin;
 }
 
 /** Drag-move the selected regions (alt = copy). Calls onClick if the pointer didn't move. */
@@ -145,7 +149,7 @@ export function dragResizeRight(e: React.PointerEvent, id: string): void {
       let end = o.start + o.length + dx / ppb;
       if (grid) end = snap(end, grid);
       let len = Math.max(MIN_LEN, end - o.start);
-      if (!o.loop && o.kind === 'audio') len = Math.min(len, audioMaxBeats(o, p0.bpm) - o.offset);
+      if (!o.loop && o.kind === 'audio') len = Math.min(len, audioMaxBeats(o, p0) - o.offset);
       useTracksUi.setState({ snapLine: o.start + len });
       editRegion(id, (r, d) => {
         r.length = len;

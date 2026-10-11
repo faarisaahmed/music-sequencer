@@ -1,11 +1,12 @@
 // Audio region editor: waveform with trim, fade and gain handles, plus reverse,
 // normalize, loop and "convert to Sampler" (sampling) tools.
+import { meterOf, tempoOf } from '../../model/timeline';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ZoomIn, ZoomOut, Repeat, FlipHorizontal2, AudioWaveform, Maximize, Eraser } from 'lucide-react';
 import type { AudioRegion } from '../../model/types';
 import { uid } from '../../model/defaults';
-import { beatsPerBar, formatPosition, formatTime } from '../../model/music';
+import { formatTime } from '../../model/music';
 import { beginGesture, commit, draftRegion, endGesture, findRegion, live, toast, useStore, useTransport } from '../../state/store';
 import { addTrack, updateTrack } from '../../state/actions';
 import { addBuffer, getBuffer, getPeaks, onAudioChange } from '../../audio/audioStore';
@@ -51,11 +52,14 @@ export default function AudioEditor({ trackId, regionId }: { trackId: string; re
     return () => ro.disconnect();
   }, []);
 
-  const spb = 60 / project.bpm;
+  // The clip plays in real time from where its content starts; convert through the song's tempo.
+  const tm = tempoOf(project);
+  const clipBase = region ? region.start - region.offset : 0;
+  const secOf = (contentBeat: number) => tm.span(clipBase, clipBase + contentBeat);
   const buf = region ? getBuffer(region.audioId) : undefined;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const peaks = useMemo(() => (region ? getPeaks(region.audioId, PEAK_BINS) : undefined), [region?.audioId, audioVer]);
-  const bufBeats = buf ? buf.duration / spb : region ? region.offset + region.length : 4;
+  const bufBeats = buf ? tm.beat(tm.sec(clipBase) + buf.duration) - clipBase : region ? region.offset + region.length : 4;
   const regionEndC = region ? region.offset + region.length : 0; // in content beats
   const totalBeats = Math.max(bufBeats, regionEndC) + 2;
   const pad = 24; // left padding px
@@ -86,19 +90,22 @@ export default function AudioEditor({ trackId, regionId }: { trackId: string; re
     const mid = top + (h - top - 8) / 2;
     const amp = (h - top - 12) / 2;
     // beat grid (song bars)
-    const bpb = beatsPerBar(project.timeSig);
+    const meter = meterOf(project);
     const songBase = region.start - region.offset;
-    for (let b = Math.floor(scrollX / ppb) - 1; b <= (scrollX + w) / ppb + 1; b++) {
-      const abs = songBase + b;
-      const bar = Math.abs(((abs % bpb) + bpb) % bpb) < 1e-6;
-      if (!bar && ppb < 10) continue;
-      ctx.fillStyle = bar ? 'rgba(255,255,255,0.13)' : 'rgba(255,255,255,0.05)';
-      ctx.fillRect(Math.round(xOf(b)), 0, 1, h);
-      if (bar) {
-        ctx.fillStyle = '#9a9aa4';
-        ctx.font = '600 10px -apple-system, sans-serif';
-        ctx.fillText(String(Math.floor(abs / bpb) + 1), xOf(b) + 3, 12);
+    const v0 = Math.floor(scrollX / ppb) - 1;
+    const v1 = (scrollX + w) / ppb + 1;
+    if (ppb >= 10)
+      for (let b = v0; b <= v1; b++) {
+        ctx.fillStyle = 'rgba(255,255,255,0.05)';
+        ctx.fillRect(Math.round(xOf(b)), 0, 1, h);
       }
+    for (const bar of meter.bars(songBase + v0, songBase + v1)) {
+      const x = xOf(bar.start - songBase);
+      ctx.fillStyle = 'rgba(255,255,255,0.13)';
+      ctx.fillRect(Math.round(x), 0, 1, h);
+      ctx.fillStyle = '#9a9aa4';
+      ctx.font = '600 10px -apple-system, sans-serif';
+      ctx.fillText(String(bar.bar + 1), x + 3, 12);
     }
     // region area
     const rx0 = xOf(region.offset);
@@ -228,8 +235,8 @@ export default function AudioEditor({ trackId, regionId }: { trackId: string; re
   const normalize = () => {
     if (!buf) return;
     let peak = 0;
-    const s0 = Math.floor(region.offset * spb * buf.sampleRate);
-    const s1 = Math.min(buf.length, Math.floor((region.offset + region.length) * spb * buf.sampleRate));
+    const s0 = Math.floor(secOf(region.offset) * buf.sampleRate);
+    const s1 = Math.min(buf.length, Math.floor(secOf(region.offset + region.length) * buf.sampleRate));
     for (let ch = 0; ch < buf.numberOfChannels; ch++) {
       const d = buf.getChannelData(ch);
       const a = region.reversed ? buf.length - s1 : s0;
@@ -246,8 +253,8 @@ export default function AudioEditor({ trackId, regionId }: { trackId: string; re
   const toSampler = async () => {
     if (!buf) return;
     const ctx = getAudioContext();
-    const s0 = Math.floor(region.offset * spb * buf.sampleRate);
-    const s1 = Math.min(buf.length, Math.floor((region.offset + Math.min(region.length, region.loop ? region.contentLength : region.length)) * spb * buf.sampleRate));
+    const s0 = Math.floor(secOf(region.offset) * buf.sampleRate);
+    const s1 = Math.min(buf.length, Math.floor(secOf(region.offset + Math.min(region.length, region.loop ? region.contentLength : region.length)) * buf.sampleRate));
     const len = Math.max(1, s1 - s0);
     const src = getBuffer(region.audioId, region.reversed) ?? buf;
     const out = ctx.createBuffer(buf.numberOfChannels, len, buf.sampleRate);
@@ -385,16 +392,16 @@ export default function AudioEditor({ trackId, regionId }: { trackId: string; re
           Clip <b>{region.name}</b>
         </span>
         <span>
-          Starts <b className="mono">{formatPosition(region.start, project.timeSig)}</b>
+          Starts <b className="mono">{meterOf(project).format(region.start)}</b>
         </span>
         <span>
-          Length <b className="mono">{formatTime(region.length * spb)}</b>
+          Length <b className="mono">{formatTime(tm.span(region.start, region.start + region.length))}</b>
         </span>
         <span>
           Source <b className="mono">{buf ? formatTime(buf.duration) : '—'}</b>
         </span>
         <span>
-          Fades <b className="mono">{(region.fadeIn * spb).toFixed(2)}s / {(region.fadeOut * spb).toFixed(2)}s</b>
+          Fades <b className="mono">{tm.span(region.start, region.start + region.fadeIn).toFixed(2)}s / {tm.span(region.start + region.length - region.fadeOut, region.start + region.length).toFixed(2)}s</b>
         </span>
         <span className="faint">Drag the blue edges to trim, yellow dots to fade · ⌘-scroll to zoom</span>
       </div>

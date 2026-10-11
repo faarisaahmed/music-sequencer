@@ -2,7 +2,7 @@
 import type { Draft } from 'immer';
 import type { Articulation, MidiRegion, Note, Project, ScoreMark } from '../../../model/types';
 import { createMidiRegion, uid } from '../../../model/defaults';
-import { beatsPerBar } from '../../../model/music';
+import { meterOf } from '../../../model/timeline';
 import { commit, draftRegion, useStore } from '../../../state/store';
 import { growSong } from '../../../state/actions';
 import { dynamicVel } from './notation';
@@ -31,8 +31,9 @@ export interface Placement {
 function ensureLength(d: Draft<Project>, r: DRegion, end: number): void {
   const { viewLen } = viewOf(r);
   if (end <= viewLen + 1e-6) return;
-  const bpb = beatsPerBar(d.timeSig);
-  const newLen = Math.ceil(end / bpb - 1e-6) * bpb;
+  // Whole bars, counted from where the region's score starts.
+  const rm = meterOf(d).relativeTo(r.start - (r.loop ? r.offset : 0));
+  const newLen = rm.ceilBar(end);
   if (r.loop) {
     r.contentLength = newLen;
     r.length = Math.max(r.length, newLen);
@@ -53,7 +54,7 @@ function resolve(d: Draft<Project>, pl: Placement, t: number, dur: number): { r:
   }
   const track = d.tracks.find((x) => x.id === pl.trackId);
   if (!track || track.type === 'audio') return null;
-  const bpb = beatsPerBar(d.timeSig);
+  const meter = meterOf(d);
   const regions = track.regions.filter((r) => r.kind === 'midi') as DRegion[];
   const host = regions.find((r) => !r.muted && r.start <= t + 1e-6 && t < r.start + r.length - 1e-6);
   if (host) {
@@ -64,25 +65,25 @@ function resolve(d: Draft<Project>, pl: Placement, t: number, dur: number): { r:
     }
     const end = t + dur;
     if (end > host.start + host.length + 1e-6) {
-      host.length = Math.ceil((end - host.start) / bpb - 1e-6) * bpb;
+      host.length = meter.ceilBar(end) - host.start;
       host.contentLength = Math.max(host.contentLength, host.offset + host.length);
       growSong(d, host.start + host.length);
     }
     return { r: host, cT: t - host.start + host.offset };
   }
   // Extend a region that ends earlier in the same bar (or exactly where we write).
-  const barStart = Math.floor(t / bpb + 1e-9) * bpb;
+  const barStart = meter.floorBar(t);
   const prev = regions
     .filter((r) => !r.loop && r.start + r.length <= t + 1e-6 && r.start + r.length >= barStart - 1e-6)
     .sort((a, b) => b.start + b.length - (a.start + a.length))[0];
   if (prev) {
-    prev.length = Math.ceil((t + dur - prev.start) / bpb - 1e-6) * bpb;
+    prev.length = meter.ceilBar(t + dur) - prev.start;
     prev.contentLength = Math.max(prev.contentLength, prev.offset + prev.length);
     growSong(d, prev.start + prev.length);
     return { r: prev, cT: t - prev.start + prev.offset };
   }
   const next = regions.filter((r) => r.start > t).sort((a, b) => a.start - b.start)[0];
-  let len = Math.max(bpb, Math.ceil((t + dur - barStart) / bpb - 1e-6) * bpb);
+  let len = Math.max(meter.lenAt(barStart), meter.ceilBar(t + dur) - barStart);
   if (next) len = Math.max(Math.min(len, next.start - barStart), t + dur - barStart);
   const r = createMidiRegion(barStart, len, [], track.name);
   track.regions.push(r);
@@ -322,7 +323,8 @@ export function addBars(regionId: string, bars: number): void {
   commit((d) => {
     const r = midi(d, regionId);
     if (!r) return;
-    ensureLength(d, r, viewOf(r).viewLen + bars * beatsPerBar(d.timeSig));
+    const rm = meterOf(d).relativeTo(r.start - (r.loop ? r.offset : 0));
+    ensureLength(d, r, rm.addBars(viewOf(r).viewLen, bars));
   });
 }
 

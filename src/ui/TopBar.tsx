@@ -23,10 +23,10 @@ import {
   Music4,
   History,
 } from 'lucide-react';
-import { beginGesture, commit, endGesture, live, openModal, redo, undo, useStore, useTransport, type DockTab } from '../state/store';
-import { closeProject, setBpm, setKey } from '../state/actions';
+import { commit, openModal, redo, undo, useStore, useTransport, type DockTab } from '../state/store';
+import { closeProject, setKey } from '../state/actions';
 import { getEngine } from '../audio/engine';
-import { formatPosition, formatTime, keyName as fullKeyName, keyUsesFlats, makeKey, pitchClassName, scaleType } from '../model/music';
+import { formatTime, keyName as fullKeyName, keyUsesFlats, makeKey, pitchClassName, scaleType } from '../model/music';
 import type { KeySignature } from '../model/types';
 import GroovePanel from './groove/GroovePanel';
 import { grooveLabel, isStraight, swingPercent } from '../model/groove';
@@ -35,6 +35,8 @@ import { saveListeners, type SaveStatus } from '../state/persistence';
 import { HSlider } from './common/controls';
 import { startDrag } from './common/drag';
 import FullScoreButton from './editors/score/FullScoreButton';
+import { meterOf, tempoOf } from '../model/timeline';
+import { MAX_BPM, MIN_BPM, setTempoAt, tempoGesture } from '../state/timelineActions';
 import { CollabBar } from './collab/CollabUI';
 
 function MetronomeIcon({ size = 17 }: { size?: number }) {
@@ -72,40 +74,41 @@ function Lcd() {
   const [swingOpen, setSwingOpen] = useState(false);
   const [bpmEdit, setBpmEdit] = useState<string | null>(null);
   const pos = playing ? position : cursor;
-  const spb = 60 / project.bpm;
+  const tm = tempoOf(project);
+  const meter = meterOf(project);
+  const here = Math.max(0, pos);
+  const bpmHere = Math.round(tm.bpmAt(here) * 10) / 10;
+  const sigHere = meter.sigAt(here);
 
   return (
     <div className="lcd">
       <div className="lcd-cell lcd-pos" onClick={() => setMode(mode === 'beats' ? 'time' : 'beats')} title="Click to switch bars / time">
-        <div className="lcd-big mono">{countingIn ? 'COUNT-IN' : mode === 'beats' ? formatPosition(Math.max(0, pos), project.timeSig) : formatTime(Math.max(0, pos) * spb)}</div>
+        <div className="lcd-big mono">{countingIn ? 'COUNT-IN' : mode === 'beats' ? meter.format(here) : formatTime(tm.sec(here))}</div>
         <div className="lcd-small">{mode === 'beats' ? 'BAR · BEAT' : 'TIME'}</div>
       </div>
       <div className="lcd-sep" />
       <div
         className="lcd-cell"
-        title="Tempo — drag up/down or double-click to type"
+        title={(project.tempoChanges?.length ? 'Tempo here (this song changes tempo; see the Tempo lane)' : 'Tempo') + ': drag up/down or double-click to type'}
         style={{ cursor: 'ns-resize' }}
         onPointerDown={(e) => {
           if (bpmEdit !== null) return;
-          const b0 = project.bpm;
+          const b0 = bpmHere;
           let started = false;
           startDrag(
             e,
             ({ dy }) => {
               if (!started) {
                 started = true;
-                beginGesture();
+                tempoGesture.begin();
               }
-              const v = Math.round(Math.max(30, Math.min(300, b0 - dy / 2)));
-              live((d) => {
-                d.bpm = v;
-              });
+              tempoGesture.move(here, Math.round(Math.max(MIN_BPM, Math.min(MAX_BPM, b0 - dy / 2))));
             },
-            () => endGesture(),
+            () => started && tempoGesture.end(),
             { threshold: 3 },
           );
         }}
-        onDoubleClick={() => setBpmEdit(String(project.bpm))}
+        onDoubleClick={() => setBpmEdit(String(bpmHere))}
       >
         {bpmEdit !== null ? (
           <input
@@ -115,7 +118,7 @@ function Lcd() {
             onChange={(e) => setBpmEdit(e.target.value)}
             onBlur={() => {
               const v = parseFloat(bpmEdit);
-              if (!isNaN(v)) setBpm(v);
+              if (!isNaN(v)) setTempoAt(here, v);
               setBpmEdit(null);
             }}
             onKeyDown={(e) => {
@@ -125,7 +128,7 @@ function Lcd() {
             }}
           />
         ) : (
-          <div className="lcd-big mono">{project.bpm}</div>
+          <div className="lcd-big mono">{bpmHere}</div>
         )}
         <div className="lcd-small">TEMPO</div>
       </div>
@@ -142,9 +145,9 @@ function Lcd() {
         {swingOpen && <GroovePanel scope={{ kind: 'song' }} onClose={() => setSwingOpen(false)} />}
       </div>
       <div className="lcd-sep" />
-      <div className="lcd-cell" style={{ cursor: 'pointer' }} onClick={() => openModal('settings')} title="Time signature">
+      <div className="lcd-cell" style={{ cursor: 'pointer' }} onClick={() => openModal('settings')} title="Time signature here">
         <div className="lcd-big mono">
-          {project.timeSig[0]}/{project.timeSig[1]}
+          {sigHere[0]}/{sigHere[1]}
         </div>
         <div className="lcd-small">TIME</div>
       </div>

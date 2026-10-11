@@ -1,6 +1,7 @@
 // Live-play router for on-screen keyboard, chord strips, drum pads and musical typing.
 // Applies scale lock, sustain and the arpeggiator before notes reach the engine
 // (so everything played here is also captured when recording).
+import { tempoOf } from '../../model/timeline';
 import { create } from 'zustand';
 import { getEngine } from '../../audio/engine';
 import { findTrack, useStore } from '../../state/store';
@@ -84,7 +85,7 @@ function arpTick() {
   if (!arpTrack || !p) return stopArp();
   const seq = arpSequence();
   if (!seq.length) return stopArp();
-  const stepSec = (st.arpRate * 60) / p.bpm;
+  const stepSec = (st.arpRate * 60) / tempoOf(p).bpmAt(engine.position);
   const now = engine.ctx.currentTime;
   if (arpNextTime < now - stepSec) arpNextTime = now; // fell behind (tab hidden) — resync
   while (arpNextTime < now + ARP_LOOKAHEAD) {
@@ -107,7 +108,7 @@ function startArp(trackId: string) {
     const rate = usePlayer.getState().arpRate;
     const pos = engine.position;
     const nextStep = Math.ceil(pos / rate - 0.05) * rate;
-    arpNextTime = Math.max(engine.ctx.currentTime + 0.002, engine.ctx.currentTime + ((nextStep - pos) * 60) / p.bpm);
+    arpNextTime = Math.max(engine.ctx.currentTime + 0.002, engine.ctx.currentTime + tempoOf(p).span(pos, nextStep));
   }
   arpTick();
   arpTimer = setInterval(arpTick, ARP_TICK_MS);

@@ -20,6 +20,7 @@ import {
 } from 'vexflow';
 import type { Articulation as Artic, KeySignature } from '../../../model/types';
 import { LETTERS, durCode, keyAlters, spell, diatonicIndex, vexKeySpec, type Clef, type Piece, type ScoreModel } from './notation';
+import { measureAt } from './notation';
 
 // VexFlow measures text by inserting <text> into the live SVG and calling getBBox(), which forces a
 // layout of the whole (growing) score for every new label. Measure with a canvas instead.
@@ -129,6 +130,8 @@ export interface RenderOpts {
   title?: string;
   subtitle?: string;
   tempo?: number;
+  /** Tempo changes (display beats): drawn as ♩ = 90, or accel./rit. for gradual ones. */
+  tempoMarks?: { t: number; bpm: number; ramp?: boolean; faster?: boolean }[];
   chords: ChordLabel[];
   /** Part labels may carry a transposition suffix ("Trumpet in B♭"). */
   partLabels: string[];
@@ -200,15 +203,21 @@ export function planScore(model: ScoreModel, widthPx: number, zoom: number, opts
   const lines: Line[] = [];
   let cur: Line = { measures: [], widths: [], left: MARGIN + nameW(true) };
   let used = 0;
+  // Room for a new time signature where the meter changes.
+  const sigW = (m: number) => {
+    const a = model.measures[m - 1]?.sig;
+    const b = model.measures[m].sig;
+    return m > 0 && a && (a[0] !== b[0] || a[1] !== b[1]) ? 30 : 0;
+  };
   model.measures.forEach((_, m) => {
     const avail = logicalW - MARGIN - cur.left;
     const first = cur.measures.length === 0;
-    const w = measureMinWidth(model, m) + (first ? headerW(lines.length === 0) : 0);
+    const w = measureMinWidth(model, m) + sigW(m) + (first ? headerW(lines.length === 0) : 0);
     if (!first && used + w > avail) {
       lines.push(cur);
       cur = { measures: [], widths: [], left: MARGIN + nameW(false) };
       used = 0;
-      const w2 = measureMinWidth(model, m) + headerW(false);
+      const w2 = measureMinWidth(model, m) + sigW(m) + headerW(false);
       cur.measures.push(m);
       cur.widths.push(w2);
       used += w2;
@@ -368,9 +377,8 @@ function drawSystem(ctx: DrawCtx, plan: ScorePlan, li: number, layout: ScoreLayo
     ctx.restore();
   }
 
-  const timeSpec = `${opts.timeSig[0]}/${opts.timeSig[1]}`;
-  const compound = opts.timeSig[1] === 8 && opts.timeSig[0] % 3 === 0 && opts.timeSig[0] > 3;
-  const beamUnit = compound ? 1.5 : opts.timeSig[1] === 2 ? 2 : 1;
+  // Beam groups follow each measure's meter (dotted quarters in 6/8, halves in 2/2…).
+  const beamUnitOf = (sig: [number, number]) => (sig[1] === 8 && sig[0] % 3 === 0 && sig[0] > 3 ? 1.5 : sig[1] === 2 ? 2 : sig[1] === 8 ? 1.5 : 1);
 
   // Tie bookkeeping within this system (keyed by unique note instance).
   const lastSeen = new Map<string, { note: StaveNote; index: number; system: number }>();
@@ -385,6 +393,9 @@ function drawSystem(ctx: DrawCtx, plan: ScorePlan, li: number, layout: ScoreLayo
     line.measures.forEach((m, k) => {
       const w = line.widths[k];
       const mm = model.measures[m];
+      const prevSig = m > 0 ? model.measures[m - 1].sig : null;
+      const sigChanged = !prevSig || prevSig[0] !== mm.sig[0] || prevSig[1] !== mm.sig[1];
+      const beamUnit = beamUnitOf(mm.sig);
       const staves = model.staves.map((ref, si) => {
         const st = new Stave(x, vl.staffY[si], w);
         const key = opts.partKeys[ref.part];
@@ -392,9 +403,9 @@ function drawSystem(ctx: DrawCtx, plan: ScorePlan, li: number, layout: ScoreLayo
           if (ref.clef === 'treble8vb') st.addClef('treble', 'default', '8vb');
           else st.addClef(ref.clef);
           if (ref.clef !== 'percussion') st.addKeySignature(vexKeySpec(key));
-          if (li === 0) st.addTimeSignature(timeSpec);
+          if (li === 0 || sigChanged) st.addTimeSignature(`${mm.sig[0]}/${mm.sig[1]}`);
           if (si === 0) st.setMeasure(opts.firstBarNumber + m);
-        }
+        } else if (sigChanged) st.addTimeSignature(`${mm.sig[0]}/${mm.sig[1]}`);
         if (m === model.measures.length - 1) st.setEndBarType(BarlineType.END);
         st.setContext(ctx);
         return st;
@@ -535,7 +546,7 @@ function drawSystem(ctx: DrawCtx, plan: ScorePlan, li: number, layout: ScoreLayo
             if (beamable) group.push(notes[i]);
           });
           flushBeam();
-          const voice = new Voice({ num_beats: opts.timeSig[0], beat_value: opts.timeSig[1] }).setMode(Voice.Mode.SOFT);
+          const voice = new Voice({ num_beats: mm.sig[0], beat_value: mm.sig[1] }).setMode(Voice.Mode.SOFT);
           voice.addTickables(notes);
           staffVoices.push(voice);
         });
@@ -691,6 +702,25 @@ function drawSystem(ctx: DrawCtx, plan: ScorePlan, li: number, layout: ScoreLayo
       }
     }
 
+    // ---- tempo changes in this system
+    if (opts.tempoMarks?.length && sys.staves[0]) {
+      const top = sys.staves[0];
+      let minY = top.topLineY;
+      for (const h of layout.heads) if (h.system === li && h.staff === top.index) minY = Math.min(minY, h.y - (h.voice === 2 ? 0 : 34));
+      const y = Math.min(top.topLineY - 24, minY - 10) - (opts.chords.length ? 22 : 0);
+      for (const tk of opts.tempoMarks) {
+        if (tk.t < 1e-6 && !tk.ramp) continue;
+        const mm = measureAt(model, tk.t);
+        const mg = sys.measures.find((g) => g.index === mm.index);
+        if (!mg || tk.t > mm.start + mm.len) continue;
+        const x = beatToX(mg, tk.t - mm.start, mm.len);
+        ctx.save();
+        ctx.setFont('Georgia, serif', 12.5, 'bold');
+        ctx.fillText(tk.ramp ? `${tk.faster ? 'accel.' : 'rit.'} → ♩ = ${Math.round(tk.bpm)}` : `♩ = ${Math.round(tk.bpm)}`, x - 4, y);
+        ctx.restore();
+      }
+    }
+
     // ---- tempo marking above the first system (drawn above chord symbols)
     if (li === 0 && opts.tempo && sys.staves[0]) {
       const top = sys.staves[0];
@@ -705,10 +735,10 @@ function drawSystem(ctx: DrawCtx, plan: ScorePlan, li: number, layout: ScoreLayo
 
     // ---- chord symbols above the top staff
     const beatX = (t: number): number | null => {
-      const m = Math.floor(t / model.bpb + 1e-9);
-      const mg = sys.measures.find((g) => g.index === m);
+      const mm = measureAt(model, t);
+      const mg = sys.measures.find((g) => g.index === mm.index);
       if (!mg) return null;
-      return beatToX(mg, t - m * model.bpb, model.bpb);
+      return beatToX(mg, t - mm.start, mm.len);
     };
     if (opts.chords.length && sys.staves[0]) {
       ctx.save();
@@ -743,8 +773,8 @@ function drawSystem(ctx: DrawCtx, plan: ScorePlan, li: number, layout: ScoreLayo
           } else {
             const firstM = sys.measures[0];
             const lastM = sys.measures[sys.measures.length - 1];
-            const sysStart = firstM.index * model.bpb;
-            const sysEnd = (lastM.index + 1) * model.bpb;
+            const sysStart = model.measures[firstM.index].start;
+            const sysEnd = model.measures[lastM.index].start + model.measures[lastM.index].len;
             const end = mk.end ?? mk.t + 1;
             if (end < sysStart || mk.t >= sysEnd) continue;
             const x0 = mk.t >= sysStart ? beatX(mk.t)! : firstM.noteX0 - 4;

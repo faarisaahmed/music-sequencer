@@ -1,9 +1,10 @@
 // High-level editing operations shared across views.
+import { meterOf, tempoOf } from '../model/timeline';
 import { current, isDraft, type Draft } from 'immer';
 import type { Groove, MidiRegion, Note, Project, Region, ScaleType, Track, TrackType } from '../model/types';
 import { applyGroove, grooveFor } from '../model/groove';
 import { createAudioRegion, createMidiRegion, createProject, createTrack, uid } from '../model/defaults';
-import { beatsPerBar, snap } from '../model/music';
+import { snap } from '../model/music';
 import { getPreset } from '../audio/presets';
 import { addClip, getClipBlob } from '../audio/audioStore';
 import { getEngine } from '../audio/engine';
@@ -198,9 +199,10 @@ export function createEmptyRegion(trackId: string, start: number, length?: numbe
   const p = useStore.getState().project;
   const t = p?.tracks.find((x) => x.id === trackId);
   if (!p || !t || t.type === 'audio') return null;
-  const bpb = beatsPerBar(p.timeSig);
-  const len = length ?? bpb * (t.type === 'drums' ? 1 : 4);
-  const r = createMidiRegion(Math.max(0, Math.floor(start / bpb) * bpb), len, [], t.name);
+  const meter = meterOf(p);
+  const at = Math.max(0, meter.floorBar(start));
+  const len = length ?? meter.addBars(at, t.type === 'drums' ? 1 : 4) - at;
+  const r = createMidiRegion(at, len, [], t.name);
   if (t.type === 'drums') {
     // Drum regions are Beat Sequencer patterns: they loop and can be placed again, linked.
     r.loop = true;
@@ -249,8 +251,7 @@ export function placePattern(trackId: string, beat: number, sourceId: string): s
   const p = useStore.getState().project;
   const src = findRegion(p, sourceId)?.region;
   if (!p || !src || src.kind !== 'midi') return null;
-  const bpb = beatsPerBar(p.timeSig);
-  const start = Math.max(0, Math.floor(beat / bpb + 1e-6) * bpb);
+  const start = Math.max(0, meterOf(p).floorBar(beat));
   const c = cloneRegion(src, { start, offset: 0, length: src.contentLength, loop: true }) as MidiRegion;
   commit((d) => {
     d.tracks.find((x) => x.id === trackId)?.regions.push(c);
@@ -310,7 +311,7 @@ export function newPatternClip(trackId: string, afterId?: string): string | null
 export function loopPlaybackOver(ids: string[]): void {
   const p = useStore.getState().project;
   if (!p) return;
-  const bpb = beatsPerBar(p.timeSig);
+  const meter = meterOf(p);
   const regs = p.tracks.flatMap((t) => t.regions).filter((r) => ids.includes(r.id));
   let lo: number;
   let hi: number;
@@ -321,15 +322,16 @@ export function loopPlaybackOver(ids: string[]): void {
     lo = getEngine().position;
     hi = lo;
   }
-  lo = Math.floor(lo / bpb + 1e-6) * bpb;
-  hi = Math.max(lo + bpb, Math.ceil(hi / bpb - 1e-6) * bpb);
+  lo = meter.floorBar(lo);
+  hi = Math.max(meter.addBars(lo, 1), meter.ceilBar(hi));
   commit((d) => {
     d.loop.start = lo;
     d.loop.end = hi;
     d.loop.enabled = true;
   });
-  const bars = Math.round((hi - lo) / bpb);
-  toast(`Looping bar${bars > 1 ? 's' : ''} ${lo / bpb + 1}${bars > 1 ? `–${hi / bpb}` : ''}`);
+  const b0 = Math.round(meter.barPos(lo)) + 1;
+  const b1 = Math.round(meter.barPos(hi));
+  toast(`Looping bar${b1 > b0 ? 's' : ''} ${b0}${b1 > b0 ? `–${b1}` : ''}`);
 }
 
 // ------------------------------------------------------------------ groove / swing
@@ -381,7 +383,7 @@ export function bakeGroove(ids: string[]): number {
 }
 
 export function growSong(d: Draft<Project>, endBeat: number): void {
-  const bars = Math.ceil(endBeat / beatsPerBar(d.timeSig)) + 4;
+  const bars = Math.ceil(meterOf(d).barPos(endBeat) - 1e-6) + 4;
   if (bars > d.lengthBars) d.lengthBars = bars;
 }
 
@@ -627,8 +629,9 @@ export async function importAudioFile(file: File, trackId?: string, at?: number)
   try {
     const id = uid('a');
     const buf = await addClip(id, file, file.name);
-    const spb = 60 / p.bpm;
-    const lengthBeats = buf.duration / spb;
+    const startAt = at ?? useStore.getState().cursor;
+    const tm = tempoOf(p);
+    const lengthBeats = tm.beat(tm.sec(startAt) + buf.duration) - startAt;
     let tid = trackId;
     const target = p.tracks.find((t) => t.id === tid);
     if (!target || target.type !== 'audio') {
@@ -691,11 +694,11 @@ export async function importMidiFile(file: File, intoCurrent: boolean): Promise<
         const inst = mt.drums ? 'kit-acoustic' : presetForProgram(mt.program);
         const t = createTrack(type, inst, mt.name.slice(0, 24) || getPreset(inst).name, d.tracks.length);
         const end = Math.max(...mt.notes.map((n) => n.start + n.duration));
-        const bpb = beatsPerBar(d.timeSig);
-        const len = Math.max(bpb, Math.ceil(end / bpb) * bpb);
+        const meter = meterOf(d);
+        const len = Math.max(meter.addBars(0, 1), meter.ceilBar(end));
         t.regions.push(createMidiRegion(0, len, mt.notes.map((n) => ({ ...n, id: uid('n') })), t.name));
         d.tracks.push(t);
-        const bars = Math.ceil(len / bpb) + 4;
+        const bars = Math.ceil(meter.barPos(len) - 1e-6) + 4;
         if (bars > d.lengthBars) d.lengthBars = bars;
       }
     };
@@ -705,6 +708,9 @@ export async function importMidiFile(file: File, intoCurrent: boolean): Promise<
       const p = createProject(file.name.replace(/\.midi?$/i, ''));
       p.bpm = m.bpm;
       p.timeSig = m.timeSig;
+      // Keep the file's tempo and time-signature changes.
+      p.tempoChanges = m.tempos.slice(1).map((t) => ({ id: uid('tc'), beat: t.beat, bpm: t.bpm }));
+      p.meterChanges = m.meters.slice(1).map((x) => ({ id: uid('mc'), bar: x.bar, timeSig: x.timeSig }));
       build(p);
       await createNewProject(p);
     }

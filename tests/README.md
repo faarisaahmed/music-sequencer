@@ -20,6 +20,7 @@ node tests/export.mjs <chromium-executable> http://localhost:5391/ /tmp        #
 node tests/youtube.mjs <chromium-executable> http://localhost:5391/ /tmp       # YouTube publish against a fake Google: setup, channel, metadata, upload, thumbnail, playlist
 node tests/safety.mjs <chromium-executable> http://localhost:5391/ /tmp        # versions (auto, named, restore+undo, copy), backups + restore, folder, reminder
 node tests/mobile.mjs <chromium-executable> http://localhost:5391/ /tmp        # phone layout, touch gestures (double-tap, hold, pinch), sheets, install, landscape, iPad
+node tests/tempo-meter.mjs <chromium-executable> http://localhost:5391/ /tmp   # tempo/meter math, render timing, Tempo lane, LCD, score measures, MIDI/MusicXML
 node tests/jam-qa-long.mjs <chromium-executable> http://localhost:5391/ 300   # frozen tab, recording, big join, soak
 ```
 

@@ -1,4 +1,5 @@
 // Event scheduling shared by live playback and offline rendering.
+import { tempoOf, type TempoMap } from '../model/timeline';
 import type { AudioRegion, AutomationPoint, Project } from '../model/types';
 import { placedNotes, regionSegments } from '../model/regions';
 import { applyGroove, grooveFor } from '../model/groove';
@@ -39,7 +40,7 @@ export function silentRows(params: Record<string, number>): Set<number> {
 export function scheduleRange(p: Project, mixer: Mixer, b0: number, b1: number, toTime: (beat: number) => number, opts: ScheduleOptions): void {
   if (b1 <= b0) return;
   const ctx = mixer.ctx;
-  const spb = 60 / p.bpm;
+  const tm = tempoOf(p);
   for (const t of p.tracks) {
     if (opts.onlyTrack && t.id !== opts.onlyTrack) continue;
     const ch = mixer.channels.get(t.id);
@@ -81,14 +82,14 @@ export function scheduleRange(p: Project, mixer: Mixer, b0: number, b1: number, 
             const step = dur / reps;
             for (let i = 0; i < reps; i++) {
               const v = vel * (i === 0 ? 1 : 0.8);
-              inst.playNote(pitch, v, toTime(pn.start + i * step), step * spb * 0.9);
+              inst.playNote(pitch, v, toTime(pn.start + i * step), tm.span(pn.start + i * step, pn.start + (i + 1) * step) * 0.9);
             }
           } else {
-            inst.playNote(pitch, vel, toTime(pn.start), dur * spb);
+            inst.playNote(pitch, vel, toTime(pn.start), tm.span(pn.start, pn.start + dur));
           }
         }
       } else {
-        scheduleAudioRegion(ctx, r, ch.input, b0, b1, toTime, spb, opts);
+        scheduleAudioRegion(ctx, r, ch.input, b0, b1, toTime, tm, opts);
       }
     }
   }
@@ -129,7 +130,7 @@ function scheduleAudioRegion(
   b0: number,
   b1: number,
   toTime: (b: number) => number,
-  spb: number,
+  tm: TempoMap,
   opts: ScheduleOptions,
 ): void {
   const buf = getBuffer(r.audioId, r.reversed);
@@ -142,7 +143,8 @@ function scheduleAudioRegion(
     else continue;
     const endBeat = Math.min(seg.end, regionEnd);
     if (endBeat <= startBeat) continue;
-    const bufOffset = (seg.contentStart + (startBeat - seg.start)) * spb;
+    // Audio runs in real time from where its content begins, whatever the tempo does.
+    const bufOffset = tm.span(seg.start - seg.contentStart, startBeat);
     if (bufOffset >= buf.duration) continue;
     const src = ctx.createBufferSource();
     src.buffer = buf;

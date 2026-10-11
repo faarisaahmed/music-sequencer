@@ -2,7 +2,8 @@
 import type { Draft } from 'immer';
 import type { MidiRegion, Note } from '../../../model/types';
 import { uid } from '../../../model/defaults';
-import { beatsPerBar, snap } from '../../../model/music';
+import { snap } from '../../../model/music';
+import { meterOf } from '../../../model/timeline';
 import { commit, draftRegion, findRegion, live, toast, useStore } from '../../../state/store';
 
 export type DraftRegion = Draft<MidiRegion>;
@@ -29,7 +30,7 @@ export function editRegion(regionId: string, recipe: (r: DraftRegion) => void, m
     const r = draftRegion(d, regionId);
     if (r?.kind !== 'midi') return;
     recipe(r);
-    fitRegion(r, beatsPerBar(d.timeSig));
+    fitRegion(r, meterOf(d).lenAt(r.start));
   });
 }
 
@@ -143,7 +144,7 @@ export function duplicateSelectedNotes(regionId: string): void {
   const picked = f.region.notes.filter((n) => sel.has(n.id));
   const lo = Math.min(...picked.map((n) => n.start));
   const hi = Math.max(...picked.map((n) => n.start + n.duration));
-  const bpb = p ? beatsPerBar(p.timeSig) : 4;
+  const bpb = p ? meterOf(p).lenAt(f.region.start - f.region.offset + lo) : 4;
   // Shift by the selection span rounded up to a beat (bar if it is long).
   const span = hi - lo;
   const shift = span >= bpb ? Math.ceil(span / bpb - 1e-6) * bpb : Math.max(0.25, Math.ceil(span / 0.25 - 1e-6) * 0.25);

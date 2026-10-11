@@ -1,4 +1,5 @@
 // MusicXML (partwise 3.1) export of a ScoreModel: parts, staves, voices, triplets, ties, lyrics, articulations, dynamics.
+import { measureAt } from './notation';
 import type { KeySignature } from '../../../model/types';
 import { C_MAJOR, LETTERS, keyFifths, spell, type Clef, type ScoreModel } from './notation';
 
@@ -30,7 +31,20 @@ function clefXml(c: Clef, n: number): string {
   return `<clef number="${n}"><sign>G</sign><line>2</line></clef>`;
 }
 
-export function toMusicXml(model: ScoreModel, title: string, partNames: string[], partKeys: KeySignature[], timeSig: [number, number], bpm: number): string {
+/** Tempo markings after the start (display beats): sudden changes and accel./rit. */
+export interface TempoMark {
+  t: number;
+  bpm: number;
+  ramp?: boolean;
+}
+
+function tempoBefore(tempos: TempoMark[], base: number, t: number): number {
+  let v = base;
+  for (const x of [...tempos].sort((a, b) => a.t - b.t)) if (x.t < t - 1e-6) v = x.bpm;
+  return v;
+}
+
+export function toMusicXml(model: ScoreModel, title: string, partNames: string[], partKeys: KeySignature[], _timeSig: [number, number], bpm: number, tempos: TempoMark[] = []): string {
   const out: string[] = [];
   out.push('<?xml version="1.0" encoding="UTF-8" standalone="no"?>');
   out.push('<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">');
@@ -52,16 +66,24 @@ export function toMusicXml(model: ScoreModel, title: string, partNames: string[]
     const seen = new Map<string, number>();
     const marksByMeasure = new Map<number, typeof part.marks>();
     for (const mk of part.marks) {
-      const mi = Math.floor(mk.t / model.bpb + 1e-9);
+      const mi = measureAt(model, mk.t).index;
       marksByMeasure.set(mi, [...(marksByMeasure.get(mi) ?? []), mk]);
     }
 
     model.measures.forEach((m, mi) => {
       out.push(`<measure number="${mi + 1}">`);
+      const prevSig = mi > 0 ? model.measures[mi - 1].sig : null;
+      if (mi > 0 && prevSig && (prevSig[0] !== m.sig[0] || prevSig[1] !== m.sig[1])) out.push(`<attributes><time><beats>${m.sig[0]}</beats><beat-type>${m.sig[1]}</beat-type></time></attributes>`);
+      if (pi === 0)
+        for (const tk of tempos.filter((x) => x.t >= m.start - 1e-6 && x.t < m.start + m.len - 1e-6 && x.t > 1e-6)) {
+          const off = Math.round((tk.t - m.start) * DIV);
+          const words = tk.ramp ? `<direction-type><words>${tk.bpm > (tempoBefore(tempos, bpm, tk.t) ?? bpm) ? 'accel.' : 'rit.'}</words></direction-type>` : '';
+          out.push(`<direction placement="above">${words}<direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>${Math.round(tk.bpm)}</per-minute></metronome></direction-type><offset>${off}</offset><sound tempo="${Math.round(tk.bpm)}"/></direction>`);
+        }
       if (mi === 0) {
         out.push(`<attributes><divisions>${DIV}</divisions>`);
         if (!part.drums) out.push(`<key><fifths>${keyFifths(key)}</fifths><mode>${key.mode}</mode></key>`);
-        out.push(`<time><beats>${timeSig[0]}</beats><beat-type>${timeSig[1]}</beat-type></time>`);
+        out.push(`<time><beats>${m.sig[0]}</beats><beat-type>${m.sig[1]}</beat-type></time>`);
         if (nStaves > 1) out.push(`<staves>${nStaves}</staves>`);
         part.clefs.forEach((c, i) => out.push(clefXml(c, i + 1)));
         if (part.transpose && !part.drums && part.transpose % 12 !== 0) {
@@ -73,21 +95,21 @@ export function toMusicXml(model: ScoreModel, title: string, partNames: string[]
         if (pi === 0) out.push(`<direction placement="above"><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>${Math.round(bpm)}</per-minute></metronome></direction-type><sound tempo="${Math.round(bpm)}"/></direction>`);
       }
       for (const mk of marksByMeasure.get(mi) ?? []) {
-        const offset = Math.round((mk.t - mi * model.bpb) * DIV);
+        const offset = Math.round((mk.t - m.start) * DIV);
         const staffNo = mk.staff + 1;
         if (mk.kind === 'dyn' && mk.value)
           out.push(`<direction placement="below"><direction-type><dynamics><${mk.value}/></dynamics></direction-type><offset>${offset}</offset><staff>${staffNo}</staff></direction>`);
         else if (mk.kind !== 'dyn') {
           out.push(`<direction placement="below"><direction-type><wedge type="${mk.kind === 'cresc' ? 'crescendo' : 'diminuendo'}"/></direction-type><offset>${offset}</offset><staff>${staffNo}</staff></direction>`);
           const endT = mk.end ?? mk.t + 1;
-          const endOff = Math.round((endT - mi * model.bpb) * DIV);
+          const endOff = Math.round((endT - m.start) * DIV);
           out.push(`<direction placement="below"><direction-type><wedge type="stop"/></direction-type><offset>${endOff}</offset><staff>${staffNo}</staff></direction>`);
         }
       }
       let first = true;
       staffIdx.forEach((g, s) => {
         m.staves[g].voices.forEach((pieces, vi) => {
-          if (!first) out.push(`<backup><duration>${Math.round(model.bpb * DIV)}</duration></backup>`);
+          if (!first) out.push(`<backup><duration>${Math.round(m.len * DIV)}</duration></backup>`);
           first = false;
           const voiceNo = s * 4 + vi + 1;
           let curTuplet: string | undefined;

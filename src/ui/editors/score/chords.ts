@@ -1,7 +1,8 @@
 // Chord symbols on the project chord track: naming, parsing typed symbols, editing.
 import type { ChordQuality, ChordSymbol, KeySignature } from '../../../model/types';
 import { uid } from '../../../model/defaults';
-import { beatsPerBar, keyUsesFlats, pitchClassName } from '../../../model/music';
+import { keyUsesFlats, pitchClassName } from '../../../model/music';
+import { meterOf } from '../../../model/timeline';
 import { commit } from '../../../state/store';
 
 const QUALITY_TEXT: Record<ChordQuality, string> = {
@@ -86,11 +87,11 @@ export function setChordAt(beat: number, text: string): boolean {
       else delete existing.bass;
       return;
     }
-    const bpb = beatsPerBar(d.timeSig);
+    const bar = meterOf(d).barAt(beat + 1e-9);
     const next = d.chords.filter((c) => c.beat > beat + eps).sort((a, b) => a.beat - b.beat)[0];
     const prev = d.chords.filter((c) => c.beat < beat - eps).sort((a, b) => b.beat - a.beat)[0];
     if (prev && prev.beat + prev.length > beat) prev.length = beat - prev.beat;
-    const barEnd = (Math.floor(beat / bpb + 1e-9) + 1) * bpb;
+    const barEnd = bar.start + bar.len;
     const length = Math.max(0.25, Math.min(next ? next.beat - beat : Infinity, barEnd - beat));
     d.chords.push({ id: uid('c'), beat, length, ...parsed });
     d.chords.sort((a, b) => a.beat - b.beat);

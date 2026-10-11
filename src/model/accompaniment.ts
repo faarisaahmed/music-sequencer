@@ -114,13 +114,18 @@ export function parseProgression(text: string, key: KeySignature): { root: numbe
 }
 
 /** Lay a list of chords along the timeline, `beatsEach` beats per chord, repeating to fill. */
-export function layChords(chords: { root: number; quality: ChordQuality }[], start: number, length: number, beatsEach: number): ChordSymbol[] {
+/**
+ * Lay chords one after another from `start`. `each` is a fixed length in beats, or a function
+ * giving where the next chord starts (so chords follow bar lines through time-signature changes).
+ */
+export function layChords(chords: { root: number; quality: ChordQuality }[], start: number, length: number, each: number | ((b: number) => number)): ChordSymbol[] {
   const out: ChordSymbol[] = [];
   if (!chords.length) return out;
+  const next = typeof each === 'number' ? (b: number) => b + each : each;
   let i = 0;
-  for (let b = start; b < start + length - 1e-6; b += beatsEach, i++) {
+  for (let b = start; b < start + length - 1e-6; b = next(b), i++) {
     const c = chords[i % chords.length];
-    const len = Math.min(beatsEach, start + length - b);
+    const len = Math.min(next(b) - b, start + length - b);
     const prev = out[out.length - 1];
     // Merge identical consecutive chords into one longer symbol.
     if (prev && prev.root === c.root && prev.quality === c.quality && Math.abs(prev.beat + prev.length - b) < 1e-6) prev.length += len;

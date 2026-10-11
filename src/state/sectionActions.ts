@@ -1,10 +1,10 @@
 // Arrangement sections (Intro / Verse / Chorus …): structural edits that move whole song parts.
+import { meterOf } from '../model/timeline';
 import type { Draft } from 'immer';
 import type { AutomationPoint, MidiRegion, Project, Region, Section } from '../model/types';
 import { uid } from '../model/defaults';
 import { NAME_SEQUENCE, makeSection } from '../model/sections';
 export { SECTION_COLORS } from '../model/sections';
-import { beatsPerBar } from '../model/music';
 import { commit, useStore } from './store';
 import { cloneRegion, growSong } from './actions';
 
@@ -135,18 +135,18 @@ function sortSections(d: Draft<Project>): void {
 export function addSection(name?: string, at?: number): string {
   const p = useStore.getState().project;
   if (!p) return '';
-  const bpb = beatsPerBar(p.timeSig);
+  const meter = meterOf(p);
   const secs = p.sections ?? [];
   const last = secs[secs.length - 1];
   const start = at ?? (last ? last.start + last.length : 0);
   const used = new Set(secs.map((s) => s.name));
   const nm = name ?? NAME_SEQUENCE.find((n) => !used.has(n)) ?? `Section ${secs.length + 1}`;
-  const s = makeSection(nm, start, 8 * bpb);
+  const s = makeSection(nm, start, meter.addBars(start, 8) - start);
   commit((d) => {
     if (!d.sections) d.sections = [];
     // Never overlap: trim to the next section.
     const nextS = d.sections.find((x) => x.start > start + EPS);
-    if (nextS) s.length = Math.max(bpb, Math.min(s.length, nextS.start - start));
+    if (nextS) s.length = Math.max(meter.lenAt(start), Math.min(s.length, nextS.start - start));
     d.sections.push(s);
     sortSections(d);
     growSong(d, s.start + s.length);
@@ -224,8 +224,7 @@ export function resizeSection(id: string, newLength: number, shift: boolean): vo
   const p = useStore.getState().project;
   const sec = p?.sections?.find((x) => x.id === id);
   if (!p || !sec) return;
-  const bpb = beatsPerBar(p.timeSig);
-  const len = Math.max(bpb, newLength);
+  const len = Math.max(meterOf(p).lenAt(sec.start), newLength);
   const delta = len - sec.length;
   if (Math.abs(delta) < EPS) return;
   const e = sec.start + sec.length;
