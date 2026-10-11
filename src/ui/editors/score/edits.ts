@@ -156,7 +156,8 @@ export function notesToRests(ids: string[], staffOf: (p: number) => number): voi
       for (const reg of t.regions) {
         if (reg.kind !== 'midi' || !reg.notes.some((n) => set.has(n.id))) continue;
         const r = reg as DRegion;
-        for (const n of r.notes.filter((x) => set.has(x.id))) addSplits(r, [n.start, n.start + n.duration], staffOf(n.pitch), (n.voice ?? 1) as 1 | 2);
+        // Grace notes (and other very short notes) take no time in the bar, so they leave no rest.
+        for (const n of r.notes.filter((x) => set.has(x.id) && !x.grace && x.duration >= 0.125)) addSplits(r, [n.start, n.start + n.duration], staffOf(n.pitch), (n.voice ?? 1) as 1 | 2);
         r.notes = r.notes.filter((n) => !set.has(n.id));
       }
   });
@@ -430,4 +431,31 @@ export function clearMarks(ids: string[], regionIds: string[]): void {
       if (!r.marks.length) delete r.marks;
     }
   });
+}
+
+/**
+ * Add a grace note before each selected note (before any grace notes it already has).
+ * It sounds a moment before the main note: `len` beats long. Returns the new ids.
+ */
+export function addGraceNotes(ids: string[], pitchOf: (n: Note) => number, len: number): string[] {
+  const out: string[] = [];
+  commit((d) => {
+    for (const t of d.tracks)
+      for (const reg of t.regions) {
+        if (reg.kind !== 'midi') continue;
+        const r = reg as DRegion;
+        for (const n of r.notes.filter((x) => ids.includes(x.id))) {
+          // Lead into the earliest grace note already in front of this note.
+          const before = r.notes.filter((x) => x.grace && x.id !== n.id && x.start < n.start + 1e-6 && x.start > n.start - 0.5 && (x.voice ?? 1) === (n.voice ?? 1));
+          const first = [...before, n].sort((a, b) => a.start - b.start)[0];
+          const start = Math.max(0, first.start - len);
+          const id = uid('n');
+          const g: Note = { id, pitch: Math.max(0, Math.min(127, pitchOf(n as Note))), start, duration: Math.max(0.03, Math.min(len, first.start - start || len)), velocity: Math.min(1, n.velocity * 0.9), grace: true };
+          if (n.voice) g.voice = n.voice;
+          r.notes.push(g);
+          out.push(id);
+        }
+      }
+  });
+  return out;
 }

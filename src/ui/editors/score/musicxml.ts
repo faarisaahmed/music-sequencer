@@ -105,6 +105,13 @@ export function toMusicXml(model: ScoreModel, title: string, partNames: string[]
               );
               return;
             }
+            // Grace notes come first, with no duration (slashed when there's just one).
+            for (const g of p.graces ?? []) {
+              const gs = spell(g.wpitch, key);
+              out.push(
+                `<note><grace${(p.graces ?? []).length === 1 ? ' slash="yes"' : ''}/><pitch><step>${LETTERS[gs.letter].toUpperCase()}</step>${gs.alter ? `<alter>${gs.alter}</alter>` : ''}<octave>${gs.octave}</octave></pitch><voice>${voiceNo}</voice><type>${(p.graces ?? []).length > 1 ? '16th' : 'eighth'}</type><staff>${s + 1}</staff></note>`,
+              );
+            }
             p.pitches.forEach((pitch, i) => {
               const sp = spell(pitch, key);
               const k = p.keys[i];

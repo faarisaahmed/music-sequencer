@@ -6,6 +6,8 @@ import {
   BarlineType,
   Dot,
   Formatter,
+  GraceNote,
+  GraceNoteGroup,
   Modifier,
   Renderer,
   Stave,
@@ -50,6 +52,8 @@ export interface HeadHit {
   voice: 1 | 2;
   system: number;
   lyric?: string;
+  /** A grace note (small, before its main note). */
+  grace?: boolean;
 }
 
 /** One rhythmic element (a note/chord or a rest) of a voice — what Flat-style selection works on. */
@@ -417,6 +421,7 @@ function drawSystem(ctx: DrawCtx, plan: ScorePlan, li: number, layout: ScoreLayo
       const beams: Beam[] = [];
       const tuplets: Tuplet[] = [];
       const pieceNotes: { note: StaveNote; piece: Piece; staff: number; voice: 1 | 2 }[] = [];
+      const graceDraws: { gns: GraceNote[]; refs: NonNullable<Piece['graces']>; staff: number; voice: 1 | 2; t: number }[] = [];
       mm.staves.forEach((sm, si) => {
         const ref = model.staves[si];
         const part = model.parts[ref.part];
@@ -457,7 +462,21 @@ function drawSystem(ctx: DrawCtx, plan: ScorePlan, li: number, layout: ScoreLayo
                   }
                   accState.set(k2, s.alter);
                 });
-              const up = sn.getStemDirection() === 1;
+              if (piece.graces?.length) {
+              // Small slashed notes slurred into the main note.
+              const gns = piece.graces.map((g) => {
+                const sp = spell(g.wpitch, spellKey);
+                const k = `${LETTERS[sp.letter]}${sp.alter === 1 ? '#' : sp.alter === -1 ? 'b' : sp.alter === 2 ? '##' : sp.alter === -2 ? 'bb' : ''}/${sp.octave}`;
+                const gn = new GraceNote({ keys: [k], duration: piece.graces!.length > 1 ? '16' : '8', slash: piece.graces!.length === 1, clef: vfClef(ref.clef), auto_stem: false, stem_direction: 1 });
+                if (sp.alter !== baseAlters[sp.letter]) gn.addModifier(new Accidental(sp.alter === 1 ? '#' : sp.alter === -1 ? 'b' : sp.alter === 2 ? '##' : sp.alter === -2 ? 'bb' : 'n'), 0);
+                return gn;
+              });
+              const group = new GraceNoteGroup(gns, true);
+              if (gns.length > 1) group.beamNotes();
+              sn.addModifier(group, 0);
+              graceDraws.push({ gns, refs: piece.graces, staff: si, voice: voiceNo, t: mm.start + piece.start });
+            }
+            const up = sn.getStemDirection() === 1;
               for (const a of piece.artic) {
                 const art = new Articulation(VF_ARTIC[a]);
                 if (a === 'fermata') art.setPosition(voiceNo === 2 ? Modifier.Position.BELOW : Modifier.Position.ABOVE);
@@ -616,6 +635,19 @@ function drawSystem(ctx: DrawCtx, plan: ScorePlan, li: number, layout: ScoreLayo
           }
         });
       }
+      // Grace note heads are clickable too.
+      for (const gd of graceDraws)
+        gd.gns.forEach((gn, i) => {
+          try {
+            const y = gn.getYs()[0];
+            const x0 = gn.getNoteHeadBeginX();
+            const x1 = gn.getNoteHeadEndX();
+            const ref = gd.refs[i];
+            layout.heads.push({ x0, x1, y, noteId: ref.id, key: ref.key, pitch: ref.wpitch, t: gd.t, t1: gd.t, staff: gd.staff, voice: gd.voice, system: li, grace: true });
+          } catch {
+            /* not positioned */
+          }
+        });
       anchors.sort((a, b) => a.x - b.x || a.t - b.t);
       sys.measures.push({ index: m, x, w, noteX0, noteX1, anchors });
       x += w;

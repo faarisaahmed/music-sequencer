@@ -230,6 +230,14 @@ export interface Piece {
   lyric?: string;
   /** Lyric's note id (for editing). */
   lyricNoteId?: string;
+  /** Grace notes played just before this piece (written pitches, in order). */
+  graces?: GraceRef[];
+}
+
+export interface GraceRef {
+  id: string;
+  key: string;
+  wpitch: number;
 }
 
 export interface StaffMeasure {
@@ -256,6 +264,8 @@ export interface QNote {
   staff: number; // staff within part
   artic?: Articulation[];
   lyric?: string;
+  /** Grace notes leading into this note. */
+  graces?: GraceRef[];
 }
 
 export interface RawNote {
@@ -269,6 +279,7 @@ export interface RawNote {
   voice?: 1 | 2;
   artic?: Articulation[];
   lyric?: string;
+  grace?: boolean;
 }
 
 export interface DisplayMark {
@@ -581,10 +592,50 @@ function buildVoice(list: QNote[], ms: number, bpb: number, win: Map<number, Win
         artic: [...artic],
         lyric: lyricNote?.lyric,
         lyricNoteId: lyricNote?.id,
+        graces: onsetNotes.some((n) => n.graces?.length) ? onsetNotes.flatMap((n) => n.graces ?? []) : undefined,
       });
     }
   }
   return pieces;
+}
+
+/**
+ * Find grace notes: notes marked as grace, and — in played or imported music — a very short
+ * note that runs straight into a clearly longer note of a different pitch (a quick
+ * "crush" note). Returns principal → its grace notes (a run of several is allowed).
+ */
+function detectGraces<T extends { n: RawNote; wpitch: number; staff: number }>(list: T[], grid: number): Map<T, T[]> {
+  const out = new Map<T, T[]>();
+  const maxDur = Math.min(0.13, grid * 0.75);
+  const byStaff = new Map<number, T[]>();
+  for (const p of list) byStaff.set(p.staff, [...(byStaff.get(p.staff) ?? []), p]);
+  for (const notes of byStaff.values()) {
+    notes.sort((a, b) => a.n.s - b.n.s || a.wpitch - b.wpitch);
+    const principalOf = new Map<T, T>();
+    // Walk backwards so a run of grace notes can chain to the same main note.
+    for (let i = notes.length - 1; i >= 0; i--) {
+      const g = notes[i];
+      const dur = g.n.e - g.n.s;
+      const explicit = !!g.n.grace;
+      if (!explicit && dur > maxDur + 1e-6) continue;
+      // Played together with a normal note? Then it's part of a chord, not a grace note.
+      if (!explicit && notes.some((o) => o !== g && Math.abs(o.n.s - g.n.s) < 0.02 && o.n.e - o.n.s > maxDur)) continue;
+      const next = notes.find((o) => o !== g && o.n.s > g.n.s - (explicit ? 1e-6 : -1e-6) && o.n.s <= g.n.e + (explicit ? 0.35 : 0.08) && o.n.s - g.n.s <= 0.35 && (explicit ? !o.n.grace || principalOf.has(o) : true));
+      if (!next) continue;
+      const target = principalOf.get(next) ?? next;
+      if (target === g || target.n.grace) continue;
+      const tDur = target.n.e - target.n.s;
+      if (!explicit) {
+        if (tDur < Math.max(2 * dur, 0.2) || target.n.pitch === g.n.pitch) continue;
+        // The main note should land on the grid (graces sit just before the beat).
+        const off = Math.abs(target.n.s / grid - Math.round(target.n.s / grid)) * grid;
+        if (off > 0.04) continue;
+      }
+      principalOf.set(g, target);
+      out.set(target, [...(out.get(target) ?? []), g]);
+    }
+  }
+  return out;
 }
 
 /**
@@ -633,7 +684,11 @@ function autoVoices(list: { n: RawNote; wpitch: number; staff: number; voice: 1 
     }
     if (chords.length < 2) continue;
     for (const c of chords) c.mean = c.members.reduce((a, p) => a + p.wpitch, 0) / c.members.length;
-    const overlaps = (a: (typeof chords)[number], b: (typeof chords)[number]) => a.s < b.e - tol && b.s < a.e - tol;
+    // Real overlap — not just a legato note ringing a hair into the next one.
+    const overlaps = (a: (typeof chords)[number], b: (typeof chords)[number]) => {
+      const ov = Math.min(a.e, b.e) - Math.max(a.s, b.s);
+      return ov > Math.min(tol, 0.5 * Math.min(a.e - a.s, b.e - b.s)) + 1e-6;
+    };
     for (const c of chords) {
       // Lower than something it overlaps with (or equal height but longer) → the lower voice.
       const lower = chords.some((o) => o !== c && overlaps(c, o) && (o.mean > c.mean + 0.01 || (Math.abs(o.mean - c.mean) <= 0.01 && c.e - c.s > o.e - o.s + tol)));
@@ -656,10 +711,14 @@ export function buildScore(inputs: PartInput[], bpb: number, totalBeats: number,
       const voice: 1 | 2 = inp.drums ? (n.pitch === 35 || n.pitch === 36 || n.pitch === 44 ? 2 : 1) : (n.voice ?? 1);
       return { n, wpitch, staff, voice, head: (drum?.[1] ?? '') as '' | 'x' };
     });
-    if (!inp.drums) autoVoices(prelim, grid);
+    // Grace notes come out of the rhythm and hang off the note they lead into.
+    const graceMap = inp.drums ? new Map<(typeof prelim)[number], (typeof prelim)[number][]>() : detectGraces(prelim, grid);
+    const isGrace = new Set([...graceMap.values()].flat());
+    const main = prelim.filter((p) => !isGrace.has(p));
+    if (!inp.drums) autoVoices(main, grid);
     const notes: QNote[] = [];
     const groups = new Map<string, typeof prelim>();
-    for (const p of prelim) {
+    for (const p of main) {
       const k = `${p.staff}:${p.voice}`;
       groups.set(k, [...(groups.get(k) ?? []), p]);
     }
@@ -693,6 +752,10 @@ export function buildScore(inputs: PartInput[], bpb: number, totalBeats: number,
       }
     }
     notes.sort((a, b) => a.s - b.s || a.wpitch - b.wpitch);
+    for (const [principal, gs] of graceMap) {
+      const q = notes.find((x) => x.key === principal.n.key);
+      if (q) q.graces = gs.sort((a, b) => a.n.s - b.n.s || a.wpitch - b.wpitch).map((g) => ({ id: g.n.id, key: g.n.key, wpitch: g.wpitch }));
+    }
     if (!inp.drums) closeLegatoGaps(notes);
     if (inp.drums) {
       // Drum hits are notated as lasting until the next hit in the same voice (max one beat, within the bar).

@@ -102,6 +102,7 @@ export const COMMANDS: Command[] = [
   C('score.add7', 'Add a 7th above', 'Score', ['Alt+7'], ['score']),
   C('score.add8', 'Add an octave above', 'Score', ['Alt+8'], ['score']),
   C('score.below3', 'Add a 3rd below', 'Score', ['Alt+Shift+3'], ['score']),
+  C('score.grace', 'Add a grace note before the selected note', 'Score', ['Alt+G'], ['score']),
   C('score.staccato', 'Staccato', 'Score', ['Shift+S'], ['score']),
   C('score.tenuto', 'Tenuto', 'Score', ['Shift+N'], ['score']),
   C('score.accent', 'Accent', 'Score', ['Shift+V'], ['score']),

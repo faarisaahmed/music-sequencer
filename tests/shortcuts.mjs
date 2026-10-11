@@ -50,13 +50,13 @@ await page.waitForTimeout(150);
 const clash = await S(() => document.querySelector('[data-command="view.mixer"] .sc-clash')?.innerText ?? '');
 check('clashWarning', /already used for/.test(clash) && /Mute/.test(clash), clash);
 await page.click('[data-command="view.mixer"] .sc-clash .btn.primary');
-const km = await S(async () => { const k = await import('/src/ui/keys/keymap.ts'); return { mixer: k.keysFor('view.mixer'), mute: k.keysFor('track.mute') }; });
+const km = await S(async () => { const k = window.__bf.keymap; return { mixer: k.keysFor('view.mixer'), mute: k.keysFor('track.mute') }; });
 check('rebindApplied', km.mixer.join() === 'M' && km.mute.length === 0, km);
 // 4. Add a second key to Undo: ⌘U.
 await page.click('[data-command="edit.undo"] .sc-add');
 await page.keyboard.press('Meta+u');
 await page.waitForTimeout(150);
-const ku = await S(async () => (await import('/src/ui/keys/keymap.ts')).keysFor('edit.undo'));
+const ku = await S(async () => (window.__bf.keymap).keysFor('edit.undo'));
 check('addSecondKey', ku.join() === 'Mod+Z,Mod+U', ku);
 // Escape while capturing cancels capture, not the window.
 await page.click('[data-command="view.editor"] .sc-key');
@@ -81,7 +81,7 @@ check('secondUndoKeyWorks', (await S(() => window.__bf.store.useStore.getState()
 // 6. The new key shows on hover and in menus.
 const t3 = await tipFor('[data-cmd="view.mixer"]');
 check('tooltipFollowsRebind', /Mixer/.test(t3 ?? '') && /\bM\b/.test(t3 ?? ''), t3);
-await S(async () => (await import('/src/ui/keys/keymap.ts')).setKeys('edit.duplicate', ['Mod+Shift+D']));
+await S(async () => (window.__bf.keymap).setKeys('edit.duplicate', ['Mod+Shift+D']));
 const rid = await S(() => window.__bf.store.useStore.getState().project.tracks.find((t) => t.regions.length).regions[0].id);
 await page.click(`[data-region-id="${rid}"]`, { button: 'right' });
 await page.waitForTimeout(200);
@@ -91,7 +91,7 @@ await page.keyboard.press('Escape');
 // 7. Persists after reload.
 await page.reload();
 await page.waitForTimeout(900);
-const kp = await S(async () => (await import('/src/ui/keys/keymap.ts')).keysFor('view.mixer'));
+const kp = await S(async () => (window.__bf.keymap).keysFor('view.mixer'));
 check('persistsAfterReload', kp.join() === 'M', kp);
 // 8. Reset all.
 await openSong();
@@ -100,7 +100,7 @@ await page.keyboard.press('?');
 await page.waitForTimeout(300);
 await page.click('.sc-top button:has-text("Reset all")');
 await page.click('.sc-top button:has-text("Reset every shortcut")');
-const kr = await S(async () => { const k = await import('/src/ui/keys/keymap.ts'); return [k.keysFor('view.mixer').join(), k.keysFor('track.mute').join(), k.keysFor('edit.undo').join()]; });
+const kr = await S(async () => { const k = window.__bf.keymap; return [k.keysFor('view.mixer').join(), k.keysFor('track.mute').join(), k.keysFor('edit.undo').join()]; });
 check('resetAll', kr.join('|') === 'X|M|Mod+Z', kr);
 await page.keyboard.press('Escape');
 

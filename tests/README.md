@@ -15,6 +15,7 @@ node tests/beat-patterns.mjs <chromium-executable> http://localhost:5391/ /tmp  
 node tests/groove.mjs <chromium-executable> http://localhost:5391/ /tmp        # swing: maths, render timing, song vs region, bake, MIDI, pickers
 node tests/score-editing.mjs <chromium-executable> http://localhost:5391/ /tmp # score: write, chords, select, values, voices
 node tests/shortcuts.mjs <chromium-executable> http://localhost:5391/ /tmp     # tooltips, rebinding, clashes, persistence, score arrows
+node tests/grace-notes.mjs <chromium-executable> http://localhost:5391/ /tmp   # grace detection, ⌥G, select/move/delete, MusicXML
 node tests/jam-qa-long.mjs <chromium-executable> http://localhost:5391/ 300   # frozen tab, recording, big join, soak
 ```
 

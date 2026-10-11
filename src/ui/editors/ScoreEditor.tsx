@@ -52,6 +52,7 @@ import {
   clearMarks,
   insertNote,
   notesToRests,
+  addGraceNotes,
   setRestValue,
   addToChords,
   mapNotes,
@@ -133,7 +134,7 @@ interface Source {
 }
 
 function rawFromNote(n: Note, regionId: string, s: number, e: number, key: string): RawNote {
-  return { id: n.id, key, regionId, pitch: n.pitch, s, e, vel: n.velocity, voice: n.voice, artic: n.artic, lyric: n.lyric };
+  return { id: n.id, key, regionId, pitch: n.pitch, s, e, vel: n.velocity, voice: n.voice, artic: n.artic, lyric: n.lyric, grace: n.grace };
 }
 
 /** Build the notation source for a single region or the whole song. */
@@ -646,6 +647,27 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
     }
   };
 
+  /** Grace note before each selected note: a step above by default (move it with ↑/↓). */
+  const addGrace = () => {
+    const ids = useStore.getState().selectedNoteIds;
+    if (!ids.length) {
+      toast('Select a note first, then add a grace note before it');
+      return;
+    }
+    const h = layout?.heads.find((x) => ids.includes(x.noteId));
+    const part = h ? partOfStaff(h.staff) : src?.parts[0];
+    if (!part || part.drums) return;
+    // About 70 ms, whatever the tempo (but never more than a 32nd note).
+    const len = Math.max(0.05, Math.min(0.125, (0.07 * project.bpm) / 60));
+    const newIds = addGraceNotes(ids, (n) => diatonicShift(n.pitch + part.transpose, 1, part.writtenKey) - part.transpose, len);
+    if (!newIds.length) return;
+    setRestSel(null);
+    useStore.setState({ selectedNoteIds: newIds });
+    const g = allNotes().find((x) => x.id === newIds[0]);
+    if (g) getEngine().preview(part.track.id, g.pitch, g.velocity, 0.12);
+    setTimeout(() => ids.slice(0, 4).forEach((id) => preview(id)), 90);
+  };
+
   /** Toggle a dot on the selection (or for the next notes). */
   const toggleDot = () => {
     const e = currentElem();
@@ -734,7 +756,7 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
     if (!layout) return null;
     const cur = layout.heads.find((x) => x.noteId === noteId);
     if (!cur) return null;
-    const cands = layout.heads.filter((h) => h.staff === cur.staff && h.voice === cur.voice && h.t > cur.t + 1e-6).sort((a, b) => a.t - b.t || b.pitch - a.pitch);
+    const cands = layout.heads.filter((h) => !h.grace && h.staff === cur.staff && h.voice === cur.voice && h.t > cur.t + 1e-6).sort((a, b) => a.t - b.t || b.pitch - a.pitch);
     return cands[0]?.noteId ?? null;
   };
 
@@ -860,6 +882,7 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
         const id = ['score.add3', 'score.add4', 'score.add5', 'score.add6', 'score.add7', 'score.add8'].find(is)!;
         addInterval(Number(id.slice(-1)) - 1);
       } else if (is('score.below3')) addInterval(-2);
+      else if (is('score.grace')) addGrace();
       else if (is('score.voice1') || is('score.voice2')) {
         const v = is('score.voice1') ? 1 : 2;
         setVoiceNo(v);
@@ -1089,7 +1112,7 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
   };
 
   /** Written pitches of the chord an element shows. */
-  const chordPitchesAt = (el: ElemHit) => (layout?.heads ?? []).filter((h) => h.staff === el.staff && h.voice === el.voice && Math.abs(h.t - el.t) < 1e-3).map((h) => h.pitch);
+  const chordPitchesAt = (el: ElemHit) => (layout?.heads ?? []).filter((h) => !h.grace && h.staff === el.staff && h.voice === el.voice && Math.abs(h.t - el.t) < 1e-3).map((h) => h.pitch);
 
   // ------------------------------------------------------------ cursor geometry
 
@@ -1300,6 +1323,17 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
           <button className="pal-btn txt" data-tip="Tie selected notes to the next" data-cmd="score.tie" onClick={() => selectedIds.length && tieNotes(selectedIds, effDur)}>
             <svg width="20" height="12" viewBox="0 0 20 12">
               <path d="M2 4 Q10 12 18 4" stroke="currentColor" strokeWidth="1.8" fill="none" />
+            </svg>
+          </button>
+        </div>
+        <div className="pal-group">
+          <button className="pal-btn txt grace-btn" data-tip="Grace note — a quick note just before the selected note (move it with ↑/↓, Delete removes it)" data-cmd="score.grace" onClick={addGrace}>
+            <svg width="20" height="22" viewBox="0 0 20 22">
+              <ellipse cx="5.5" cy="16" rx="3.3" ry="2.4" transform="rotate(-22 5.5 16)" fill="currentColor" />
+              <line x1="8.4" y1="15.5" x2="8.4" y2="4" stroke="currentColor" strokeWidth="1.2" />
+              <path d="M8.4 4 q 4 2.5 3 6.5" stroke="currentColor" strokeWidth="1.2" fill="none" />
+              <line x1="4" y1="12" x2="13" y2="6" stroke="currentColor" strokeWidth="1.1" />
+              <ellipse cx="15.5" cy="18" rx="3.6" ry="2.6" transform="rotate(-22 15.5 18)" fill="currentColor" opacity="0.45" />
             </svg>
           </button>
         </div>

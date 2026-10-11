@@ -18,6 +18,8 @@ export interface Note {
   lyric?: string;
   /** Score: articulations; staccato/accent/marcato also change playback. */
   artic?: Articulation[];
+  /** Score: a grace note — played quickly just before the note that follows it, drawn small and slashed. */
+  grace?: boolean;
 }
 
 export type Articulation = 'staccato' | 'accent' | 'tenuto' | 'marcato' | 'fermata';
