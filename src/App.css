@@ -111,6 +111,15 @@
   position: relative;
   overflow: hidden;
 }
+.song-cover-img {
+  display: block;
+  width: 100%;
+  object-fit: cover;
+}
+.song-artist {
+  color: var(--text);
+  opacity: 0.8;
+}
 .song-cover-bars {
   position: absolute;
   left: 12px;

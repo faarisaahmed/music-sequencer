@@ -26,7 +26,7 @@ function timeAgo(ts: number): string {
   return new Date(ts).toLocaleDateString();
 }
 
-function Cover({ hue, seed }: { hue: number; seed: string }) {
+function Cover({ hue, seed, image }: { hue: number; seed: string; image?: string }) {
   // Deterministic decorative "waveform" bars for each song.
   const bars = useMemo(() => {
     let h = 0;
@@ -36,6 +36,7 @@ function Cover({ hue, seed }: { hue: number; seed: string }) {
       return 0.25 + ((h >>> 8) % 1000) / 1000 * 0.75 * (0.6 + 0.4 * Math.sin(i / 3));
     });
   }, [seed]);
+  if (image) return <img className="song-cover song-cover-img" src={image} alt="" draggable={false} />;
   return (
     <div className="song-cover" style={{ background: `linear-gradient(135deg, hsl(${hue} 70% 45%), hsl(${(hue + 50) % 360} 75% 28%))` }}>
       <div className="song-cover-bars">
@@ -218,7 +219,7 @@ export default function HomeScreen() {
                 onContextMenu={(e) => showContextMenu(e, menuFor(s))}
               >
                 <div className="song-cover-wrap" onClick={() => void openProjectById(s.id)}>
-                  <Cover hue={s.coverHue} seed={s.id} />
+                  <Cover hue={s.coverHue} seed={s.id} image={s.cover} />
                   <div className="song-open">
                     <Play size={22} fill="white" />
                   </div>
@@ -241,6 +242,7 @@ export default function HomeScreen() {
                       {s.name}
                     </div>
                   )}
+                  {s.artist && <div className="song-meta song-artist">{s.artist}</div>}
                   <div className="song-meta">
                     {timeAgo(s.updatedAt)} · {formatDuration((s.lengthBeats * 60) / s.bpm)}
                   </div>

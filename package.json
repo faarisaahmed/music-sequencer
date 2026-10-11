@@ -10,11 +10,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@breezystack/lamejs": "^1.2.7",
+    "@mediabunny/aac-encoder": "1.59.1",
+    "@mediabunny/flac-encoder": "1.59.1",
+    "@mediabunny/mp3-encoder": "1.59.1",
     "@tonejs/midi": "^2.0.28",
     "idb-keyval": "^6.3.0",
     "immer": "^11.1.21",
     "lucide-react": "^1.54.0",
+    "mediabunny": "1.59.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "trystero": "^0.25.4",

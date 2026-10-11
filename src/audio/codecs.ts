@@ -1,67 +1,81 @@
-// Heavy file codecs (MP3 encoder, MIDI files), split into their own chunk.
-import { Mp3Encoder } from '@breezystack/lamejs';
+// MIDI files, split into their own chunk.
 import { Midi } from '@tonejs/midi';
 import type { Project } from '../model/types';
 import { placedNotes } from '../model/regions';
 import { applyGroove, grooveFor } from '../model/groove';
+import { gmProgram } from '../model/gm';
 
-export async function encodeMp3(buf: AudioBuffer, kbps = 192, onProgress?: (f: number) => void): Promise<Blob> {
-  const enc = new Mp3Encoder(2, buf.sampleRate, kbps);
-  const l = buf.getChannelData(0);
-  const r = buf.numberOfChannels > 1 ? buf.getChannelData(1) : l;
-  const block = 1152 * 20;
-  const parts: BlobPart[] = [];
-  const toInt = (src: Float32Array, s: number, e: number) => {
-    const out = new Int16Array(e - s);
-    for (let i = s; i < e; i++) {
-      const v = Math.max(-1, Math.min(1, src[i]));
-      out[i - s] = v < 0 ? v * 0x8000 : v * 0x7fff;
-    }
-    return out;
-  };
-  for (let i = 0; i < l.length; i += block) {
-    const e = Math.min(l.length, i + block);
-    const chunk = enc.encodeBuffer(toInt(l, i, e), toInt(r, i, e));
-    if (chunk.length) parts.push(new Uint8Array(chunk));
-    if ((i / block) % 40 === 0) {
-      onProgress?.(i / l.length);
-      await new Promise((res) => setTimeout(res, 0));
-    }
-  }
-  const last = enc.flush();
-  if (last.length) parts.push(new Uint8Array(last));
-  return new Blob(parts, { type: 'audio/mpeg' });
+export interface MidiExportOptions {
+  /** Write swing into the note timing (what you hear) instead of the straight written notes. */
+  swing?: boolean;
+  /** Only these tracks (default: every instrument and drum track). */
+  trackIds?: string[];
 }
 
-// ---------------------------------------------------------------- MIDI files
+// Sharps/flats for each major key, indexed by tonic pitch class.
+const SF = [0, -5, 2, -3, 4, -1, 6, 1, -4, 3, -2, 5];
+const SF_KEYS = ['Cb', 'Gb', 'Db', 'Ab', 'Eb', 'Bb', 'F', 'C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#'];
 
-export function projectToMidi(p: Project): Blob {
+export function projectToMidi(p: Project, opts: MidiExportOptions = {}): Blob {
   const midi = new Midi();
+  const ppq = midi.header.ppq;
   midi.header.setTempo(p.bpm);
   midi.header.timeSignatures.push({ ticks: 0, timeSignature: [p.timeSig[0], p.timeSig[1]] });
   midi.header.name = p.name;
-  const ppq = midi.header.ppq;
+  const minor = p.key.mode === 'minor';
+  const sf = SF[(p.key.tonic + (minor ? 3 : 0)) % 12];
+  midi.header.keySignatures.push({ ticks: 0, key: SF_KEYS[sf + 7], scale: minor ? 'minor' : 'major' });
+  const info = p.info ?? {};
+  const credit = [info.artist, info.year].filter(Boolean).join(', ');
+  if (credit) midi.header.meta.push({ ticks: 0, type: 'copyrightNotice', text: `(C) ${credit}` });
+  for (const [label, v] of [
+    ['Artist', info.artist],
+    ['Album', info.album],
+    ['Composer', info.composer],
+    ['Genre', info.genre],
+    ['Comment', info.comment],
+  ] as const)
+    if (v) midi.header.meta.push({ ticks: 0, type: 'text', text: `${label}: ${v}` });
+  for (const sec of p.sections ?? []) midi.header.meta.push({ ticks: Math.round(sec.start * ppq), type: 'marker', text: sec.name });
+  midi.header.update();
+
+  let channel = 0;
   for (const t of p.tracks) {
     if (t.type === 'audio') continue;
+    if (opts.trackIds && !opts.trackIds.includes(t.id)) continue;
+    if (!t.regions.some((r) => r.kind === 'midi' && !r.muted && r.notes.length)) continue;
     const mt = midi.addTrack();
     mt.name = t.name;
-    if (t.type === 'drums') mt.channel = 9;
+    if (t.type === 'drums') {
+      mt.channel = 9;
+    } else {
+      if (channel === 9) channel++;
+      mt.channel = channel % 16;
+      channel++;
+      mt.instrument.number = gmProgram(t.instrument);
+    }
     for (const r of t.regions) {
-      if (r.kind !== 'midi') continue;
-      const groove = grooveFor(p, r);
+      if (r.kind !== 'midi' || r.muted) continue;
+      const groove = opts.swing === false ? undefined : grooveFor(p, r);
       for (const pn of placedNotes(r)) {
-        // Export what you hear: swing is written into the note timing.
         const at = groove ? applyGroove(pn.note, pn.start, pn.duration, groove) : pn;
         mt.addNote({
           midi: Math.max(0, Math.min(127, pn.note.pitch + (t.type === 'drums' ? 0 : t.transpose))),
-          ticks: Math.round(at.start * ppq),
+          ticks: Math.max(0, Math.round(at.start * ppq)),
           durationTicks: Math.max(1, Math.round(at.duration * ppq)),
           velocity: pn.note.velocity,
         });
       }
     }
   }
-  return new Blob([new Uint8Array(midi.toArray())], { type: 'audio/midi' });
+  const bytes = new Uint8Array(midi.toArray());
+  // @tonejs/midi writes the key signature's sharps/flats count 14 too high; fix the byte.
+  for (let i = 0; i + 4 < bytes.length; i++)
+    if (bytes[i] === 0xff && bytes[i + 1] === 0x59 && bytes[i + 2] === 0x02) {
+      bytes[i + 3] = sf & 0xff;
+      break;
+    }
+  return new Blob([bytes], { type: 'audio/midi' });
 }
 
 export interface ImportedMidi {

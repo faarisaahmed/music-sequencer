@@ -23,6 +23,8 @@ function metaOf(p: Project): ProjectMeta {
     createdAt: p.createdAt,
     coverHue: p.coverHue ?? 200,
     lengthBeats: contentEndBeat(p),
+    cover: p.info?.coverThumb,
+    artist: p.info?.artist || undefined,
   };
 }
 

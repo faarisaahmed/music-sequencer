@@ -30,4 +30,6 @@ function assetManifest(): Plugin {
 export default defineConfig({
   base: './',
   plugins: [react(), assetManifest()],
+  // Export encoders load on demand; pre-bundle them so the dev server doesn't re-optimize mid-session.
+  optimizeDeps: { include: ['mediabunny', '@mediabunny/mp3-encoder', '@mediabunny/aac-encoder', '@mediabunny/flac-encoder'] },
 })

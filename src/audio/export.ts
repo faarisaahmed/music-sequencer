@@ -1,4 +1,4 @@
-// Offline rendering and file export (MP3, WAV, MIDI).
+// Offline rendering and file export (MP3, M4A, FLAC, WAV, OGG, MIDI).
 import type { Project } from '../model/types';
 import { contentEndBeat } from '../model/defaults';
 import { Mixer } from './mixer';
@@ -106,12 +106,26 @@ export function safeFileName(name: string): string {
 
 // ---------------------------------------------------------------- codecs (loaded on demand)
 
-export async function encodeMp3(buf: AudioBuffer, kbps = 192, onProgress?: (f: number) => void): Promise<Blob> {
-  return (await import('./codecs')).encodeMp3(buf, kbps, onProgress);
+export type { AudioFormat, EncodeOptions } from './audioEncode';
+export type { MidiExportOptions } from './codecs';
+
+export async function encodeAudio(
+  buf: AudioBuffer,
+  fmt: import('./audioEncode').AudioFormat,
+  p: Project,
+  opts: import('./audioEncode').EncodeOptions & { part?: string } = {},
+  onProgress?: (f: number) => void,
+): Promise<Blob> {
+  const m = await import('./audioEncode');
+  return m.encodeAudio(buf, fmt, m.songTags(p, opts.part), { ...opts, composer: p.info?.composer }, onProgress);
 }
 
-export async function projectToMidi(p: Project): Promise<Blob> {
-  return (await import('./codecs')).projectToMidi(p);
+export async function canExport(fmt: import('./audioEncode').AudioFormat): Promise<boolean> {
+  return (await import('./audioEncode')).canExport(fmt);
+}
+
+export async function projectToMidi(p: Project, opts?: import('./codecs').MidiExportOptions): Promise<Blob> {
+  return (await import('./codecs')).projectToMidi(p, opts);
 }
 
 export type { ImportedMidi } from './codecs';

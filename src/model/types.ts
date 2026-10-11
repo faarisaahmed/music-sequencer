@@ -237,6 +237,25 @@ export interface Project {
   groove?: Groove | null;
   /** Arrangement markers (Intro, Verse, Chorus…). */
   sections?: Section[];
+  /** Release details written into exported files (ID3 / MP4 / Vorbis tags, MIDI meta). */
+  info?: SongInfo;
+}
+
+/** Song details for exported files. The title is the project name. */
+export interface SongInfo {
+  artist?: string;
+  album?: string;
+  albumArtist?: string;
+  genre?: string;
+  year?: number;
+  trackNumber?: number;
+  trackTotal?: number;
+  composer?: string;
+  comment?: string;
+  /** Album cover as a square JPEG data URL (up to 1000 px). */
+  cover?: string;
+  /** Small copy of the cover for the song browser. */
+  coverThumb?: string;
 }
 
 export interface Section {
@@ -257,4 +276,7 @@ export interface ProjectMeta {
   createdAt: number;
   coverHue: number;
   lengthBeats: number;
+  /** Album cover thumbnail (data URL). */
+  cover?: string;
+  artist?: string;
 }
