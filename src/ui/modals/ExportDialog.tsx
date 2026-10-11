@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Download, ImagePlus, Trash2 } from 'lucide-react';
-import { closeModal, commit, toast, useStore } from '../../state/store';
+import { ChevronRight, Download, ImagePlus, MonitorPlay, Trash2 } from 'lucide-react';
+import { closeModal, commit, openModal, toast, useStore } from '../../state/store';
 import { exportProjectFile } from '../../state/actions';
 import { canExport, download, encodeAudio, normalize, projectToMidi, renderProject, safeFileName, type AudioFormat } from '../../audio/export';
 import { contentEndBeat } from '../../model/defaults';
@@ -195,6 +195,14 @@ export default function ExportDialog() {
           );
         })}
       </div>
+      <button className="export-yt" onClick={() => openModal('youtube')} disabled={!!busy} data-cmd="song.youtube">
+        <MonitorPlay size={18} />
+        <span>
+          <b>Publish to YouTube</b>
+          <small>Makes a video from your cover and song, with the title, description and settings filled in</small>
+        </span>
+        <ChevronRight size={16} />
+      </button>
       <div className={'export-body' + (format === 'project' ? ' single' : '')}>
         <div className="form-grid export-settings">
           <span className="label">File name</span>

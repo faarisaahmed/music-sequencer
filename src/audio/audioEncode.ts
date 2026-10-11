@@ -67,7 +67,7 @@ export function songTags(p: Project, part?: string): MetadataTags {
   return tags;
 }
 
-async function ensureEncoder(codec: AudioCodec): Promise<void> {
+export async function ensureEncoder(codec: AudioCodec): Promise<void> {
   if (await canEncodeAudio(codec)) return;
   if (codec === 'mp3') (await import('@mediabunny/mp3-encoder')).registerMp3Encoder();
   else if (codec === 'aac') (await import('@mediabunny/aac-encoder')).registerAacEncoder();

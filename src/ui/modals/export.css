@@ -192,3 +192,38 @@
     grid-template-columns: 1fr;
   }
 }
+
+.export-yt {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-soft);
+  background: var(--panel-2);
+  border-radius: 10px;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+.export-yt:hover {
+  background: var(--panel-3);
+  border-color: var(--border);
+}
+.export-yt > span {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.export-yt b {
+  font-size: 13px;
+}
+.export-yt small {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.export-yt > svg:first-child {
+  color: var(--record);
+}

@@ -69,6 +69,7 @@ export function useGlobalShortcuts(): void {
         ['edit.redo', redo],
         ['song.save', () => void flushSave().then(() => toast('Song saved', 'success'))],
         ['song.export', () => openModal('export')],
+        ['song.youtube', () => openModal('youtube')],
         ['song.newTrack', () => openModal('newTrack')],
         ['view.zoomIn', () => useStore.setState({ pxPerBeat: Math.min(200, s.pxPerBeat * 1.25) })],
         ['view.zoomOut', () => useStore.setState({ pxPerBeat: Math.max(4, s.pxPerBeat / 1.25) })],

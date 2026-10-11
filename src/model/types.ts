@@ -256,6 +256,20 @@ export interface SongInfo {
   cover?: string;
   /** Small copy of the cover for the song browser. */
   coverThumb?: string;
+  /** YouTube publishing: your edits (unset fields follow the song info) and the last upload. */
+  youtube?: YouTubeInfo;
+}
+
+export interface YouTubeInfo {
+  title?: string;
+  description?: string;
+  tags?: string[];
+  /** Custom 1280×720 thumbnail (JPEG data URL); unset = made from the cover. */
+  thumbnail?: string;
+  /** The last published video. */
+  videoId?: string;
+  channel?: string;
+  publishedAt?: number;
 }
 
 export interface Section {

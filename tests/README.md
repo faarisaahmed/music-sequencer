@@ -17,6 +17,7 @@ node tests/score-editing.mjs <chromium-executable> http://localhost:5391/ /tmp #
 node tests/shortcuts.mjs <chromium-executable> http://localhost:5391/ /tmp     # tooltips, rebinding, clashes, persistence, score arrows
 node tests/grace-notes.mjs <chromium-executable> http://localhost:5391/ /tmp   # grace detection, ⌥G, select/move/delete, MusicXML
 node tests/export.mjs <chromium-executable> http://localhost:5391/ /tmp        # MP3/M4A/FLAC/WAV/OGG tags + cover, MIDI instruments/key/markers, remembered settings
+node tests/youtube.mjs <chromium-executable> http://localhost:5391/ /tmp       # YouTube publish against a fake Google: setup, channel, metadata, upload, thumbnail, playlist
 node tests/jam-qa-long.mjs <chromium-executable> http://localhost:5391/ 300   # frozen tab, recording, big join, soak
 ```
 

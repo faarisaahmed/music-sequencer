@@ -5,6 +5,9 @@ import SettingsDialog from './SettingsDialog';
 import HelpDialog from './HelpDialog';
 import TemplatesDialog from '../home/TemplatesDialog';
 import { CollabDialog, JoinDialog } from '../collab/CollabUI';
+import { lazy, Suspense } from 'react';
+
+const YouTubeDialog = lazy(() => import('./YouTubeDialog'));
 
 export default function ModalHost() {
   const modal = useStore((s) => s.modal);
@@ -14,6 +17,12 @@ export default function ModalHost() {
       return <NewTrackDialog />;
     case 'export':
       return <ExportDialog />;
+    case 'youtube':
+      return (
+        <Suspense fallback={null}>
+          <YouTubeDialog />
+        </Suspense>
+      );
     case 'settings':
       return <SettingsDialog />;
     case 'help':

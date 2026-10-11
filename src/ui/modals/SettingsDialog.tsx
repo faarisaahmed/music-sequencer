@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import type { Draft } from 'immer';
 import type { Project } from '../../model/types';
-import { closeModal, commit, openModal, useStore } from '../../state/store';
+import { closeModal, commit, openModal, toast, useStore } from '../../state/store';
 import { Keyboard } from 'lucide-react';
+import { googleClientId, looksLikeClientId, setGoogleClientId } from '../../publish/youtube';
 import { setBpm, setKey, setTimeSig } from '../../state/actions';
 import { keyName, keyUsesFlats, makeKey, pitchClassName } from '../../model/music';
 import ScalePicker from '../common/ScalePicker';
@@ -170,6 +171,26 @@ export default function SettingsDialog() {
         <button className="btn" onClick={() => openModal('help', { tab: 'shortcuts' })}>
           <Keyboard size={14} /> Edit Shortcuts…
         </button>
+      </div>
+      <div className="form-section">YouTube Publishing</div>
+      <div className="form-grid">
+        <span className="label">Google client ID</span>
+        <input
+          type="text"
+          defaultValue={googleClientId()}
+          placeholder="….apps.googleusercontent.com"
+          onKeyDown={(e) => e.stopPropagation()}
+          onBlur={(e) => {
+            const v = e.target.value.trim();
+            if (v === googleClientId()) return;
+            if (v && !looksLikeClientId(v)) {
+              toast("That doesn't look like a Google client ID", 'error');
+              return;
+            }
+            setGoogleClientId(v);
+            toast(v ? 'YouTube client ID saved' : 'YouTube client ID removed', 'success');
+          }}
+        />
       </div>
     </Modal>
   );
