@@ -22,6 +22,7 @@ node tests/safety.mjs <chromium-executable> http://localhost:5391/ /tmp        #
 node tests/mobile.mjs <chromium-executable> http://localhost:5391/ /tmp        # phone layout, touch gestures (double-tap, hold, pinch), sheets, install, landscape, iPad
 node tests/tempo-meter.mjs <chromium-executable> http://localhost:5391/ /tmp   # tempo/meter math, render timing, Tempo lane, LCD, score measures, MIDI/MusicXML
 node tests/repeats.mjs <chromium-executable> http://localhost:5391/ /tmp       # repeat/ending/D.S./D.C. order, engine jumps, export, MIDI, score, MusicXML
+node tests/parts.mjs <chromium-executable> http://localhost:5391/ /tmp         # print parts: transposed, multi-bar rests, full score, paper, MusicXML per part, ⌘P
 node tests/jam-qa-long.mjs <chromium-executable> http://localhost:5391/ 300   # frozen tab, recording, big join, soak
 ```
 

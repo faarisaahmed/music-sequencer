@@ -27,6 +27,7 @@ import {
   Undo2,
   Users,
   FileMusic,
+  Printer,
 } from 'lucide-react';
 import { commit, openModal, redo, undo, useStore, useTransport, type DockTab } from '../../state/store';
 import { closeProject } from '../../state/actions';
@@ -155,6 +156,7 @@ export default function MobileProject() {
           <div className="m-sheet-sep" />
           <SheetItem icon={<Download size={19} />} label="Export" onClick={() => (openModal('export'), setMore(false))} />
           <SheetItem icon={<MonitorPlay size={19} />} label="Publish to YouTube" onClick={() => (openModal('youtube'), setMore(false))} />
+          <SheetItem icon={<Printer size={19} />} label="Print Sheet Music & Parts" onClick={() => (openModal('parts'), setMore(false))} />
           <SheetItem icon={<History size={19} />} label="Version History" onClick={() => (openModal('versions'), setMore(false))} />
           <SheetItem icon={<Users size={19} />} label="Jam Session" onClick={() => (openModal('collab'), setMore(false))} />
           <SheetItem icon={<Settings size={19} />} label="Song Settings" onClick={() => (openModal('settings'), setMore(false))} />

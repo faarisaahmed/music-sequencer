@@ -9,6 +9,7 @@ import {
   GraceNote,
   GraceNoteGroup,
   Modifier,
+  MultiMeasureRest,
   Renderer,
   Repetition,
   Stave,
@@ -131,6 +132,9 @@ export interface RenderOpts {
   showNames: boolean;
   title?: string;
   subtitle?: string;
+  /** Printed parts: the instrument at the top left, the composer at the top right. */
+  partName?: string;
+  composer?: string;
   tempo?: number;
   /** Repeats, endings and jumps; `barOffset` is the song bar of the score's first measure. */
   form?: { marks: NavMark[]; voltas: Volta[]; barOffset: number };
@@ -154,6 +158,7 @@ const VF_ARTIC: Record<Artic, string> = { staccato: 'a.', accent: 'a>', tenuto: 
 
 /** Estimated minimum width of a measure from its content density. */
 function measureMinWidth(model: ScoreModel, m: number): number {
+  if ((model.measures[m].restRun ?? 1) > 1) return 130;
   let n = 1;
   for (const s of model.measures[m].staves) {
     for (const v of s.voices) {
@@ -200,7 +205,7 @@ export function planScore(model: ScoreModel, widthPx: number, zoom: number, opts
     const labels = first ? opts.partLabels : model.parts.map((p) => p.abbr);
     return Math.min(180, Math.max(...labels.map((l) => l.length)) * 7.2 + 40);
   };
-  const titleSpace = opts.title ? (opts.subtitle ? 74 : 56) : 10;
+  const titleSpace = opts.title ? (opts.subtitle ? 74 : 56) + (opts.composer ? 16 : 0) : 10;
 
   // ---- line breaking
   const headerW = (first: boolean) => 38 + maxFifths * 11 + 10 + (first ? 30 : 0) + (hasGrand || multi ? 14 : 0);
@@ -378,6 +383,15 @@ function drawSystem(ctx: DrawCtx, plan: ScorePlan, li: number, layout: ScoreLayo
       const sw = ctx.measureText(opts.subtitle).width;
       ctx.fillText(opts.subtitle, logicalW / 2 - sw / 2, 56);
     }
+    if (opts.partName) {
+      ctx.setFont('Georgia, serif', 13, 'bold');
+      ctx.fillText(opts.partName, MARGIN, 22);
+    }
+    if (opts.composer) {
+      ctx.setFont('Georgia, serif', 12, 'italic');
+      const cw = ctx.measureText(opts.composer).width;
+      ctx.fillText(opts.composer, logicalW - MARGIN - cw, opts.subtitle ? 76 : 60);
+    }
     ctx.restore();
   }
 
@@ -408,10 +422,10 @@ function drawSystem(ctx: DrawCtx, plan: ScorePlan, li: number, layout: ScoreLayo
           else st.addClef(ref.clef);
           if (ref.clef !== 'percussion') st.addKeySignature(vexKeySpec(key));
           if (li === 0 || sigChanged) st.addTimeSignature(`${mm.sig[0]}/${mm.sig[1]}`);
-          if (si === 0) st.setMeasure(opts.firstBarNumber + m);
+          if (si === 0) st.setMeasure(opts.firstBarNumber + (mm.number ?? m));
         } else if (sigChanged) st.addTimeSignature(`${mm.sig[0]}/${mm.sig[1]}`);
         if (m === model.measures.length - 1) st.setEndBarType(BarlineType.END);
-        if (opts.form) applyForm(st, opts.form, opts.form.barOffset + m, si === 0, m === model.measures.length - 1);
+        if (opts.form) applyForm(st, opts.form, opts.form.barOffset + (mm.number ?? m), si === 0, m === model.measures.length - 1);
         st.setContext(ctx);
         return st;
       });
@@ -430,6 +444,22 @@ function drawSystem(ctx: DrawCtx, plan: ScorePlan, li: number, layout: ScoreLayo
         const b = staves[part.firstStaff + part.clefs.length - 1];
         new StaveConnector(a, b).setType('singleRight').setContext(ctx).draw();
         if (m === model.measures.length - 1) new StaveConnector(a, b).setType('boldDoubleRight').setContext(ctx).draw();
+      }
+
+      // ---- a multi-bar rest (printed parts): one bar with the count above it
+      if ((mm.restRun ?? 1) > 1) {
+        for (const st of staves) {
+          ctx.openGroup('multirest');
+          try {
+            new MultiMeasureRest(mm.restRun!, { number_of_measures: mm.restRun!, use_symbols: false }).setStave(st).setContext(ctx).draw();
+          } catch {
+            /* cosmetic */
+          }
+          ctx.closeGroup();
+        }
+        sys.measures.push({ index: m, x, w, noteX0: staves[0].getNoteStartX(), noteX1: x + w - 10, anchors: [] });
+        x += w;
+        return;
       }
 
       // ---- notes

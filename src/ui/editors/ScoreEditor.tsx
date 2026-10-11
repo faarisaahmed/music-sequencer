@@ -3,53 +3,38 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { useToolbarSlot } from './useToolbarSlot';
-import { MousePointer2, PenLine, Plus, Minus, Printer, FileDown, ZoomIn, ZoomOut, ArrowUp, ArrowDown, Type, Hash, Eraser } from 'lucide-react';
-import type { Articulation, MidiRegion, Note, Project, Track } from '../../model/types';
-import { beginGesture, endGesture, findRegion, live, useStore, useTransport, toast } from '../../state/store';
+import { MousePointer2, PenLine, Plus, Minus, Printer, FileDown, Files, ZoomIn, ZoomOut, ArrowUp, ArrowDown, Type, Hash, Eraser } from 'lucide-react';
+import type { Articulation, Note } from '../../model/types';
+import { beginGesture, endGesture, live, openModal, useStore, useTransport, toast } from '../../state/store';
 import { noteName } from '../../model/music';
-import { meterOf } from '../../model/timeline';
 import { formMenu } from '../tracks/TempoLane';
 import { showContextMenu } from '../common/menus';
-import { placedNotes } from '../../model/regions';
-import { getPreset } from '../../audio/presets';
 import { getEngine } from '../../audio/engine';
 import { download, safeFileName } from '../../audio/export';
 import { isTyping, startDrag } from '../common/drag';
 import { comboOf, isKey } from '../keys/keymap';
 import {
-  abbreviate,
-  buildScore,
   diatonicShift,
   spell,
   drumAtPosition,
-  notationFor,
   pitchFromDiatonic,
-  staffForWritten,
-  transposeKey,
   DYNAMICS,
   type ClefMode,
-  type DisplayMark,
-  type PartInput,
-  type RawNote,
-  type ScoreModel,
 } from './score/notation';
 import { measureAt } from './score/notation';
 import {
   beatToX,
   emptyLayout,
   planScore,
-  renderScore,
   renderSystemInto,
   systemBounds,
   topLineDiatonic,
   xToBeat,
-  type ChordLabel,
   type ElemHit,
   type HeadHit,
   type ScoreLayout,
   type ScorePlan,
 } from './score/render';
-import type { RenderOpts } from './score/render';
 import {
   addBars,
   addDynamic,
@@ -67,11 +52,12 @@ import {
   setVoice,
   tieNotes,
   toggleArticulation,
-  viewOf,
   type Placement,
 } from './score/edits';
 import { chordAt, chordName, setChordAt } from './score/chords';
 import { toMusicXml } from './score/musicxml';
+import { buildSource, formFor, tempoMarksFor, type Source } from './score/source';
+import { printDocs } from './score/print';
 import './score.css';
 
 const DURATIONS: { v: number; key: string; label: string }[] = [
@@ -116,167 +102,6 @@ interface Ghost {
   y: number;
   ledger: number[];
   label: string;
-}
-
-interface PartMeta {
-  track: Track;
-  placement: Placement;
-  transpose: number;
-  writtenKey: Project['key'];
-  drums: boolean;
-}
-
-interface Source {
-  model: ScoreModel;
-  parts: PartMeta[];
-  firstBar: number;
-  chords: ChordLabel[];
-  toAbs: (t: number) => number;
-  fromAbs: (abs: number) => number | null;
-  region?: MidiRegion;
-  labels: string[];
-  regionIds: string[];
-}
-
-function rawFromNote(n: Note, regionId: string, s: number, e: number, key: string): RawNote {
-  return { id: n.id, key, regionId, pitch: n.pitch, s, e, vel: n.velocity, voice: n.voice, artic: n.artic, lyric: n.lyric, grace: n.grace };
-}
-
-function formFor(project: Project, src: Source): RenderOpts['form'] {
-  if (!project.navMarks?.length && !project.voltas?.length) return undefined;
-  return { marks: project.navMarks ?? [], voltas: project.voltas ?? [], barOffset: src.firstBar - 1 };
-}
-
-/** The song's tempo changes in the score's own beats (only those inside what it shows). */
-function tempoMarksFor(project: Project, src: Source): { t: number; bpm: number; ramp?: boolean; faster?: boolean }[] {
-  const out: { t: number; bpm: number; ramp?: boolean; faster?: boolean }[] = [];
-  let prev = project.bpm;
-  let prevBeat = 0;
-  for (const c of [...(project.tempoChanges ?? [])].sort((a, b) => a.beat - b.beat)) {
-    // A gradual change is marked where it starts ("accel." … to the new tempo).
-    const t = src.fromAbs(c.ramp ? prevBeat : c.beat);
-    if (t !== null) out.push({ t, bpm: c.bpm, ramp: c.ramp, faster: c.bpm > prev });
-    prev = c.bpm;
-    prevBeat = c.beat;
-  }
-  return out;
-}
-
-/** Build the notation source for a single region or the whole song. */
-function buildSource(project: Project, full: boolean, regionId: string | undefined, grid: number, clefMode: ClefMode, concert: boolean): Source | null {
-  const meter = meterOf(project);
-  let bpb = meter.lenAt(0);
-  const mkPart = (track: Track, raw: RawNote[], marks: DisplayMark[], mode: ClefMode, placementBase: Omit<Placement, 'staffOf'>, splits: PartInput['splits'] = []) => {
-    const drums = track.type === 'drums';
-    const preset = getPreset(track.instrument);
-    const nt = notationFor(track.instrument, drums, raw.map((n) => n.pitch), mode, concert, preset.range);
-    const writtenKey = transposeKey(project.key, nt.transpose);
-    const staffOf = (p: number) => (drums ? 0 : staffForWritten(p + nt.transpose, nt.clefs));
-    const input: PartInput = {
-      id: track.id,
-      trackId: track.id,
-      name: track.name,
-      abbr: abbreviate(track.name),
-      clefs: nt.clefs,
-      transpose: nt.transpose,
-      writtenKey,
-      drums,
-      notes: raw,
-      marks,
-      splits,
-    };
-    const meta: PartMeta = { track, placement: { ...placementBase, staffOf }, transpose: nt.transpose, writtenKey, drums };
-    return { input, meta, label: track.name + (nt.transLabel ? ` ${nt.transLabel}` : '') };
-  };
-
-  if (!full) {
-    const found = findRegion(project, regionId ?? null);
-    if (!found || found.region.kind !== 'midi') return null;
-    const region = found.region;
-    const track = found.track;
-    const { viewStart, viewLen } = viewOf(region);
-    // Bars counted from where this region's score starts.
-    const origin = region.start - (region.loop ? region.offset : 0);
-    const rm = meter.relativeTo(origin);
-    bpb = rm.lenAt(0);
-    const raw: RawNote[] = [];
-    for (const n of region.notes) {
-      const t = n.start - viewStart;
-      if (t < -1e-6 || t >= viewLen - 1e-6) continue;
-      raw.push(rawFromNote(n, region.id, t, t + n.duration, n.id));
-    }
-    const marks: DisplayMark[] = (region.marks ?? []).map((m) => ({ kind: m.kind, t: m.beat - viewStart, end: m.end !== undefined ? m.end - viewStart : undefined, value: m.value, staff: m.staff ?? 0, id: m.id, regionId: region.id }));
-    const splits = (region.restSplits ?? []).map((x) => ({ t: x.beat - viewStart, staff: x.staff, voice: x.voice })).filter((x) => x.t > 0 && x.t < viewLen + bpb);
-    const p = mkPart(track, raw, marks, clefMode, { mode: 'region', trackId: track.id, regionId: region.id }, splits);
-    const toAbs = (t: number) => region.start + t - (region.loop ? region.offset : 0);
-    const fromAbs = (a: number) => a - region.start + (region.loop ? region.offset : 0);
-    const chords: ChordLabel[] = (project.chords ?? [])
-      .map((c) => ({ t: fromAbs(c.beat), name: chordName(c, p.meta.writtenKey) }))
-      .filter((c) => c.t >= -1e-6 && c.t < viewLen + bpb);
-    const model = buildScore([p.input], rm, viewLen, 1, grid);
-    return {
-      model,
-      parts: [p.meta],
-      firstBar: meter.barAt(origin + 1e-9).bar + 1,
-      chords,
-      toAbs,
-      fromAbs: (a) => {
-        const rel = a - region.start;
-        if (rel < 0 || rel >= region.length) return null;
-        return region.loop ? (((rel + region.offset) % region.contentLength) + region.contentLength) % region.contentLength : rel;
-      },
-      region,
-      labels: [p.label],
-      regionIds: [region.id],
-    };
-  }
-
-  const tracks = project.tracks.filter((t) => t.type !== 'audio');
-  if (!tracks.length) return null;
-  let total = meter.barStart(4);
-  const built = tracks.map((track) => {
-    const raw: RawNote[] = [];
-    const marks: DisplayMark[] = [];
-    const splits: NonNullable<PartInput['splits']> = [];
-    for (const r of track.regions) {
-      if (r.kind !== 'midi' || r.muted) continue;
-      const iters = r.loop ? Math.ceil((r.offset + r.length) / r.contentLength) + 1 : 1;
-      for (const sp of r.restSplits ?? [])
-        for (let k = 0; k < iters; k++) {
-          const t = r.start - r.offset + k * (r.loop ? r.contentLength : 0) + sp.beat;
-          if (t > r.start && t < r.start + r.length) splits.push({ t, staff: sp.staff, voice: sp.voice });
-        }
-      total = Math.max(total, r.start + r.length);
-      for (const pn of placedNotes(r)) raw.push(rawFromNote(pn.note, r.id, pn.start, pn.start + pn.duration, `${pn.note.id}@${pn.iteration}`));
-      for (const m of r.marks ?? []) {
-        const iters = r.loop ? Math.ceil((r.offset + r.length) / r.contentLength) + 1 : 1;
-        for (let k = 0; k < iters; k++) {
-          const base = r.start - r.offset + k * (r.loop ? r.contentLength : 0);
-          const t = base + m.beat;
-          if (t < r.start - 1e-6 || t >= r.start + r.length) continue;
-          marks.push({ kind: m.kind, t, end: m.end !== undefined ? Math.min(base + m.end, r.start + r.length) : undefined, value: m.value, staff: m.staff ?? 0, id: m.id, regionId: r.id });
-        }
-      }
-    }
-    return mkPart(track, raw, marks, 'auto', { mode: 'song', trackId: track.id }, splits);
-  });
-  const model = buildScore(
-    built.map((b) => b.input),
-    meter,
-    total,
-    1,
-    grid,
-  );
-  return {
-    model,
-    parts: built.map((b) => b.meta),
-    firstBar: 1,
-    chords: (project.chords ?? []).map((c) => ({ t: c.beat, name: chordName(c, project.key) })),
-    toAbs: (t) => t,
-    fromAbs: (a) => a,
-    labels: built.map((b) => b.label),
-    regionIds: tracks.flatMap((t) => t.regions.map((r) => r.id)),
-  };
 }
 
 interface TextEntry {
@@ -1176,58 +1001,28 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
   const title = full ? project.name : `${project.name} — ${src?.parts[0]?.track.name ?? ''}`;
   const printScore = () => {
     if (!src) return;
-    const W = 760;
-    const tmp = document.createElement('div');
-    const l = renderScore(tmp, src.model, W, 1, {
-      partKeys,
-      timeSig: project.timeSig,
-      firstBarNumber: src.firstBar,
-      showDynamics: showDyn,
-      showNames: full,
-      title,
-      tempo: project.bpm,
-      tempoMarks: tempoMarksFor(project, src),
-      form: formFor(project, src),
-      chords: src.chords,
-      partLabels: src.labels,
-    });
-    const svg = tmp.querySelector('svg');
-    if (!svg) return;
-    // Paginate between systems (A4 portrait proportions).
-    const pageH = Math.round(W * 1.42);
-    const pages: [number, number][] = [];
-    let start = 0;
-    for (const sys of l.systems) {
-      if (sys.y1 - start > pageH && sys.y0 > start + 1) {
-        pages.push([start, sys.y0 - 16]);
-        start = sys.y0 - 16;
-      }
-    }
-    pages.push([start, l.height]);
-    const html = pages
-      .map(([y0, y1]) => {
-        const clone = svg.cloneNode(true) as SVGSVGElement;
-        clone.setAttribute('viewBox', `0 ${y0} ${W} ${y1 - y0}`);
-        clone.setAttribute('width', '100%');
-        clone.removeAttribute('height');
-        clone.style.cssText = '';
-        return `<div class="page">${clone.outerHTML}</div>`;
-      })
-      .join('');
-    const w = window.open('', '_blank');
-    if (!w) return;
-    w.document.write(
-      `<!doctype html><html><head><title>${title}</title><style>
-        body{margin:0;background:#888}
-        .page{background:white;width:186mm;margin:12px auto;padding:0;box-shadow:0 2px 12px rgba(0,0,0,.4)}
-        .page svg{display:block;width:100%;height:auto}
-        @page{size:A4 portrait;margin:12mm}
-        @media print{body{background:white}.page{margin:0;box-shadow:none;page-break-after:always;break-after:page}.page:last-child{page-break-after:auto;break-after:auto}}
-      </style></head><body>${html}</body></html>`,
-    );
-    w.document.close();
-    w.focus();
-    setTimeout(() => w.print(), 400);
+    const info = project.info ?? {};
+    const ok = printDocs(title, [
+      {
+        model: src.model,
+        footer: full ? project.name : title,
+        opts: {
+          partKeys,
+          timeSig: project.timeSig,
+          firstBarNumber: src.firstBar,
+          showDynamics: showDyn,
+          showNames: full,
+          title,
+          composer: info.composer || info.artist || undefined,
+          tempo: project.bpm,
+          tempoMarks: tempoMarksFor(project, src),
+          form: formFor(project, src),
+          chords: src.chords,
+          partLabels: src.labels,
+        },
+      },
+    ]);
+    if (!ok) toast('Your browser blocked the print window. Allow pop-ups for this site', 'error');
   };
   const exportXml = () => {
     if (!src) return;
@@ -1280,6 +1075,9 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
       )}
       <button className="btn sm" onClick={printScore} title="Print or save as PDF">
         <Printer size={13} /> Print / PDF
+      </button>
+      <button className="btn sm parts-btn" onClick={() => openModal('parts')} title="Print a separate part for each player (transposed, with multi-bar rests)">
+        <Files size={13} /> Parts
       </button>
       <button className="btn sm" onClick={exportXml} title="Export MusicXML (open in MuseScore, Sibelius, Finale…)">
         <FileDown size={13} /> MusicXML

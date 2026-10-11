@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronRight, Download, ImagePlus, MonitorPlay, Trash2 } from 'lucide-react';
+import { ChevronRight, Download, ImagePlus, MonitorPlay, Printer, Trash2 } from 'lucide-react';
 import { closeModal, commit, openModal, toast, useStore } from '../../state/store';
 import { exportProjectFile } from '../../state/actions';
 import { canExport, download, encodeAudio, normalize, playSeconds, projectToMidi, renderProject, safeFileName, type AudioFormat } from '../../audio/export';
@@ -202,6 +202,14 @@ export default function ExportDialog() {
         <span>
           <b>Publish to YouTube</b>
           <small>Makes a video from your cover and song, with the title, description and settings filled in</small>
+        </span>
+        <ChevronRight size={16} />
+      </button>
+      <button className="export-yt export-parts" onClick={() => openModal('parts')} disabled={!!busy}>
+        <Printer size={18} />
+        <span>
+          <b>Print Sheet Music &amp; Parts</b>
+          <small>The full score and a part for each player, transposed, as PDF or on paper</small>
         </span>
         <ChevronRight size={16} />
       </button>

@@ -227,3 +227,6 @@
 .export-yt > svg:first-child {
   color: var(--record);
 }
+.export-parts > svg:first-child {
+  color: var(--accent-2);
+}

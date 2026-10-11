@@ -71,6 +71,7 @@ export function useGlobalShortcuts(): void {
         ['song.save', () => void flushSave().then(() => toast('Song saved', 'success'))],
         ['song.export', () => openModal('export')],
         ['song.youtube', () => openModal('youtube')],
+        ['song.parts', () => openModal('parts')],
         ['song.versions', () => openModal('versions')],
         [
           'song.saveVersion',

@@ -9,6 +9,7 @@ import { lazy, Suspense } from 'react';
 import VersionsDialog from './VersionsDialog';
 
 const YouTubeDialog = lazy(() => import('./YouTubeDialog'));
+const PartsDialog = lazy(() => import('../editors/score/PartsDialog'));
 
 export default function ModalHost() {
   const modal = useStore((s) => s.modal);
@@ -22,6 +23,12 @@ export default function ModalHost() {
       return (
         <Suspense fallback={null}>
           <YouTubeDialog />
+        </Suspense>
+      );
+    case 'parts':
+      return (
+        <Suspense fallback={null}>
+          <PartsDialog />
         </Suspense>
       );
     case 'versions':

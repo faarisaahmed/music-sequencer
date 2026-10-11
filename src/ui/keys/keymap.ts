@@ -34,6 +34,7 @@ export const COMMANDS: Command[] = [
   C('song.save', 'Save', 'Song', ['Mod+S']),
   C('song.export', 'Export', 'Song', ['Mod+E']),
   C('song.youtube', 'Publish to YouTube', 'Song', []),
+  C('song.parts', 'Print sheet music & parts', 'Song', ['Mod+P']),
   C('song.saveVersion', 'Save a version (to go back to later)', 'Song', ['Mod+Alt+S']),
   C('song.versions', 'Version history', 'Song', []),
   C('song.newTrack', 'New track', 'Song', ['Mod+Alt+N']),

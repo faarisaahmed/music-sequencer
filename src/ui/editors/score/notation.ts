@@ -252,6 +252,10 @@ export interface MeasureModel {
   len: number;
   sig: [number, number];
   staves: StaffMeasure[]; // indexed by global staff index
+  /** Parts: this measure stands for `restRun` empty bars, drawn as one multi-bar rest. */
+  restRun?: number;
+  /** The bar it shows (0-based from the score's first bar) when measures have been merged. */
+  number?: number;
 }
 
 export interface QNote {
@@ -339,7 +343,36 @@ export interface ScoreModel {
 /** The measure containing display beat `t` (clamped to the score). */
 export function measureAt(model: ScoreModel, t: number): MeasureModel {
   const i = Math.max(0, Math.min(model.measures.length - 1, model.meter.barAt(t + 1e-9).bar));
-  return model.measures[i];
+  const m = model.measures[i];
+  if (m && t >= m.start - 1e-9 && t < m.start + m.len - 1e-9) return m;
+  // Merged measures (parts with multi-bar rests): look it up.
+  return model.measures.find((x) => t >= x.start - 1e-9 && t < x.start + x.len - 1e-9) ?? model.measures[model.measures.length - 1];
+}
+
+/**
+ * For printed parts: runs of two or more completely empty bars become one multi-bar rest.
+ * A run can't continue into a bar in `breaks` (sections, tempo or meter changes start a new
+ * one there), and bars in `alone` (repeats, endings, jumps) are never merged.
+ */
+export function compressRests(model: ScoreModel, breaks: Set<number>, alone: Set<number> = new Set()): ScoreModel {
+  const empty = (m: MeasureModel) =>
+    m.staves.every((s) => s.voices.length === 1 && s.voices[0].length === 1 && s.voices[0][0].rest && s.voices[0][0].wholeMeasure) &&
+    !model.parts.some((p) => p.marks.some((mk) => mk.t >= m.start - 1e-9 && mk.t < m.start + m.len - 1e-9));
+  const out: MeasureModel[] = [];
+  const ms = model.measures;
+  for (let i = 0; i < ms.length; ) {
+    const m = ms[i];
+    let j = i;
+    if (empty(m) && !alone.has(i))
+      while (j + 1 < ms.length && empty(ms[j + 1]) && !breaks.has(j + 1) && !alone.has(j + 1) && ms[j + 1].sig[0] === m.sig[0] && ms[j + 1].sig[1] === m.sig[1]) j++;
+    const run = j - i + 1;
+    if (run >= 2) {
+      const len = ms.slice(i, j + 1).reduce((a, x) => a + x.len, 0);
+      out.push({ ...m, index: out.length, len, number: m.number ?? i, restRun: run });
+    } else out.push({ ...m, index: out.length, number: m.number ?? i });
+    i = j + 1;
+  }
+  return { ...model, measures: out };
 }
 
 export const SPLIT = 60;
