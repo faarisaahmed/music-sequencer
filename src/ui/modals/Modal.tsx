@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { closeModal } from '../../state/store';
 import { keyCapture } from '../keys/keymap';
@@ -16,6 +16,7 @@ export default function Modal({
   width?: number;
   onClose?: () => void;
 }) {
+  const downOnBackdrop = useRef(false);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !keyCapture.active) {
@@ -27,7 +28,14 @@ export default function Modal({
     return () => window.removeEventListener('keydown', onKey, true);
   }, [onClose]);
   return (
-    <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div
+      className="modal-backdrop"
+      onPointerDown={(e) => (downOnBackdrop.current = e.target === e.currentTarget)}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && downOnBackdrop.current) onClose();
+        downOnBackdrop.current = false;
+      }}
+    >
       <div className="modal" style={{ width }}>
         <div className="modal-head">
           <div className="grow">{title}</div>

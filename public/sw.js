@@ -2,7 +2,7 @@
 const SHELL = 'bandforge-shell';
 const SAMPLES = 'bandforge-samples-v1';
 const SAMPLE_HOSTS = ['tonejs.github.io', 'nbrosowsky.github.io', 'gleitz.github.io'];
-const CORE = ['./', './index.html', './manifest.webmanifest', './favicon.svg', './icon-192.png', './icon-512.png'];
+const CORE = ['./', './index.html', './manifest.webmanifest', './favicon.svg', './icon-192.png', './icon-512.png', './apple-touch-icon.png', './privacy.html', './terms.html'];
 
 async function readManifest(fromNetwork) {
   try {
@@ -65,11 +65,15 @@ async function cacheFirst(cacheName, request) {
 
 async function networkFirstPage(request) {
   const cache = await caches.open(SHELL);
+  // Only the app itself is the offline start page; other pages (privacy, terms) cache as themselves.
+  const path = new URL(request.url).pathname;
+  const isApp = path.endsWith('/') || path.endsWith('/index.html');
   try {
     const res = await fetch(request);
-    if (res.ok) cache.put('./index.html', res.clone());
+    if (res.ok) cache.put(isApp ? './index.html' : request, res.clone());
     return res;
   } catch {
+    if (!isApp) return (await cache.match(request, { ignoreSearch: true })) || Response.error();
     return (await cache.match('./index.html')) || (await cache.match('./')) || Response.error();
   }
 }

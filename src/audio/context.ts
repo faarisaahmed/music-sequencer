@@ -2,10 +2,20 @@ let ctx: AudioContext | null = null;
 
 export function getAudioContext(): AudioContext {
   if (!ctx) {
+    // iPhone: play through the speaker even with the silent switch on (it's a music app).
+    const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
+    if (session) session.type = 'playback';
     ctx = new AudioContext({ latencyHint: 'interactive', sampleRate: 44100 });
   }
   return ctx;
 }
+
+// Phones suspend audio when you switch apps or take a call; the next touch brings it back.
+const wake = () => {
+  if (ctx && ctx.state !== 'running' && ctx.state !== 'closed') void ctx.resume().catch(() => undefined);
+};
+window.addEventListener('pointerdown', wake, true);
+window.addEventListener('keydown', wake, true);
 
 /** Must be called from a user gesture at least once. */
 export async function resumeAudio(): Promise<AudioContext> {

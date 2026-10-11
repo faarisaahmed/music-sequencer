@@ -10,6 +10,7 @@ import AutomationLane from './AutomationLane';
 import ArrangementLane from './ArrangementLane';
 import ChordLane, { ChordToggleButton } from '../assistant/ChordLane';
 import { HEADER_W, RULER_H, useTracksUi } from './tracksUi';
+import { useTwoFingerPan } from '../mobile/touchPan';
 import { shortcutLabel } from '../keys/keymap';
 import './tracks.css';
 import { PeerPlayheads } from '../collab/presence';
@@ -278,6 +279,7 @@ export default function TracksView() {
   const snapLine = useTracksUi((s) => s.snapLine);
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  useTwoFingerPan(scrollRef, { wheelPerLn: 100 });
   const [viewW, setViewW] = useState(1200);
   useArmedMic(project.tracks);
 

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Search, FolderOpen, FileMusic, MoreHorizontal, Music2, Trash2, Copy, Pencil, Download, Play, ChevronDown, ChevronRight, Users, History, Archive } from 'lucide-react';
 import { BackupBanner, backUpAllSongs } from '../modals/SafetyPanels';
+import { InstallButton } from '../mobile/install';
 import type { ProjectMeta } from '../../model/types';
 import { listProjects, loadProject, saveProject } from '../../state/persistence';
 import { duplicateProjectById, exportProjectFile, importMidiFile, importProjectFile, openProjectById, removeProject, createNewProject } from '../../state/actions';
@@ -168,11 +169,12 @@ export default function HomeScreen() {
           <Search size={14} />
           <input type="search" placeholder="Search songs" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
+        <InstallButton />
         <button className="btn" onClick={() => openModal('collab')} title="Join a friend's jam session with a code or link">
-          <Users size={15} /> Join a Jam
+          <Users size={15} /> <span className="btn-label">Join a Jam</span>
         </button>
         <button className="btn" onClick={() => fileRef.current?.click()} title="Import a MIDI file or BandForge project">
-          <FileMusic size={15} /> Import
+          <FileMusic size={15} /> <span className="btn-label">Import</span>
         </button>
         <button className="btn primary" onClick={() => openModal('templates')}>
           <Plus size={16} /> New Song

@@ -12,6 +12,8 @@ import { startDrag } from './common/drag';
 import EmptyHint from './onboarding/EmptyHint';
 import LoadingPill from './onboarding/LoadingPill';
 import { maybeAutoStart } from './onboarding/tourState';
+import { useIsPhone } from './mobile/device';
+import MobileProject from './mobile/MobileProject';
 
 export default function ProjectScreen() {
   const libraryOpen = useStore((s) => s.libraryOpen);
@@ -19,13 +21,15 @@ export default function ProjectScreen() {
   const dockHeight = useStore((s) => s.dockHeight);
   const dockMax = useStore((s) => s.dockMaximized);
   const mainRef = useRef<HTMLDivElement>(null);
+  const phone = useIsPhone();
   useGlobalShortcuts();
   useMusicalTyping();
 
   useEffect(() => {
+    if (phone) return; // the guided tour points at desktop controls
     const t = setTimeout(() => maybeAutoStart('project'), 700);
     return () => clearTimeout(t);
-  }, []);
+  }, [phone]);
 
   // Level meters polling (~30fps) while the project is open.
   useEffect(() => {
@@ -42,6 +46,8 @@ export default function ProjectScreen() {
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
   }, []);
+
+  if (phone) return <MobileProject />;
 
   return (
     <div

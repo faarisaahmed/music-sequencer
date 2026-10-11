@@ -1,0 +1,773 @@
+/* ---------------------------------------------------------------- phone shell */
+
+html.phone,
+html.phone body {
+  overscroll-behavior: none;
+}
+html.touch body {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+/* iOS zooms into inputs smaller than 16px. */
+html.phone input[type='text'],
+html.phone input[type='number'],
+html.phone input[type='search'],
+html.phone textarea,
+html.phone select {
+  font-size: 16px;
+}
+
+.m-project {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  overflow: hidden;
+}
+.m-top {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: calc(env(safe-area-inset-top) + 4px) 6px 4px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border-soft);
+  flex: none;
+}
+.m-icon,
+.m-t {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.m-icon:disabled {
+  opacity: 0.3;
+}
+.m-icon:active,
+.m-t:active {
+  background: var(--panel-3);
+}
+.m-top .m-icon:first-child {
+  color: var(--accent-2);
+}
+.m-title {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: 600 16px var(--font);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 6px;
+  border-radius: 10px;
+}
+.m-title span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.m-save {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--green);
+  opacity: 0.8;
+}
+.m-save.dirty,
+.m-save.saving {
+  background: var(--orange);
+}
+
+.m-main {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: flex;
+}
+.m-panel {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.m-dock > .dock-inner {
+  flex: 1;
+  min-height: 0;
+}
+/* The bottom tab bar replaces the dock's own tabs. */
+.m-dock .dock-tabs {
+  display: none;
+}
+.m-library > * {
+  flex: 1;
+  width: 100% !important;
+  max-width: none !important;
+  border-right: none !important;
+}
+
+.m-fab {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 30;
+}
+
+.m-transport {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 8px;
+  background: var(--panel);
+  border-top: 1px solid var(--border-soft);
+}
+.m-lcd {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  border: 1px solid var(--border-soft);
+  background: #0c0c0e;
+  border-radius: 10px;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 0 10px;
+  margin-right: 4px;
+}
+.m-lcd b {
+  font-size: 15px;
+  line-height: 1.1;
+  color: #cfe6ff;
+}
+.m-lcd span {
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.m-t.m-play {
+  background: var(--panel-3);
+}
+.m-t.m-play.on {
+  background: var(--green);
+  color: #06210f;
+}
+.m-t.m-rec {
+  color: var(--record);
+}
+.m-t.m-rec.on {
+  background: var(--record);
+  color: #fff;
+}
+.m-t.cycle {
+  color: var(--cycle);
+}
+.m-t.on-soft {
+  color: var(--accent-2);
+}
+
+.m-tabs {
+  flex: none;
+  display: flex;
+  background: var(--panel);
+  border-top: 1px solid var(--border-soft);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.m-tabs button {
+  flex: 1;
+  height: 54px;
+  border: none;
+  background: none;
+  color: var(--text-faint);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font: 500 10.5px var(--font);
+}
+.m-tabs button.on {
+  color: var(--accent-2);
+}
+
+/* ---------------------------------------------------------------- sheets */
+
+.m-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  align-items: flex-end;
+  animation: fade-in 0.15s ease;
+}
+.m-sheet {
+  width: 100%;
+  max-height: 88dvh;
+  background: var(--panel);
+  border-radius: 16px 16px 0 0;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding-bottom: env(safe-area-inset-bottom);
+  animation: m-sheet-up 0.2s ease;
+}
+@keyframes m-sheet-up {
+  from {
+    transform: translateY(40px);
+    opacity: 0.6;
+  }
+}
+.m-sheet-grab {
+  width: 38px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--border);
+  margin: 8px auto 2px;
+  flex: none;
+}
+.m-sheet-title {
+  font-weight: 700;
+  font-size: 15px;
+  padding: 6px 18px 8px;
+  flex: none;
+}
+.m-sheet-body {
+  overflow: auto;
+  padding: 0 8px 10px;
+  display: flex;
+  flex-direction: column;
+}
+.m-sheet-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 50px;
+  padding: 0 12px;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: 15px var(--font);
+  text-align: left;
+  border-radius: 10px;
+  width: 100%;
+}
+.m-sheet-item:active {
+  background: var(--panel-3);
+}
+.m-sheet-item:disabled {
+  opacity: 0.35;
+}
+.m-sheet-item.danger {
+  color: var(--record);
+}
+.m-sheet-icon {
+  width: 22px;
+  display: flex;
+  justify-content: center;
+  color: var(--text-dim);
+  flex: none;
+}
+.m-sheet-item.danger .m-sheet-icon {
+  color: var(--record);
+}
+.m-sheet-label {
+  flex: 1;
+  min-width: 0;
+}
+.m-sheet-hint {
+  color: var(--text-faint);
+  font-size: 13px;
+}
+.m-sheet-chev {
+  color: var(--text-faint);
+}
+.m-sheet-sep {
+  height: 1px;
+  background: var(--border-soft);
+  margin: 6px 12px;
+  flex: none;
+}
+.m-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 12px 10px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.m-field input {
+  width: 100%;
+  height: 42px;
+}
+
+/* ---------------------------------------------------------------- tracks on phones */
+
+html.phone {
+  --hw: 132px;
+}
+.phone .tv-toolbar {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  gap: 8px;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+.phone .tv-toolbar::-webkit-scrollbar,
+.phone .editor-toolbar-slot::-webkit-scrollbar {
+  display: none;
+}
+.phone .tv-toolbar > * {
+  flex-shrink: 0;
+}
+.phone .tv-zoom,
+.phone .tv-hint {
+  display: none;
+}
+.phone .track-header .th-sub,
+.phone .track-header .th-vol,
+.phone .track-header .knob,
+.phone .track-header .th-btn.auto,
+.phone .track-header .th-meter {
+  display: none;
+}
+.phone .track-header .th-icon {
+  width: 34px;
+}
+.phone .track-header .th-icon svg {
+  width: 18px;
+  height: 18px;
+}
+.phone .track-header .th-name {
+  font-size: 13px;
+}
+.phone .track-header .th-controls {
+  gap: 5px;
+}
+.phone .track-header .th-btn {
+  width: 26px;
+  height: 24px;
+  font-size: 11px;
+}
+
+/* ---------------------------------------------------------------- editors on phones */
+
+.phone .editor-head {
+  gap: 6px 10px;
+  padding: 6px 8px;
+}
+.phone .editor-title {
+  font-size: 13px;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.phone .editor-toolbar-slot {
+  flex: none;
+  width: 100%;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  overflow-x: auto;
+  scrollbar-width: none;
+  gap: 6px;
+  padding-bottom: 2px;
+}
+.phone .editor-toolbar-slot > *,
+.phone .editor-toolbar-slot .row {
+  flex-wrap: nowrap !important;
+  flex-shrink: 0;
+}
+.phone .editor-toolbar-slot * {
+  flex-shrink: 0;
+}
+
+/* Step sequencer: icon, name and the row menu; M/S, level and pan move into that menu. */
+.phone .ss-head .ss-knob,
+.phone .ss-head .ss-ms {
+  display: none;
+}
+.phone .ss-name {
+  font-size: 12px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.phone .ss-toolbar,
+.phone .ss-bottom {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.phone .ss-toolbar > *,
+.phone .ss-bottom > * {
+  flex-shrink: 0;
+}
+
+/* Score: the palette is one swipeable row; the typing hints are for keyboards. */
+.phone .score-tools {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.phone .score-tools > * {
+  flex-shrink: 0;
+}
+.phone .score-hint {
+  display: none;
+}
+.phone .track-header .th-btn {
+  width: 24px;
+}
+.phone .track-header .th-controls {
+  gap: 3px;
+}
+
+/* No iOS text-selection callouts or magnifier when pressing and holding on controls. */
+html.touch .project,
+html.touch .m-project,
+html.touch .home {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+html.touch input,
+html.touch textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* One finger scrolls the arrangement on empty space and drags regions; the page never zooms. */
+html.touch body {
+  touch-action: pan-x pan-y;
+}
+html.touch .tv-scroll {
+  touch-action: pan-x pan-y;
+}
+html.touch .region,
+html.touch .region * {
+  touch-action: none;
+}
+
+/* Mixer: one row you swipe through — tracks first, then mastering and the master. */
+.phone .mixer {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.phone .mixer-strips {
+  flex: none;
+  overflow: visible;
+}
+.phone .mixer-pinned {
+  flex: none;
+}
+
+/* Smart Controls: the instrument and the effects stack instead of sitting side by side. */
+.phone .fxp {
+  flex-direction: column;
+  overflow-y: auto;
+}
+.phone .fxp > * {
+  width: 100% !important;
+  max-width: none !important;
+  flex: none !important;
+  border-right: none !important;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+/* Keyboard: controls on one swipeable row so the keys get the room. */
+.phone .kp-bar {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.phone .kp-bar > * {
+  flex-shrink: 0;
+}
+/* Hover-only buttons are always visible on touch screens. */
+html.touch .ss-more {
+  opacity: 1;
+  flex: none;
+}
+html.touch .ss-name {
+  min-width: 0;
+}
+
+/* ---------------------------------------------------------------- dialogs on phones: sheets */
+
+.phone .modal-backdrop {
+  align-items: flex-end;
+}
+.phone .modal {
+  width: 100% !important;
+  min-width: 0;
+  max-width: 100%;
+  max-height: 94dvh;
+  border-radius: 16px 16px 0 0;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  padding-bottom: env(safe-area-inset-bottom);
+  animation: m-sheet-up 0.2s ease;
+}
+.phone .modal-body {
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+.phone .modal-foot {
+  flex-wrap: wrap;
+  padding: 10px 14px;
+}
+.phone .modal-foot .btn {
+  min-height: 40px;
+}
+.phone .modal-foot .export-summary {
+  flex-basis: 100%;
+  margin: 0 0 2px;
+}
+.phone .form-grid,
+.phone .export-settings,
+.phone .yt-settings {
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 4px 0;
+}
+.phone .form-grid > .label,
+.phone .export-settings > .label,
+.phone .yt-settings > .label {
+  text-align: left;
+  margin-top: 8px;
+}
+.phone .export-formats {
+  grid-template-columns: repeat(4, 1fr);
+}
+.phone .info-grid {
+  grid-template-columns: 1fr;
+}
+.phone .newtrack-kinds {
+  grid-template-columns: 1fr 1fr;
+}
+.phone .newtrack-card {
+  padding: 14px;
+}
+.phone .newtrack-desc {
+  font-size: 12px;
+}
+.phone .newtrack-pick {
+  flex-direction: column;
+  min-height: 0;
+}
+.phone .newtrack-cats {
+  width: auto;
+  flex-direction: row;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.phone .newtrack-cats > * {
+  flex: none;
+}
+.phone .newtrack-cats .spacer {
+  display: none;
+}
+.phone .preset-grid {
+  grid-template-columns: 1fr 1fr;
+}
+.phone .ver-actions .btn.icon {
+  width: 34px;
+  height: 34px;
+}
+.phone .yt-art-side {
+  width: 100%;
+}
+.phone .yt-thumb {
+  flex: 1;
+  width: auto;
+}
+
+/* ---------------------------------------------------------------- Home on phones */
+
+.phone .home {
+  height: 100dvh;
+}
+.phone .home-header {
+  flex-wrap: wrap;
+  padding: calc(env(safe-area-inset-top) + 10px) 14px 10px;
+  gap: 8px;
+}
+.phone .home-header .brand-sub {
+  display: none;
+}
+.phone .home-header .spacer {
+  display: none;
+}
+.phone .home-search {
+  order: 10;
+  flex-basis: 100%;
+  max-width: none;
+}
+.phone .home-search input {
+  width: 100%;
+}
+.phone .home-header > .btn:not(.primary) {
+  margin-left: auto;
+}
+.phone .home-header > .btn:not(.primary) ~ .btn:not(.primary) {
+  margin-left: 0;
+}
+.phone .home-header > .btn:not(.primary) .btn-label,
+.phone .home-header .nothing {
+  display: none;
+}
+.phone .home-main {
+  padding: 4px 14px calc(env(safe-area-inset-bottom) + 24px);
+}
+.phone .quick-row {
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: none;
+  gap: 10px;
+  margin: 0 -14px;
+  padding: 0 14px 4px;
+  scroll-snap-type: x mandatory;
+}
+.phone .quick-card {
+  flex: 0 0 72%;
+  scroll-snap-align: start;
+}
+.phone .song-grid {
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.phone .song-cover {
+  height: 110px;
+}
+.phone .home-foot {
+  padding: 10px 14px calc(env(safe-area-inset-bottom) + 10px);
+}
+.phone .home-foot .home-links {
+  display: flex;
+  margin: 6px 0 0;
+}
+
+/* ---------------------------------------------------------------- install */
+
+.install-steps {
+  list-style: none;
+  margin: 0;
+  padding: 4px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-size: 15px;
+  line-height: 1.45;
+}
+.install-steps li {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.install-n {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.install-glyph {
+  vertical-align: -3px;
+  color: var(--accent-2);
+}
+.install-note {
+  margin: 14px 10px 4px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.install-done {
+  margin: 10px;
+  min-height: 44px;
+  justify-content: center;
+}
+
+/* ---------------------------------------------------------------- phone landscape: every pixel of height counts */
+
+@media (max-height: 500px) {
+  .m-project {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+  .m-top {
+    grid-column: 1 / -1;
+    padding-top: 2px;
+    padding-bottom: 2px;
+  }
+  .m-top .m-icon,
+  .m-title {
+    height: 36px;
+  }
+  .m-main {
+    grid-column: 1 / -1;
+  }
+  .m-transport {
+    grid-column: 1;
+    padding-bottom: calc(env(safe-area-inset-bottom) + 4px);
+  }
+  .m-tabs {
+    grid-column: 2;
+    border-left: 1px solid var(--border-soft);
+  }
+  .m-tabs button {
+    width: 54px;
+    flex: none;
+    height: auto;
+  }
+  .m-tabs button span {
+    display: none;
+  }
+  .m-lcd {
+    max-width: 200px;
+  }
+  .phone .tv-toolbar {
+    padding-top: 2px;
+    padding-bottom: 2px;
+  }
+}

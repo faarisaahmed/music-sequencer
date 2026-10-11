@@ -239,6 +239,21 @@
   color: var(--text-dim);
   font-size: 12px;
 }
+.newtrack-kinds {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+.newtrack-pick {
+  display: flex;
+  gap: 14px;
+  min-height: 360px;
+}
+.newtrack-cats {
+  width: 170px;
+  gap: 2px;
+  flex: none;
+}
 .newtrack-card {
   padding: 22px;
 }

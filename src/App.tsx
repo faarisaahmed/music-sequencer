@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { useStore } from './state/store';
+import { openModal, useStore } from './state/store';
+import { importMidiFile, importProjectFile } from './state/actions';
 import { startAutosave } from './state/persistence';
 import { startSafety } from './state/safety';
 import HomeScreen from './ui/home/HomeScreen';
@@ -24,6 +25,20 @@ export default function App() {
       autosaveStarted = true;
       startAutosave();
       startSafety();
+      // Home-screen shortcut "New Song".
+      if (new URLSearchParams(location.search).get('new') === '1') {
+        history.replaceState(null, '', location.pathname + location.hash);
+        setTimeout(() => openModal('templates'), 300);
+      }
+      // Files opened with the installed app (desktop Chrome / Edge).
+      const lq = (window as unknown as { launchQueue?: { setConsumer(cb: (p: { files: FileSystemFileHandle[] }) => void): void } }).launchQueue;
+      lq?.setConsumer(async ({ files }) => {
+        for (const h of files ?? []) {
+          const f = await h.getFile();
+          if (/\.midi?$/i.test(f.name)) await importMidiFile(f, false);
+          else if (/\.json$/i.test(f.name)) await importProjectFile(f);
+        }
+      });
       void handleJamLinkOnStartup();
       // Pasting an invite link into an already-open tab.
       window.addEventListener('hashchange', () => {

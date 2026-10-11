@@ -35,7 +35,7 @@ export default function NewTrackDialog() {
   return (
     <Modal title={kind === 'instrument' ? 'Choose an Instrument' : kind === 'drums' ? 'Choose a Drum Kit' : 'Add a New Track'} width={kind ? 760 : 680}>
       {!kind && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+        <div className="newtrack-kinds">
           {KINDS.map((k) => (
             <button
               key={k.kind}
@@ -56,8 +56,8 @@ export default function NewTrackDialog() {
         </div>
       )}
       {kind === 'instrument' && (
-        <div style={{ display: 'flex', gap: 14, minHeight: 360 }}>
-          <div className="col" style={{ width: 170, gap: 2 }}>
+        <div className="newtrack-pick">
+          <div className="col newtrack-cats">
             {cats.map((c) => (
               <button key={c} className={'lib-cat' + (c === cat ? ' on' : '')} onClick={() => setCat(c)}>
                 {c}

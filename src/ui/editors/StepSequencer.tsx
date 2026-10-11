@@ -25,6 +25,8 @@ import { DrumIcon } from './steps/drumVisuals';
 import { drumColor } from './steps/drumColors';
 import { useToolbarSlot } from './useToolbarSlot';
 import './steps/steps.css';
+import { isPhone } from '../mobile/device';
+import { useTwoFingerPan } from '../mobile/touchPan';
 
 type Mode = 'step' | 'velocity' | 'repeat' | 'chance' | 'loop';
 
@@ -44,7 +46,9 @@ const RESOLUTIONS = [
 ];
 
 const DEFAULT_LANES = DRUM_LANES.slice(0, 8);
-const HEADER_W = 250;
+
+/** Row header width (narrow on phones: the knobs move into the row menu). */
+let HEADER_W = 250;
 const GAP = 4;
 const GROUP_GAP = 5;
 const BAR_GAP = 6;
@@ -98,6 +102,7 @@ function midiDraft(d: Draft<Project>, id: string): Draft<MidiRegion> | null {
 }
 
 export default function StepSequencer({ trackId, regionId }: { trackId: string; regionId: string }) {
+  HEADER_W = isPhone() ? 118 : 250;
   const project = useStore((s) => s.project)!;
   const found = findRegion(project, regionId);
   const [mode, setMode] = useState<Mode>('step');
@@ -110,6 +115,7 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
   const [page, setPage] = useState(0);
   const [follow, setFollow] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
+  useTwoFingerPan(scrollRef);
   const dragRef = useRef<{ paintOn: boolean; visited: Set<string> } | null>(null);
 
   const setExtra = (v: number[]) => {
@@ -344,6 +350,21 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
     return [
       { title: rowName(pitch) },
       { label: 'Audition', onClick: () => engine.preview(trackId, pitch, 0.9, 0.25) },
+      // Phones hide the row's M/S buttons and knobs to fit the grid; they live here instead.
+      ...(isPhone()
+        ? [
+            { label: param('mute' + pitch, 0) ? 'Unmute Row' : 'Mute Row', onClick: () => setParam('mute' + pitch, param('mute' + pitch, 0) ? 0 : 1) },
+            { label: param('solo' + pitch, 0) ? 'Unsolo Row' : 'Solo Row', onClick: () => setParam('solo' + pitch, param('solo' + pitch, 0) ? 0 : 1) },
+            {
+              label: `Level (${Math.round(param('level' + pitch, 1) * 100)}%)`,
+              submenu: [1, 0.85, 0.7, 0.55, 0.4, 0.25].map((v) => ({ label: `${Math.round(v * 100)}%`, onClick: () => setParam('level' + pitch, v) })),
+            },
+            {
+              label: `Pan (${panLabel(param('pan' + pitch, 0))})`,
+              submenu: [-1, -0.5, -0.25, 0, 0.25, 0.5, 1].map((v) => ({ label: panLabel(v), onClick: () => setParam('pan' + pitch, v) })),
+            },
+          ]
+        : []),
       {
         label: own ? 'Replace Sound…' : 'Use Your Own Sound…',
         onClick: async () => {

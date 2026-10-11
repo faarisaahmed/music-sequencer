@@ -1,7 +1,11 @@
 // UI-only state for the tracks area.
 import { create } from 'zustand';
 
-export const HEADER_W = 236;
+/** Width of the track headers: compact on phones (updated by setCompactHeaders; a live binding). */
+export let HEADER_W = 236;
+export function setCompactHeaders(compact: boolean): void {
+  HEADER_W = compact ? 132 : 236;
+}
 export const RULER_H = 36;
 export const AUTOMATION_H = 70;
 

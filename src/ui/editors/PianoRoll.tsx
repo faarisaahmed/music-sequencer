@@ -2,6 +2,7 @@
 // a velocity lane with dynamics tools, and a toolbar portalled into the editor header.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useTwoFingerPan } from '../mobile/touchPan';
 import { MousePointer2, Pencil, ZoomIn, ZoomOut, Music, BarChart3, Repeat, Magnet, Waves, Shuffle } from 'lucide-react';
 import { grooveLabel } from '../../model/groove';
 import GroovePanel from '../groove/GroovePanel';
@@ -102,6 +103,7 @@ function PianoRollInner({ region, track, bpb, selectedIds }: { region: MidiRegio
   const [slot, setSlot] = useState<HTMLElement | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  useTwoFingerPan(scrollRef, { wheelPerLn: 1 / Math.log(1.0018) });
   const gridCanvas = useRef<HTMLCanvasElement>(null);
   const keysCanvas = useRef<HTMLCanvasElement>(null);
   const rulerCanvas = useRef<HTMLCanvasElement>(null);
