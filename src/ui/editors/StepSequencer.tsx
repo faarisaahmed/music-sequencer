@@ -19,7 +19,8 @@ import { addClip } from '../../audio/audioStore';
 import { Knob } from '../common/controls';
 import { getEngine } from '../../audio/engine';
 import { showContextMenu, type MenuItem } from '../common/menus';
-import { clamp } from '../common/drag';
+import { clamp, isTyping } from '../common/drag';
+import { isKey } from '../keys/keymap';
 import { DrumIcon } from './steps/drumVisuals';
 import { drumColor } from './steps/drumColors';
 import { useToolbarSlot } from './useToolbarSlot';
@@ -152,6 +153,18 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
   }, [notes, extra, hidden, customKey]);
 
   const patternPlaying = useStore((s) => s.patternPlay === regionId);
+  // ⇧Space (changeable): loop this pattern on its own, or stop.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (useStore.getState().modal || isTyping(e) || !isKey(e, 'steps.playPattern')) return;
+      e.preventDefault();
+      const engine = getEngine();
+      if (useStore.getState().patternPlay === regionId) engine.stop();
+      else void engine.playPattern(regionId);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [regionId]);
   const [swingOpen, setSwingOpen] = useState(false);
   const useCounts = useMemo(() => patternUseCounts(project), [project]);
 
@@ -636,7 +649,8 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
       <div className="ss-bottom">
         <button
           className={'btn ss-play' + (patternPlaying ? ' on' : '')}
-          title={patternPlaying ? 'Stop (Space)' : 'Loop just this pattern, on its own — the song and its length stay untouched'}
+          data-tip={patternPlaying ? 'Stop' : 'Loop just this pattern, on its own — the song and its length stay untouched'}
+          data-cmd="steps.playPattern"
           onClick={() => (patternPlaying ? engine.stop() : void engine.playPattern(regionId))}
         >
           {patternPlaying ? <Square size={13} fill="currentColor" /> : <Play size={14} fill="currentColor" />}

@@ -5,6 +5,7 @@ import HomeScreen from './ui/home/HomeScreen';
 import ProjectScreen from './ui/ProjectScreen';
 import { MenuHost } from './ui/common/menus';
 import Toasts from './ui/common/Toasts';
+import Tooltips from './ui/keys/Tooltips';
 import ModalHost from './ui/modals/ModalHost';
 import Tour from './ui/onboarding/Tour';
 import { enableMidi } from './audio/midiInput';
@@ -47,6 +48,7 @@ export default function App() {
       <JamStatusPill />
       <ChatPanel />
       <Toasts />
+      <Tooltips />
     </>
   );
 }

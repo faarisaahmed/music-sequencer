@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { Draft } from 'immer';
 import type { Project } from '../../model/types';
-import { closeModal, commit, useStore } from '../../state/store';
+import { closeModal, commit, openModal, useStore } from '../../state/store';
+import { Keyboard } from 'lucide-react';
 import { setBpm, setKey, setTimeSig } from '../../state/actions';
 import { keyName, keyUsesFlats, makeKey, pitchClassName } from '../../model/music';
 import ScalePicker from '../common/ScalePicker';
@@ -163,6 +164,13 @@ export default function SettingsDialog() {
       </div>
       <div className="form-section">Recording Input</div>
       <InputSetup />
+      <div className="form-section">Keyboard Shortcuts</div>
+      <div className="row" style={{ gap: 10 }}>
+        <span className="dim grow">See every shortcut and change any of them to keys you like.</span>
+        <button className="btn" onClick={() => openModal('help', { tab: 'shortcuts' })}>
+          <Keyboard size={14} /> Edit Shortcuts…
+        </button>
+      </div>
     </Modal>
   );
 }

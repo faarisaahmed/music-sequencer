@@ -12,6 +12,7 @@ import { getPreset } from '../../audio/presets';
 import { getEngine } from '../../audio/engine';
 import { download, safeFileName } from '../../audio/export';
 import { isTyping, startDrag } from '../common/drag';
+import { comboOf, isKey } from '../keys/keymap';
 import {
   abbreviate,
   buildScore,
@@ -49,7 +50,6 @@ import {
   addDynamic,
   addHairpin,
   clearMarks,
-  deleteNotes,
   insertNote,
   notesToRests,
   setRestValue,
@@ -77,12 +77,12 @@ const DURATIONS: { v: number; key: string; label: string }[] = [
   { v: 4, key: '7', label: 'Whole' },
 ];
 
-const ARTICS: { a: Articulation; glyph: string; label: string; key: string }[] = [
-  { a: 'staccato', glyph: '•', label: 'Staccato', key: '⇧S' },
-  { a: 'tenuto', glyph: '–', label: 'Tenuto', key: '⇧N' },
-  { a: 'accent', glyph: '>', label: 'Accent', key: '⇧V' },
-  { a: 'marcato', glyph: '^', label: 'Marcato', key: '⇧O' },
-  { a: 'fermata', glyph: '𝄐', label: 'Fermata', key: 'palette' },
+const ARTICS: { a: Articulation; glyph: string; label: string }[] = [
+  { a: 'staccato', glyph: '•', label: 'Staccato' },
+  { a: 'tenuto', glyph: '–', label: 'Tenuto' },
+  { a: 'accent', glyph: '>', label: 'Accent' },
+  { a: 'marcato', glyph: '^', label: 'Marcato' },
+  { a: 'fermata', glyph: '𝄐', label: 'Fermata' },
 ];
 
 function NoteIcon({ v }: { v: number }) {
@@ -586,7 +586,8 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
     if (!src) return [];
     const ids = new Set(src.regionIds);
     const out: Note[] = [];
-    for (const t of project.tracks) for (const r of t.regions) if (r.kind === 'midi' && ids.has(r.id)) out.push(...r.notes);
+    // Always read the latest song, so a note that was just changed plays its new pitch.
+    for (const t of useStore.getState().project?.tracks ?? []) for (const r of t.regions) if (r.kind === 'midi' && ids.has(r.id)) out.push(...r.notes);
     return out;
   };
   const selectedNotes = (): Note[] => allNotes().filter((n) => selectedIds.includes(n.id));
@@ -615,7 +616,7 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
     mapNotes(ids, (n) => {
       n.pitch = Math.max(0, Math.min(127, fn(n.pitch)));
     });
-    setTimeout(() => preview(ids[0]), 0);
+    ids.slice(0, 6).forEach((id) => preview(id));
   };
 
   const diatonicSel = (dir: number) => {
@@ -807,21 +808,38 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
       const ids = s.selectedNoteIds;
       const curPart = partOfStaff(cursor.staff);
       let handled = true;
+      const combo = comboOf(e);
+      const is = (id: string) => isKey(e, id, combo);
+      const toRests = () => {
+        if (!ids.length) return;
+        const first = currentElem();
+        notesToRests(ids, staffFnForSelection());
+        if (first) setRestSel({ gi: first.staff, voice: first.voice, t: first.t });
+      };
+      const step = (dir: number, extend: boolean) => {
+        // Step through the notes and rests of the voice; notes play as you land on them.
+        const cur = currentElem();
+        if (!cur) return;
+        const list = elemsOf(cur.staff, cur.voice).filter((x) => !x.cont);
+        const i = list.findIndex((x) => Math.abs(x.t - cur.t) < 1e-3);
+        const next = list[i + dir];
+        if (!next) return;
+        if (extend && !next.rest && !cur.rest) useStore.setState({ selectedNoteIds: [...new Set([...ids, ...next.noteIds])] });
+        else selectElem(next);
+        if (!next.rest) next.noteIds.forEach((id) => preview(id));
+        if (!s.playing) seekTo(next.t);
+      };
+      const durIdx = DURATIONS.findIndex((d) => is(`score.dur.${d.v}`));
 
-      if (mod && lower === 'l') {
-        startLyric();
-      } else if (mod && lower === 'k') {
-        startChord();
-      } else if (mod && e.code === 'Digit3') {
-        setTriplet((v) => !v);
-      } else if (mod && lower === 'a') {
-        useStore.setState({ selectedNoteIds: allNotes().map((n) => n.id) });
-      } else if (mod && lower === 'c') {
+      if (is('score.lyrics')) startLyric();
+      else if (is('score.chordSymbol')) startChord();
+      else if (is('score.triplet')) setTriplet((v) => !v);
+      else if (is('edit.selectAll')) useStore.setState({ selectedNoteIds: allNotes().map((n) => n.id) });
+      else if (is('edit.copy')) noteClipboard = selectedNotes().map((n) => ({ ...n }));
+      else if (is('edit.cut')) {
         noteClipboard = selectedNotes().map((n) => ({ ...n }));
-      } else if (mod && lower === 'x') {
-        noteClipboard = selectedNotes().map((n) => ({ ...n }));
-        deleteNotes(ids);
-      } else if (mod && lower === 'v') {
+        toRests();
+      } else if (is('edit.paste')) {
         const pl = placementFor(cursor.staff);
         if (pl) {
           const h = layout?.heads.filter((x) => ids.includes(x.noteId)).sort((a, b) => b.t1 - a.t1)[0];
@@ -829,64 +847,37 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
           const newIds = pasteNotes(pl, noteClipboard, at);
           useStore.setState({ selectedNoteIds: newIds });
         }
-      } else if (mod && (key === 'ArrowUp' || key === 'ArrowDown')) {
-        transposeSel((p) => p + (key === 'ArrowUp' ? 12 : -12));
-      } else if (mod) {
-        handled = false;
-      } else if (e.altKey && /^Digit[3-8]$/.test(e.code)) {
-        // MuseScore-style: ⌥3 adds a 3rd above, ⌥5 a 5th … ⌥8 an octave (⇧ for below).
-        const n = Number(e.code.slice(5));
-        addInterval((n - 1) * (e.shiftKey ? -1 : 1));
-      } else if (e.altKey && (e.code === 'Digit1' || e.code === 'Digit2')) {
-        const v = e.code === 'Digit1' ? 1 : 2;
+      } else if (is('score.octaveUp') || is('score.octaveDown')) {
+        transposeSel((p) => p + (is('score.octaveUp') ? 12 : -12));
+      } else if (is('score.sharp') || is('score.flat')) {
+        accidental(is('score.sharp') ? 1 : -1);
+      } else if (is('score.stepUp') || is('score.stepDown')) {
+        diatonicSel(is('score.stepUp') ? 1 : -1);
+      } else if (is('score.prev') || is('score.next') || is('score.prevExtend') || is('score.nextExtend')) {
+        step(is('score.prev') || is('score.prevExtend') ? -1 : 1, is('score.prevExtend') || is('score.nextExtend'));
+      } else if (['score.add3', 'score.add4', 'score.add5', 'score.add6', 'score.add7', 'score.add8'].some(is)) {
+        // MuseScore-style: ⌥3 adds a 3rd above, ⌥5 a 5th … ⌥8 an octave.
+        const id = ['score.add3', 'score.add4', 'score.add5', 'score.add6', 'score.add7', 'score.add8'].find(is)!;
+        addInterval(Number(id.slice(-1)) - 1);
+      } else if (is('score.below3')) addInterval(-2);
+      else if (is('score.voice1') || is('score.voice2')) {
+        const v = is('score.voice1') ? 1 : 2;
         setVoiceNo(v);
         if (ids.length) setVoice(ids, v);
-      } else if (e.shiftKey && ['S', 'N', 'V', 'O'].includes(key.toUpperCase())) {
-        const a = ({ S: 'staccato', N: 'tenuto', V: 'accent', O: 'marcato' } as const)[key.toUpperCase() as 'S'];
+      } else if (['score.staccato', 'score.tenuto', 'score.accent', 'score.marcato'].some(is)) {
+        const a = (['staccato', 'tenuto', 'accent', 'marcato'] as const).find((x) => is('score.' + x))!;
         if (ids.length) toggleArticulation(ids, a);
-      } else if (lower === 'n') {
-        setMode((m) => (m === 'input' ? 'select' : 'input'));
-      } else if (key === 'Escape') {
+      } else if (is('score.mode')) setMode((m) => (m === 'input' ? 'select' : 'input'));
+      else if (key === 'Escape') {
         setMode('select');
         useStore.setState({ selectedNoteIds: [] });
-      } else if (DURATIONS.some((d) => d.key === key)) {
-        chooseDuration(DURATIONS.find((d) => d.key === key)!.v);
-      } else if (key === '.') {
-        toggleDot();
-      } else if (key === '0') {
-        // Turn the selected notes into rests of the same value.
-        if (ids.length) {
-          const first = currentElem();
-          notesToRests(ids, staffFnForSelection());
-          if (first) setRestSel({ gi: first.staff, voice: first.voice, t: first.t });
-        }
-      } else if (key === '+' || key === '=') {
+      } else if (durIdx >= 0) chooseDuration(DURATIONS[durIdx].v);
+      else if (is('score.dot')) toggleDot();
+      else if (is('score.rest') || is('edit.delete')) toRests();
+      else if (is('score.tie')) {
         if (ids.length) tieNotes(ids, effDur);
-      } else if (key === 'ArrowUp' || key === 'ArrowDown') {
-        const dir = key === 'ArrowUp' ? 1 : -1;
-        if (e.altKey) diatonicSel(dir);
-        else transposeSel((p) => p + dir);
-      } else if (key === 'ArrowLeft' || key === 'ArrowRight') {
-        // Step through the notes and rests of the voice, one element at a time.
-        const dir = key === 'ArrowLeft' ? -1 : 1;
-        const cur = currentElem();
-        if (cur) {
-          const list = elemsOf(cur.staff, cur.voice).filter((x) => !x.cont);
-          const i = list.findIndex((x) => Math.abs(x.t - cur.t) < 1e-3);
-          const next = list[i + dir];
-          if (next) {
-            if (e.shiftKey && !next.rest && !cur.rest) useStore.setState({ selectedNoteIds: [...new Set([...ids, ...next.noteIds])] });
-            else selectElem(next);
-            if (!s.playing) seekTo(next.t);
-          }
-        }
-      } else if (key === 'Delete' || key === 'Backspace') {
-        // Deleting a note leaves a rest of the same value (Flat / Noteflight).
-        if (ids.length) {
-          const first = currentElem();
-          notesToRests(ids, staffFnForSelection());
-          if (first) setRestSel({ gi: first.staff, voice: first.voice, t: first.t });
-        }
+      } else if (mod) {
+        handled = false;
       } else if (/^[a-g]$/.test(lower) && !e.altKey && (restSel || ids.length) && (restSel ? partOfStaff(restSel.gi) : curPart) && !(restSel ? partOfStaff(restSel.gi)! : curPart!).drums) {
         const target = restSel ? partOfStaff(restSel.gi)! : curPart!;
         const letter = 'cdefgab'.indexOf(lower);
@@ -915,7 +906,7 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
           mapNotes(ids, (n) => {
             n.pitch = nearestWritten(n.pitch + tr) - tr;
           });
-          setTimeout(() => preview(ids[0]), 0);
+          ids.slice(0, 6).forEach((id) => preview(id));
         } else if (restSel) {
           // A rest is selected: it becomes a note (current value), then we move on.
           const clef = staffRef(restSel.gi)!.clef;
@@ -1240,28 +1231,28 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
       {slot ? createPortal(toolbar, slot) : toolbar}
       <div className="score-palette">
         <div className="seg">
-          <button className={mode === 'select' ? 'on' : ''} onClick={() => setMode('select')} title="Select & edit (Esc)">
+          <button className={mode === 'select' ? 'on' : ''} onClick={() => setMode('select')} data-tip="Select: click notes and rests to edit them" data-cmd="score.mode">
             <MousePointer2 size={13} /> Select
           </button>
-          <button className={mode === 'input' ? 'on' : ''} onClick={() => setMode('input')} title="Note input (N)">
+          <button className={mode === 'input' ? 'on' : ''} onClick={() => setMode('input')} data-tip="Write: click rests and the staff to add notes" data-cmd="score.mode">
             <PenLine size={13} /> Write
           </button>
         </div>
         <div className="pal-group">
           {DURATIONS.map((d) => (
-            <button key={d.v} className={'pal-btn' + (dur === d.v ? ' on' : '')} title={`${d.label} (${d.key})`} onClick={() => chooseDuration(d.v)}>
+            <button key={d.v} className={'pal-btn' + (dur === d.v ? ' on' : '')} data-tip={d.label} data-cmd={`score.dur.${d.v}`} onClick={() => chooseDuration(d.v)}>
               <NoteIcon v={d.v} />
             </button>
           ))}
-          <button className={'pal-btn' + (dotted ? ' on' : '')} title="Dotted (.) — adds or removes the dot on selected notes" onClick={toggleDot}>
+          <button className={'pal-btn' + (dotted ? ' on' : '')} data-tip="Dot — adds or removes the dot on the selection" data-cmd="score.dot" onClick={toggleDot}>
             <span style={{ fontSize: 22, lineHeight: 0.5 }}>•</span>
           </button>
-          <button className={'pal-btn txt' + (triplet ? ' on' : '')} title="Triplet (⌘3) — next notes are written as triplets" onClick={() => setTriplet(!triplet)}>
+          <button className={'pal-btn txt' + (triplet ? ' on' : '')} data-tip="Triplets — next notes are written as triplets" data-cmd="score.triplet" onClick={() => setTriplet(!triplet)}>
             <span className="tuplet-glyph">3</span>
           </button>
           <button
             className="pal-btn txt"
-            title="Turn the selected note into a rest (0)"
+            data-tip="Turn the selected note into a rest" data-cmd="score.rest"
             onClick={() => {
               const ids = useStore.getState().selectedNoteIds;
               if (!ids.length) {
@@ -1276,12 +1267,12 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
             Rest
           </button>
         </div>
-        <div className="pal-group" title="Voice (⌥1 / ⌥2) — voice 2 has stems down">
+        <div className="pal-group" data-tip="Voice — voice 2 has stems down">
           {([1, 2] as const).map((v) => (
             <button
               key={v}
               className={'pal-btn txt voice-btn v' + v + (voice === v ? ' on' : '')}
-              title={`Voice ${v} (⌥${v})${selectedIds.length ? ' — moves selected notes' : ''}`}
+              data-tip={`Voice ${v}${selectedIds.length ? ' — moves selected notes' : ''}`} data-cmd={`score.voice${v}`}
               onClick={() => {
                 setVoiceNo(v);
                 if (selectedIds.length) setVoice(selectedIds, v);
@@ -1300,13 +1291,13 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
             <button
               key={x.a}
               className={'pal-btn acc' + (acc === x.a ? ' on' : '')}
-              title={`${x.t} — next note (or raise/lower selected)`}
+              data-tip={`${x.t} — on the selected notes, or the next note you write`} data-cmd={x.a === 1 ? 'score.sharp' : x.a === -1 ? 'score.flat' : undefined}
               onClick={() => accidental(x.a)}
             >
               {x.s}
             </button>
           ))}
-          <button className="pal-btn txt" title="Tie selected notes to the next (+)" onClick={() => selectedIds.length && tieNotes(selectedIds, effDur)}>
+          <button className="pal-btn txt" data-tip="Tie selected notes to the next" data-cmd="score.tie" onClick={() => selectedIds.length && tieNotes(selectedIds, effDur)}>
             <svg width="20" height="12" viewBox="0 0 20 12">
               <path d="M2 4 Q10 12 18 4" stroke="currentColor" strokeWidth="1.8" fill="none" />
             </svg>
@@ -1314,20 +1305,20 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
         </div>
         <div className="pal-group" title="Build chords: add a note above each selected note">
           {[
-            { st: 2, l: '+3', t: 'Add a 3rd above (⌥3)' },
-            { st: 4, l: '+5', t: 'Add a 5th above (⌥5)' },
-            { st: 5, l: '+6', t: 'Add a 6th above (⌥6)' },
-            { st: 7, l: '+8', t: 'Add an octave above (⌥8)' },
-            { st: -2, l: '−3', t: 'Add a 3rd below (⇧⌥3)' },
+            { st: 2, l: '+3', t: 'Add a 3rd above', c: 'score.add3' },
+            { st: 4, l: '+5', t: 'Add a 5th above', c: 'score.add5' },
+            { st: 5, l: '+6', t: 'Add a 6th above', c: 'score.add6' },
+            { st: 7, l: '+8', t: 'Add an octave above', c: 'score.add8' },
+            { st: -2, l: '−3', t: 'Add a 3rd below', c: 'score.below3' },
           ].map((x) => (
-            <button key={x.l} className="pal-btn txt chord-btn" title={x.t} onClick={() => addInterval(x.st)}>
+            <button key={x.l} className="pal-btn txt chord-btn" data-tip={x.t} data-cmd={x.c} onClick={() => addInterval(x.st)}>
               {x.l}
             </button>
           ))}
         </div>
         <div className="pal-group">
           {ARTICS.map((x) => (
-            <button key={x.a} className={'pal-btn artic'} title={`${x.label} (${x.key}) — selected notes`} onClick={() => selectedIds.length && toggleArticulation(selectedIds, x.a)}>
+            <button key={x.a} className={'pal-btn artic'} data-tip={`${x.label} — on the selected notes`} data-cmd={x.a === 'fermata' ? undefined : `score.${x.a}`} onClick={() => selectedIds.length && toggleArticulation(selectedIds, x.a)}>
               {x.glyph}
             </button>
           ))}
@@ -1353,27 +1344,27 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
           </button>
         </div>
         <div className="pal-group">
-          <button className="pal-btn txt" title="Lyrics (⌘L) — type a syllable, Space for next note, - for hyphen" onClick={() => startLyric()}>
+          <button className="pal-btn txt" data-tip="Lyrics — type a syllable, Space for the next note, - for a hyphen" data-cmd="score.lyrics" onClick={() => startLyric()}>
             <Type size={14} />
           </button>
-          <button className="pal-btn txt" title="Chord symbol (⌘K) — type e.g. Am7, Space for next beat, Tab for next bar" onClick={() => startChord()}>
+          <button className="pal-btn txt" data-tip="Chord symbol — type e.g. Am7, Space for the next beat, Tab for the next bar" data-cmd="score.chordSymbol" onClick={() => startChord()}>
             <Hash size={14} />
           </button>
         </div>
         <div className="pal-group">
-          <button className="pal-btn txt" title="Transpose selected up a semitone (↑)" onClick={() => transposeSel((p) => p + 1)}>
+          <button className="pal-btn txt" data-tip="Move up to the next note in the key" data-cmd="score.stepUp" onClick={() => diatonicSel(1)}>
             <ArrowUp size={14} />
           </button>
-          <button className="pal-btn txt" title="Transpose selected down a semitone (↓)" onClick={() => transposeSel((p) => p - 1)}>
+          <button className="pal-btn txt" data-tip="Move down to the next note in the key" data-cmd="score.stepDown" onClick={() => diatonicSel(-1)}>
             <ArrowDown size={14} />
           </button>
-          <button className="pal-btn txt" title="Octave up (⌘↑)" onClick={() => transposeSel((p) => p + 12)}>
+          <button className="pal-btn txt" data-tip="Up an octave" data-cmd="score.octaveUp" onClick={() => transposeSel((p) => p + 12)}>
             8va
           </button>
-          <button className="pal-btn txt" title="Octave down (⌘↓)" onClick={() => transposeSel((p) => p - 12)}>
+          <button className="pal-btn txt" data-tip="Down an octave" data-cmd="score.octaveDown" onClick={() => transposeSel((p) => p - 12)}>
             8vb
           </button>
-          <button className="pal-btn txt" title="Delete selected (Delete)" onClick={() => selectedIds.length && deleteNotes(selectedIds)}>
+          <button className="pal-btn txt" data-tip="Delete (leaves a rest)" data-cmd="edit.delete" onClick={() => selectedIds.length && notesToRests(selectedIds, staffFnForSelection())}>
             <Minus size={14} />
           </button>
         </div>

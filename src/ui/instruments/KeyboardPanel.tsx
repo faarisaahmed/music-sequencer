@@ -128,7 +128,8 @@ export default function KeyboardPanel({ track, compact = false }: { track: Track
         </div>
         <button
           className={'btn kp-btn' + (typing ? ' active' : '')}
-          title="Musical Typing: play with your computer keyboard (A–' keys, Z/X octave, C/V velocity, Tab sustain)"
+          data-tip="Musical Typing: play with your computer keyboard (A–' keys, Z/X octave, C/V velocity, Tab sustain)"
+          data-cmd="view.musicalTyping"
           onClick={() => useStore.setState({ musicalTyping: !typing })}
         >
           <KeyboardIcon size={15} /> Typing

@@ -60,7 +60,7 @@ export const TOURS: Record<TourId, TourStep[]> = {
       before: () => useStore.setState({ dockTab: null }),
     },
     {
-      target: 'button[title^="New Track"]',
+      target: '[data-cmd="song.newTrack"]',
       title: 'Add instruments',
       body: 'Add a software instrument, drums, a microphone recorder or a Sampler.',
       placement: 'bottom',
@@ -92,26 +92,26 @@ export const TOURS: Record<TourId, TourStep[]> = {
       before: openDock('editor'),
     },
     {
-      target: 'button[title^="Full Score"]',
+      target: '[data-tour="full-score"]',
       title: 'Sheet music',
       body: 'See and write the whole song as a full score — just like MuseScore. Notes you write appear in the piano roll too.',
       placement: 'bottom',
       before: () => useStore.setState({ dockTab: null }),
     },
     {
-      target: 'button[title^="Chord Track"]',
+      target: '[data-cmd="view.chords"]',
       title: 'Chord Track',
       body: 'Sketch your harmony: write chords on the timeline, try common progressions and get ideas for the next chord. You write every note yourself.',
       placement: 'bottom',
     },
     {
-      target: 'button[title^="Mixer"]',
+      target: '[data-cmd="view.mixer"]',
       title: 'Mix',
       body: 'Balance levels, pan, EQ and effects. Smart Controls (B) has amps, reverb, delay and more for the selected track.',
       placement: 'bottom',
     },
     {
-      target: 'button[title="Sounds (Y)"]',
+      target: '[data-cmd="view.sounds"]',
       title: 'Sounds',
       body: 'Browse and swap instruments and drum kits for the selected track.',
       placement: 'bottom',
@@ -123,7 +123,7 @@ export const TOURS: Record<TourId, TourStep[]> = {
       placement: 'bottom',
     },
     {
-      target: 'button[title^="Keyboard shortcuts"]',
+      target: '[data-cmd="view.shortcuts"]',
       title: 'You’re ready!',
       body: 'Press ? any time for every shortcut, or to take this tour again. Have fun making music.',
       placement: 'bottom',

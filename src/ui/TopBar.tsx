@@ -46,12 +46,13 @@ function MetronomeIcon({ size = 17 }: { size?: number }) {
   );
 }
 
-function DockButton({ tab, icon, label, shortcut }: { tab: DockTab; icon: React.ReactNode; label: string; shortcut: string }) {
+function DockButton({ tab, icon, label, cmd }: { tab: DockTab; icon: React.ReactNode; label: string; cmd: string }) {
   const dockTab = useStore((s) => s.dockTab);
   return (
     <button
       className={'btn icon tb' + (dockTab === tab ? ' active' : '')}
-      title={`${label} (${shortcut})`}
+      data-tip={label}
+      data-cmd={cmd}
       onClick={() => useStore.setState({ dockTab: dockTab === tab ? null : tab, dockMaximized: false })}
     >
       {icon}
@@ -267,34 +268,34 @@ export default function TopBar() {
       </div>
 
       <div className="tb-group">
-        <button className={'btn icon tb' + (libraryOpen ? ' active' : '')} title="Sounds (Y)" onClick={() => useStore.setState({ libraryOpen: !libraryOpen })}>
+        <button className={'btn icon tb' + (libraryOpen ? ' active' : '')} data-tip="Sounds" data-cmd="view.sounds" onClick={() => useStore.setState({ libraryOpen: !libraryOpen })}>
           <Library size={17} />
         </button>
-        <DockButton tab="fx" icon={<SlidersHorizontal size={17} />} label="Smart Controls & FX" shortcut="B" />
-        <DockButton tab="editor" icon={<SquarePen size={17} />} label="Editor" shortcut="E" />
-        <DockButton tab="instrument" icon={<Piano size={17} />} label="Instrument / Keyboard" shortcut="P" />
-        <DockButton tab="mixer" icon={<SlidersVertical size={17} />} label="Mixer" shortcut="X" />
-        <DockButton tab="assistant" icon={<Music4 size={17} />} label="Chord Track" shortcut="W" />
+        <DockButton tab="fx" icon={<SlidersHorizontal size={17} />} label="Smart Controls & FX" cmd="view.fx" />
+        <DockButton tab="editor" icon={<SquarePen size={17} />} label="Editor" cmd="view.editor" />
+        <DockButton tab="instrument" icon={<Piano size={17} />} label="Instrument / Keyboard" cmd="view.instrument" />
+        <DockButton tab="mixer" icon={<SlidersVertical size={17} />} label="Mixer" cmd="view.mixer" />
+        <DockButton tab="assistant" icon={<Music4 size={17} />} label="Chord Track" cmd="view.chords" />
         <FullScoreButton />
-        <button className="btn icon tb" title="New Track (⌥⌘N)" onClick={() => openModal('newTrack')}>
+        <button className="btn icon tb" data-tip="New Track" data-cmd="song.newTrack" onClick={() => openModal('newTrack')}>
           <Plus size={18} />
         </button>
       </div>
 
       <div className="tb-center">
         <div className="transport">
-          <button className="btn icon tb" title="Go to Beginning (Return)" onClick={() => engine.seek(0)}>
+          <button className="btn icon tb" data-tip="Go to Beginning" data-cmd="transport.toStart" onClick={() => engine.seek(0)}>
             <SkipBack size={17} fill="currentColor" />
           </button>
-          <button className={'btn icon tb play' + (playing ? ' on' : '')} title="Play / Stop (Space)" onClick={() => engine.togglePlay()}>
+          <button className={'btn icon tb play' + (playing ? ' on' : '')} data-tip="Play / Stop" data-cmd="transport.play" onClick={() => engine.togglePlay()}>
             {playing ? <Square size={15} fill="currentColor" /> : <Play size={17} fill="currentColor" />}
           </button>
-          <button className={'btn icon tb rec' + (recording ? ' on' : '')} title="Record (R)" onClick={() => void engine.record()}>
+          <button className={'btn icon tb rec' + (recording ? ' on' : '')} data-tip="Record" data-cmd="transport.record" onClick={() => void engine.record()}>
             <Circle size={15} fill="currentColor" />
           </button>
           <button
             className={'btn icon tb' + (project.loop.enabled ? ' cycle-on' : '')}
-            title="Cycle (C)"
+            data-tip="Loop (cycle) — drag the yellow strip in the ruler to set bars" data-cmd="transport.cycle"
             onClick={() =>
               commit((d) => {
                 d.loop.enabled = !d.loop.enabled;
@@ -308,7 +309,7 @@ export default function TopBar() {
         <div className="transport">
           <button
             className={'btn icon tb' + (project.metronome ? ' active' : '')}
-            title="Metronome (K)"
+            data-tip="Metronome" data-cmd="transport.metronome"
             onClick={() =>
               commit((d) => {
                 d.metronome = !d.metronome;
@@ -333,10 +334,10 @@ export default function TopBar() {
 
       <div className="tb-group right">
         <CollabBar />
-        <button className="btn icon tb" title="Undo (⌘Z)" disabled={!canUndo} onClick={undo}>
+        <button className="btn icon tb" data-tip="Undo" data-cmd="edit.undo" disabled={!canUndo} onClick={undo}>
           <Undo2 size={17} />
         </button>
-        <button className="btn icon tb" title="Redo (⇧⌘Z)" disabled={!canRedo} onClick={redo}>
+        <button className="btn icon tb" data-tip="Redo" data-cmd="edit.redo" disabled={!canRedo} onClick={redo}>
           <Redo2 size={17} />
         </button>
         <div className="row master-vol" title="Master volume">
@@ -355,13 +356,13 @@ export default function TopBar() {
           />
           <MasterMeter />
         </div>
-        <button className="btn primary tb-export" title="Export song (⌘E)" onClick={() => openModal('export')}>
+        <button className="btn primary tb-export" data-tip="Export song" data-cmd="song.export" onClick={() => openModal('export')}>
           <Download size={15} /> Export
         </button>
         <button className="btn icon tb" title="Song settings" onClick={() => openModal('settings')}>
           <Settings size={17} />
         </button>
-        <button className="btn icon tb" title="Keyboard shortcuts & help (?)" onClick={() => openModal('help')}>
+        <button className="btn icon tb" data-tip="Keyboard shortcuts & help" data-cmd="view.shortcuts" onClick={() => openModal('help')}>
           <HelpCircle size={17} />
         </button>
       </div>

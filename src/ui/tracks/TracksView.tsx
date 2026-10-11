@@ -10,6 +10,7 @@ import AutomationLane from './AutomationLane';
 import ArrangementLane from './ArrangementLane';
 import ChordLane, { ChordToggleButton } from '../assistant/ChordLane';
 import { HEADER_W, RULER_H, useTracksUi } from './tracksUi';
+import { shortcutLabel } from '../keys/keymap';
 import './tracks.css';
 import { PeerPlayheads } from '../collab/presence';
 
@@ -260,7 +261,7 @@ function Toolbar({ viewW }: { viewW: number }) {
       <ChordToggleButton />
       <div className="spacer" />
       <div className="tv-hint faint">
-        Double-click empty space for a new region (on drums: places the current pattern) · <kbd>⌥</kbd> drag copies · drag the top-right corner to loop · <kbd>⌘T</kbd> split
+        Double-click empty space for a new region (on drums: places the current pattern) · <kbd>⌥</kbd> drag copies · drag the top-right corner to loop · <kbd>{shortcutLabel('region.split')}</kbd> split
       </div>
     </div>
   );

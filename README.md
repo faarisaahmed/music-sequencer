@@ -26,7 +26,7 @@ Built for writing original music: there are no loop libraries, auto-generated pa
 - **Export:** MP3, WAV, MIDI and per-track stems.
 - **Jam Sessions:** make music with friends in real time. Click the people icon, start a session and share the link; everyone edits the same song live, with presence, chat and optional synced playback. Browsers connect peer-to-peer (no account or server).
 
-Press `?` in a song for keyboard shortcuts.
+Press `?` in a song for keyboard shortcuts. Every shortcut can be changed there (or Settings › Edit Shortcuts), and hovering any button shows its current shortcut.
 
 ## Develop
 ```

@@ -11,7 +11,7 @@ function ScoreIcon({ size = 17 }: { size?: number }) {
   );
 }
 
-function openFullScore(): void {
+export function openFullScore(): void {
   useStore.setState({ dockTab: 'editor', editorMode: 'fullscore', dockMaximized: true, focusArea: 'editor' });
 }
 
@@ -20,7 +20,7 @@ export default function FullScoreButton() {
   return (
     <button
       className={'btn icon tb' + (on ? ' active' : '')}
-      title="Full Score — the whole song as sheet music"
+      data-tip="Full Score — the whole song as sheet music" data-cmd="view.fullScore" data-tour="full-score"
       onClick={() => (on ? useStore.setState({ dockTab: null, dockMaximized: false }) : openFullScore())}
     >
       <ScoreIcon />

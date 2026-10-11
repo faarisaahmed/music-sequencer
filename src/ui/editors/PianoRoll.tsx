@@ -11,6 +11,7 @@ import { DRUM_NAMES, GRID_OPTIONS, beatsPerBar, inScale, isBlackKey, noteName, s
 import { beginGesture, endGesture, findRegion, useStore, useTransport } from '../../state/store';
 import { getEngine } from '../../audio/engine';
 import { startDrag, clamp, isTyping } from '../common/drag';
+import { comboOf, isKey } from '../keys/keymap';
 import { HSlider } from '../common/controls';
 import { showContextMenu, showPillMenu, type MenuItem } from '../common/menus';
 import {
@@ -692,13 +693,13 @@ function PianoRollInner({ region, track, bpb, selectedIds }: { region: MidiRegio
     const hasSel = useStore.getState().selectedNoteIds.length > 0;
     const gridLabel = GRID_OPTIONS.find((g) => Math.abs(g.value - grid) < 1e-6)?.label ?? '';
     return [
-      { label: 'Cut', shortcut: '⌘X', disabled: !hasSel, onClick: () => copyNotes(regionId, true) },
-      { label: 'Copy', shortcut: '⌘C', disabled: !hasSel, onClick: () => copyNotes(regionId, false) },
-      { label: 'Paste', shortcut: '⌘V', disabled: useStore.getState().clipboard?.kind !== 'notes', onClick: () => doPaste() },
-      { label: 'Duplicate', shortcut: '⌘D', disabled: !hasSel, onClick: () => duplicateSelectedNotes(regionId) },
-      { label: 'Delete', shortcut: '⌫', disabled: !hasSel, onClick: () => deleteSelectedNotes(regionId) },
+      { label: 'Cut', cmd: 'edit.cut', disabled: !hasSel, onClick: () => copyNotes(regionId, true) },
+      { label: 'Copy', cmd: 'edit.copy', disabled: !hasSel, onClick: () => copyNotes(regionId, false) },
+      { label: 'Paste', cmd: 'edit.paste', disabled: useStore.getState().clipboard?.kind !== 'notes', onClick: () => doPaste() },
+      { label: 'Duplicate', cmd: 'edit.duplicate', disabled: !hasSel, onClick: () => duplicateSelectedNotes(regionId) },
+      { label: 'Delete', cmd: 'edit.delete', disabled: !hasSel, onClick: () => deleteSelectedNotes(regionId) },
       { separator: true },
-      { label: `Quantize to ${gridLabel}`, shortcut: 'Q', onClick: () => quantizeNotes(regionId, grid, qStrength) },
+      { label: `Quantize to ${gridLabel}`, cmd: 'pianoroll.quantize', onClick: () => quantizeNotes(regionId, grid, qStrength) },
       {
         label: 'Transpose',
         submenu: [
@@ -725,7 +726,7 @@ function PianoRollInner({ region, track, bpb, selectedIds }: { region: MidiRegio
       },
       { label: 'Legato', onClick: () => legato(regionId) },
       { separator: true },
-      { label: 'Select All', shortcut: '⌘A', onClick: () => selectAllNotes(regionId) },
+      { label: 'Select All', cmd: 'edit.selectAll', onClick: () => selectAllNotes(regionId) },
       ...(hitNote
         ? [{ label: `Select All ${isDrums ? (DRUM_NAMES[hitNote.pitch] ?? noteName(hitNote.pitch)) : noteName(hitNote.pitch)}`, onClick: () => selectAllNotes(regionId, hitNote.pitch) }]
         : []),
@@ -753,50 +754,61 @@ function PianoRollInner({ region, track, bpb, selectedIds }: { region: MidiRegio
     const onKey = (e: KeyboardEvent) => {
       const s = useStore.getState();
       if (s.focusArea !== 'editor' || s.dockTab !== 'editor' || s.modal || isTyping(e)) return;
-      const mod = e.metaKey || e.ctrlKey;
       const k = e.key.toLowerCase();
       const hasSel = s.selectedNoteIds.length > 0;
+      const combo = comboOf(e);
+      const is = (id: string) => isKey(e, id, combo);
       const handled = () => {
         e.preventDefault();
         e.stopPropagation();
       };
-      if ((k === 'delete' || k === 'backspace') && hasSel) {
+      const move = (beats: number) => {
+        const sel = new Set(s.selectedNoteIds);
+        editRegion(regionId, (r) => {
+          const minS = Math.min(...r.notes.filter((n) => sel.has(n.id)).map((n) => n.start));
+          const st = Math.max(beats, -minS);
+          for (const n of r.notes) if (sel.has(n.id)) n.start += st;
+        });
+      };
+      const shiftPitch = (semis: number) => {
+        transposeNotes(regionId, semis);
+        const first = getRegion()?.notes.find((n) => n.id === s.selectedNoteIds[0]);
+        if (first) audition(first.pitch);
+      };
+      if (is('edit.delete') && hasSel) {
         handled();
         deleteSelectedNotes(regionId);
       } else if (k === 'escape' && hasSel) {
         handled();
         setSel([]);
-      } else if ((k === 'arrowup' || k === 'arrowdown') && hasSel && !mod) {
+      } else if (hasSel && (is('notes.up') || is('notes.down'))) {
         handled();
-        transposeNotes(regionId, (k === 'arrowup' ? 1 : -1) * (e.shiftKey ? 12 : 1));
-        const r = getRegion();
-        const first = r?.notes.find((n) => n.id === s.selectedNoteIds[0]);
-        if (first) audition(first.pitch);
-      } else if ((k === 'arrowleft' || k === 'arrowright') && hasSel && !mod) {
+        shiftPitch(is('notes.up') ? 1 : -1);
+      } else if (hasSel && (is('notes.octaveUp') || is('notes.octaveDown'))) {
         handled();
-        const step = (k === 'arrowright' ? 1 : -1) * (e.shiftKey ? bpb : grid);
-        const sel = new Set(s.selectedNoteIds);
-        editRegion(regionId, (r) => {
-          const minS = Math.min(...r.notes.filter((n) => sel.has(n.id)).map((n) => n.start));
-          const st = Math.max(step, -minS);
-          for (const n of r.notes) if (sel.has(n.id)) n.start += st;
-        });
-      } else if (mod && k === 'a') {
+        shiftPitch(is('notes.octaveUp') ? 12 : -12);
+      } else if (hasSel && (is('pianoroll.left') || is('pianoroll.right'))) {
+        handled();
+        move((is('pianoroll.right') ? 1 : -1) * grid);
+      } else if (hasSel && (is('pianoroll.barLeft') || is('pianoroll.barRight'))) {
+        handled();
+        move((is('pianoroll.barRight') ? 1 : -1) * bpb);
+      } else if (is('edit.selectAll')) {
         handled();
         selectAllNotes(regionId);
-      } else if (mod && k === 'c' && hasSel) {
+      } else if (is('edit.copy') && hasSel) {
         handled();
         copyNotes(regionId, false);
-      } else if (mod && k === 'x' && hasSel) {
+      } else if (is('edit.cut') && hasSel) {
         handled();
         copyNotes(regionId, true);
-      } else if (mod && k === 'v' && s.clipboard?.kind === 'notes') {
+      } else if (is('edit.paste') && s.clipboard?.kind === 'notes') {
         handled();
         doPaste();
-      } else if (mod && k === 'd' && hasSel) {
+      } else if (is('edit.duplicate') && hasSel) {
         handled();
         duplicateSelectedNotes(regionId);
-      } else if (!mod && k === 'q' && !s.musicalTyping) {
+      } else if (is('pianoroll.quantize') && !(s.musicalTyping && !e.metaKey && !e.ctrlKey && k.length === 1)) {
         handled();
         quantizeNotes(regionId, grid, qStrength);
       }
@@ -1009,7 +1021,7 @@ function PianoRollInner({ region, track, bpb, selectedIds }: { region: MidiRegio
         </select>
       </label>
       <div className="row" style={{ gap: 2 }}>
-        <button className="btn sm" title="Quantize selected notes (Q)" onClick={() => quantizeNotes(regionId, grid, qStrength)}>
+        <button className="btn sm" data-tip="Quantize selected notes" data-cmd="pianoroll.quantize" onClick={() => quantizeNotes(regionId, grid, qStrength)}>
           Quantize
         </button>
         <select className="pr-mini" value={qStrength} title="Quantize strength" onChange={(e) => setQStrength(parseFloat(e.target.value))}>
@@ -1085,10 +1097,10 @@ function PianoRollInner({ region, track, bpb, selectedIds }: { region: MidiRegio
         <Repeat size={13} />
       </button>
       <div className="row" style={{ gap: 2 }}>
-        <button className="btn sm icon" title="Zoom out (⌘ scroll)" onClick={() => zoomH(1 / 1.3)}>
+        <button className="btn sm icon" title="Zoom out (or ⌘ + scroll)" onClick={() => zoomH(1 / 1.3)}>
           <ZoomOut size={13} />
         </button>
-        <button className="btn sm icon" title="Zoom in (⌘ scroll)" onClick={() => zoomH(1.3)}>
+        <button className="btn sm icon" title="Zoom in (or ⌘ + scroll)" onClick={() => zoomH(1.3)}>
           <ZoomIn size={13} />
         </button>
       </div>

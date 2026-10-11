@@ -9,12 +9,12 @@ import { PanelLoading } from './common/Lazy';
 
 const AssistantPanel = lazy(() => import('./assistant/AssistantPanel'));
 
-const TABS: { id: DockTab; label: string }[] = [
-  { id: 'fx', label: 'Smart Controls' },
-  { id: 'editor', label: 'Editor' },
-  { id: 'instrument', label: 'Instrument' },
-  { id: 'mixer', label: 'Mixer' },
-  { id: 'assistant', label: 'Chord Track' },
+const TABS: { id: DockTab; label: string; cmd: string }[] = [
+  { id: 'fx', label: 'Smart Controls', cmd: 'view.fx' },
+  { id: 'editor', label: 'Editor', cmd: 'view.editor' },
+  { id: 'instrument', label: 'Instrument', cmd: 'view.instrument' },
+  { id: 'mixer', label: 'Mixer', cmd: 'view.mixer' },
+  { id: 'assistant', label: 'Chord Track', cmd: 'view.chords' },
 ];
 
 export default function Dock() {
@@ -24,7 +24,7 @@ export default function Dock() {
     <div className="dock-inner" onPointerDownCapture={() => useStore.setState({ focusArea: tab === 'editor' ? 'editor' : tab === 'instrument' ? 'instrument' : 'other' })}>
       <div className="dock-tabs">
         {TABS.map((t) => (
-          <button key={t.id} className={'dock-tab' + (tab === t.id ? ' on' : '')} onClick={() => useStore.setState({ dockTab: t.id })}>
+          <button key={t.id} className={'dock-tab' + (tab === t.id ? ' on' : '')} data-cmd={t.cmd} onClick={() => useStore.setState({ dockTab: t.id })}>
             {t.label}
           </button>
         ))}

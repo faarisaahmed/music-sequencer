@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { X } from 'lucide-react';
 import { closeModal } from '../../state/store';
+import { keyCapture } from '../keys/keymap';
 
 export default function Modal({
   title,
@@ -17,7 +18,7 @@ export default function Modal({
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && !keyCapture.active) {
         e.stopPropagation();
         onClose();
       }

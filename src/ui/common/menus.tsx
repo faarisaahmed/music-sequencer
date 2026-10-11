@@ -1,4 +1,5 @@
 import { ChevronRight } from 'lucide-react';
+import { shortcutLabel } from '../keys/keymap';
 // Context menus and the GarageBand-style pill edit menu, driven by a tiny global store.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
@@ -6,6 +7,8 @@ import { create } from 'zustand';
 export interface MenuItem {
   label?: string;
   shortcut?: string;
+  /** Keymap command: its current shortcut is shown (and stays right if you change it). */
+  cmd?: string;
   icon?: React.ReactNode;
   disabled?: boolean;
   onClick?: () => void;
@@ -77,7 +80,7 @@ function MenuList({ items, x, y, onClose }: { items: MenuItem[]; x: number; y: n
             >
               {it.icon && <span style={{ display: 'flex', width: 16, opacity: 0.85 }}>{it.icon}</span>}
               <span>{it.label}</span>
-              {it.shortcut && <span className="shortcut">{it.shortcut}</span>}
+              {(it.cmd ? shortcutLabel(it.cmd) : it.shortcut) && <span className="shortcut">{it.cmd ? shortcutLabel(it.cmd) : it.shortcut}</span>}
               {it.submenu && <span className="shortcut"><ChevronRight size={13} /></span>}
             </div>
           ),

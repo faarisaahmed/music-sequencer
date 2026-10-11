@@ -6,6 +6,8 @@ import { getEngine } from '../audio/engine';
 import { flushSave } from '../state/persistence';
 import { beatsPerBar } from '../model/music';
 import { isTyping } from './common/drag';
+import { comboOf, isKey } from './keys/keymap';
+import { openFullScore } from './editors/score/FullScoreButton';
 
 /** Keys that musical typing claims while it is active. */
 export const MUSICAL_TYPING_KEYS = new Set(['a', 'w', 's', 'e', 'd', 'f', 't', 'g', 'y', 'h', 'u', 'j', 'k', 'o', 'l', 'p', ';', "'", 'z', 'x', 'c', 'v', '1', '2', '3', '4', '5', '6', '7', '8']);
@@ -21,191 +23,84 @@ export function useGlobalShortcuts(): void {
       const key = e.key.toLowerCase();
       const engine = getEngine();
       const bpb = beatsPerBar(p.timeSig);
+      const combo = comboOf(e);
+      if (!combo) return;
+      const is = (id: string) => isKey(e, id, combo);
 
       // Musical typing owns plain letter keys while it's on.
-      if (s.musicalTyping && !mod && MUSICAL_TYPING_KEYS.has(key)) return;
+      if (s.musicalTyping && !mod && !e.altKey && MUSICAL_TYPING_KEYS.has(key) && !is('view.musicalTyping')) return;
 
       const inTracks = s.focusArea === 'tracks';
-
-      if (mod && key === 'z') {
-        e.preventDefault();
-        if (e.shiftKey) redo();
-        else undo();
-        return;
-      }
-      if (mod && key === 'y') {
-        e.preventDefault();
-        redo();
-        return;
-      }
-      if (mod && key === 's') {
-        e.preventDefault();
-        void flushSave().then(() => toast('Song saved', 'success'));
-        return;
-      }
-      if (mod && key === 'e') {
-        e.preventDefault();
-        openModal('export');
-        return;
-      }
-      if (mod && e.altKey && key === 'n') {
-        e.preventDefault();
-        openModal('newTrack');
-        return;
-      }
-      if (mod && (key === '=' || key === '+')) {
-        e.preventDefault();
-        useStore.setState({ pxPerBeat: Math.min(200, s.pxPerBeat * 1.25) });
-        return;
-      }
-      if (mod && key === '-') {
-        e.preventDefault();
-        useStore.setState({ pxPerBeat: Math.max(4, s.pxPerBeat / 1.25) });
-        return;
-      }
+      const done = () => e.preventDefault();
+      const dock = (tab: NonNullable<typeof s.dockTab>) => useStore.setState({ dockTab: s.dockTab === tab ? null : tab, dockMaximized: false });
+      const toggleTrack = (field: 'mute' | 'solo') =>
+        s.selectedTrackId &&
+        commit((d) => {
+          const t = d.tracks.find((x) => x.id === s.selectedTrackId);
+          if (t) t[field] = !t[field];
+        });
+      const prevBar = () => engine.seek(Math.max(0, Math.ceil(engine.position / bpb - 1.0001) * bpb));
+      const nextBar = () => engine.seek(Math.floor(engine.position / bpb + 1.0001) * bpb);
+      const selectTrack = (dir: number) => {
+        const i = p.tracks.findIndex((t) => t.id === s.selectedTrackId);
+        const j = Math.max(0, Math.min(p.tracks.length - 1, i + dir));
+        if (p.tracks[j]) useStore.setState({ selectedTrackId: p.tracks[j].id });
+      };
 
       // Region editing in the tracks area.
       if (inTracks) {
-        if (mod && key === 'c') {
-          e.preventDefault();
-          copySelection(false);
-          return;
-        }
-        if (mod && key === 'x') {
-          e.preventDefault();
-          copySelection(true);
-          return;
-        }
-        if (mod && key === 'v') {
-          e.preventDefault();
-          pasteRegions();
-          return;
-        }
-        if (mod && key === 'd') {
-          e.preventDefault();
-          duplicateRegions(s.selectedRegionIds);
-          return;
-        }
-        if (mod && key === 't') {
-          e.preventDefault();
-          splitRegionsAt(s.selectedRegionIds, engine.position);
-          return;
-        }
-        if (mod && key === 'j') {
-          e.preventDefault();
-          joinRegions(s.selectedRegionIds);
-          return;
-        }
-        if (mod && key === 'a') {
-          e.preventDefault();
-          useStore.setState({ selectedRegionIds: p.tracks.flatMap((t) => t.regions.map((r) => r.id)) });
-          return;
-        }
-        if ((key === 'delete' || key === 'backspace') && s.selectedRegionIds.length) {
-          e.preventDefault();
-          deleteRegions(s.selectedRegionIds);
-          return;
-        }
-        if (key === 'l' && !mod && s.selectedRegionIds.length) {
-          toggleLoopRegions(s.selectedRegionIds);
-          return;
-        }
+        if (is('edit.copy')) return done(), copySelection(false);
+        if (is('edit.cut')) return done(), copySelection(true);
+        if (is('edit.paste')) return done(), pasteRegions();
+        if (is('edit.duplicate')) return done(), duplicateRegions(s.selectedRegionIds);
+        if (is('region.split')) return done(), splitRegionsAt(s.selectedRegionIds, engine.position);
+        if (is('region.join')) return done(), joinRegions(s.selectedRegionIds);
+        if (is('edit.selectAll')) return done(), useStore.setState({ selectedRegionIds: p.tracks.flatMap((t) => t.regions.map((r) => r.id)) });
+        if (is('edit.delete') && s.selectedRegionIds.length) return done(), deleteRegions(s.selectedRegionIds);
+        if (is('region.loop') && s.selectedRegionIds.length) return done(), toggleLoopRegions(s.selectedRegionIds);
+        if (is('track.prev')) return done(), selectTrack(-1);
+        if (is('track.next')) return done(), selectTrack(1);
+        if (is('tracks.prevBar')) return done(), prevBar();
+        if (is('tracks.nextBar')) return done(), nextBar();
       }
 
-      if (mod) return;
-
-      switch (key) {
-        case ' ':
-          e.preventDefault();
-          engine.togglePlay();
-          break;
-        case 'enter':
-        case 'home':
-          e.preventDefault();
-          engine.seek(0);
-          break;
-        case 'r':
-          e.preventDefault();
-          void engine.record();
-          break;
-        case 'c':
-          if (e.shiftKey) {
-            // Loop playback over the selected regions (or the current bar).
-            loopPlaybackOver(s.selectedRegionIds);
-            break;
-          }
-          commit((d) => {
-            d.loop.enabled = !d.loop.enabled;
-          });
-          break;
-        case 'k':
-          commit((d) => {
-            d.metronome = !d.metronome;
-          });
-          break;
-        case 'e':
-          useStore.setState({ dockTab: s.dockTab === 'editor' ? null : 'editor', dockMaximized: false });
-          break;
-        case 'p':
-          useStore.setState({ dockTab: s.dockTab === 'instrument' ? null : 'instrument', dockMaximized: false });
-          break;
-        case 'x':
-          useStore.setState({ dockTab: s.dockTab === 'mixer' ? null : 'mixer', dockMaximized: false });
-          break;
-        case 'w':
-          useStore.setState({ dockTab: s.dockTab === 'assistant' ? null : 'assistant', dockMaximized: false });
-          break;
-        case 'b':
-          useStore.setState({ dockTab: s.dockTab === 'fx' ? null : 'fx', dockMaximized: false });
-          break;
-        case 'y':
-          useStore.setState({ libraryOpen: !s.libraryOpen });
-          break;
-        case '?':
-          openModal('help');
-          break;
-        case 'arrowleft':
-          if (inTracks) {
-            e.preventDefault();
-            engine.seek(Math.max(0, Math.ceil(engine.position / bpb - 1.0001) * bpb));
-          }
-          break;
-        case 'arrowright':
-          if (inTracks) {
-            e.preventDefault();
-            engine.seek(Math.floor(engine.position / bpb + 1.0001) * bpb);
-          }
-          break;
-        case ',':
-          engine.seek(Math.max(0, Math.ceil(engine.position / bpb - 1.0001) * bpb));
-          break;
-        case '.':
-          engine.seek(Math.floor(engine.position / bpb + 1.0001) * bpb);
-          break;
-        case 'm':
-          if (s.selectedTrackId)
-            commit((d) => {
-              const t = d.tracks.find((x) => x.id === s.selectedTrackId);
-              if (t) t.mute = !t.mute;
-            });
-          break;
-        case 's':
-          if (s.selectedTrackId)
-            commit((d) => {
-              const t = d.tracks.find((x) => x.id === s.selectedTrackId);
-              if (t) t.solo = !t.solo;
-            });
-          break;
-        case 'arrowup':
-        case 'arrowdown':
-          if (inTracks) {
-            e.preventDefault();
-            const i = p.tracks.findIndex((t) => t.id === s.selectedTrackId);
-            const j = Math.max(0, Math.min(p.tracks.length - 1, i + (key === 'arrowup' ? -1 : 1)));
-            if (p.tracks[j]) useStore.setState({ selectedTrackId: p.tracks[j].id });
-          }
-          break;
-      }
+      const actions: [string, () => void][] = [
+        ['edit.undo', undo],
+        ['edit.redo', redo],
+        ['song.save', () => void flushSave().then(() => toast('Song saved', 'success'))],
+        ['song.export', () => openModal('export')],
+        ['song.newTrack', () => openModal('newTrack')],
+        ['view.zoomIn', () => useStore.setState({ pxPerBeat: Math.min(200, s.pxPerBeat * 1.25) })],
+        ['view.zoomOut', () => useStore.setState({ pxPerBeat: Math.max(4, s.pxPerBeat / 1.25) })],
+        ['transport.play', () => engine.togglePlay()],
+        ['transport.toStart', () => engine.seek(0)],
+        ['transport.record', () => void engine.record()],
+        ['transport.loopSelection', () => loopPlaybackOver(s.selectedRegionIds)],
+        ['transport.cycle', () => commit((d) => void (d.loop.enabled = !d.loop.enabled))],
+        ['transport.metronome', () => commit((d) => void (d.metronome = !d.metronome))],
+        ['transport.prevBar', prevBar],
+        ['transport.nextBar', nextBar],
+        ['view.editor', () => dock('editor')],
+        ['view.instrument', () => dock('instrument')],
+        ['view.mixer', () => dock('mixer')],
+        ['view.chords', () => dock('assistant')],
+        ['view.fx', () => dock('fx')],
+        ['view.sounds', () => useStore.setState({ libraryOpen: !s.libraryOpen })],
+        ['view.musicalTyping', () => {
+          useStore.setState({ musicalTyping: !s.musicalTyping });
+          toast(s.musicalTyping ? 'Musical typing off' : 'Musical typing on: play with A S D F…');
+        }],
+        ['view.shortcuts', () => openModal('help')],
+        ['view.fullScore', () => (s.dockTab === 'editor' && s.editorMode === 'fullscore' ? useStore.setState({ dockTab: null, dockMaximized: false }) : openFullScore())],
+        ['track.mute', () => toggleTrack('mute')],
+        ['track.solo', () => toggleTrack('solo')],
+      ];
+      for (const [id, run] of actions)
+        if (is(id)) {
+          done();
+          run();
+          return;
+        }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);

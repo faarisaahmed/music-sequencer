@@ -4,6 +4,7 @@ import { Piano, Plus, Circle, MousePointerClick, X, Lightbulb } from 'lucide-rea
 import { openModal, useStore } from '../../state/store';
 import { getEngine } from '../../audio/engine';
 import { useTour } from './tourState';
+import { shortcutLabel } from '../keys/keymap';
 import './onboarding.css';
 
 export default function EmptyHint() {
@@ -15,13 +16,13 @@ export default function EmptyHint() {
   if (!empty || recording || touring || dismissed === projectId) return null;
 
   const items: { icon: React.ReactNode; label: string; k: string; run: () => void }[] = [
-    { icon: <Piano size={16} />, label: 'Play the keyboard', k: 'P', run: () => useStore.setState({ dockTab: 'instrument', dockMaximized: false }) },
-    { icon: <Plus size={16} />, label: 'Add an instrument or mic track', k: '⌥⌘N', run: () => openModal('newTrack') },
-    { icon: <Circle size={16} />, label: 'Record what you play', k: 'R', run: () => void getEngine().record() },
+    { icon: <Piano size={16} />, label: 'Play the keyboard', k: shortcutLabel('view.instrument'), run: () => useStore.setState({ dockTab: 'instrument', dockMaximized: false }) },
+    { icon: <Plus size={16} />, label: 'Add an instrument or mic track', k: shortcutLabel('song.newTrack'), run: () => openModal('newTrack') },
+    { icon: <Circle size={16} />, label: 'Record what you play', k: shortcutLabel('transport.record'), run: () => void getEngine().record() },
     {
       icon: <MousePointerClick size={16} />,
       label: 'Double-click a lane to draw notes',
-      k: 'E',
+      k: shortcutLabel('view.editor'),
       run: () => useStore.setState({ dockTab: 'editor', dockMaximized: false }),
     },
   ];

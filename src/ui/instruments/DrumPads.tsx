@@ -28,7 +28,7 @@ export default function DrumPads({ track }: { track: Track }) {
         <button className="btn kp-btn" onClick={() => useStore.setState({ dockTab: 'editor', editorMode: 'steps' })}>
           <Grid3x3 size={15} /> Open Step Sequencer
         </button>
-        <button className={'btn kp-btn' + (typing ? ' active' : '')} title="Play pads with your computer keyboard" onClick={() => useStore.setState({ musicalTyping: !typing })}>
+        <button className={'btn kp-btn' + (typing ? ' active' : '')} data-tip="Play pads with your computer keyboard" data-cmd="view.musicalTyping" onClick={() => useStore.setState({ musicalTyping: !typing })}>
           <KeyboardIcon size={15} /> Typing
         </button>
         <MidiButton />
