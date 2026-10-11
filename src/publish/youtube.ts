@@ -10,7 +10,7 @@ const CLIENT_KEY = 'bf.googleClientId';
  * BandForge's own Google OAuth client (Web application). It identifies the app, not a user,
  * and isn't secret: everyone signs in to their own channel through it.
  */
-export const BUILT_IN_CLIENT_ID = '';
+export const BUILT_IN_CLIENT_ID = '199254615616-r2ssqg1g89fi50tk4f90aq2vjfcpqjab.apps.googleusercontent.com';
 
 export const SCOPE_UPLOAD = 'https://www.googleapis.com/auth/youtube.upload';
 export const SCOPE_READ = 'https://www.googleapis.com/auth/youtube.readonly';

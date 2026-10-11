@@ -69,16 +69,9 @@ await S(async () => {
 });
 // Reached from the Export dialog.
 await page.click('.export-yt');
-await page.waitForSelector('.yt-setup');
-// Without a built-in client, regular users get a plain message; developer steps are tucked away.
-check('setupHiddenForUsers', /isn't switched on/.test(await page.locator('.yt-setup').textContent()) && (await page.locator('.yt-setup input').count()) === 0);
-await page.click('.yt-setup .yt-link');
-await page.fill('.yt-setup input', 'not-an-id');
-check('setupRejectsBad', await page.locator('.modal-foot .btn.primary').isDisabled());
-await page.fill('.yt-setup input', '123-abc.apps.googleusercontent.com');
-await page.click('.modal-foot .btn.primary');
 await page.waitForSelector('.yt-section');
-check('clientIdSaved', (await S(() => localStorage.getItem('bf.googleClientId'))) === '123-abc.apps.googleusercontent.com');
+// The built-in client is used: no setup for anyone.
+check('noSetupNeeded', (await page.locator('.yt-setup').count()) === 0);
 check('publishNeedsChannel', await page.locator('.yt-publish').isDisabled() && /connect a channel/.test(await page.locator('.export-summary').textContent()));
 
 // Automatic text from Song Info.
@@ -94,7 +87,7 @@ await page.click('.yt-connect .btn.primary');
 await page.waitForSelector('.yt-channel');
 check('channelShown', (await page.locator('.yt-channel b').textContent()) === 'Faaris Music');
 const gis = await S(() => window.__gis);
-check('scopesMinimal', gis[0].scope.includes('youtube.upload') && gis[0].scope.includes('youtube.readonly') && !gis[0].scope.includes('force-ssl') && gis[0].prompt.includes('select_account') && gis[0].client === '123-abc.apps.googleusercontent.com', gis);
+check('scopesMinimal', gis[0].scope.includes('youtube.upload') && gis[0].scope.includes('youtube.readonly') && !gis[0].scope.includes('force-ssl') && gis[0].prompt.includes('select_account') && gis[0].client === '199254615616-r2ssqg1g89fi50tk4f90aq2vjfcpqjab.apps.googleusercontent.com', gis);
 check('playlistsLoaded', (await page.locator('.yt-row select').nth(1).locator('option').count()) === 2);
 check('needsAudience', await page.locator('.yt-publish').isDisabled() && /choose the audience/.test(await page.locator('.export-summary').textContent()));
 
