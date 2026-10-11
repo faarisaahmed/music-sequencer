@@ -6,6 +6,12 @@ const API = 'https://www.googleapis.com/youtube/v3';
 const UPLOAD = 'https://www.googleapis.com/upload/youtube/v3';
 const CLIENT_KEY = 'bf.googleClientId';
 
+/**
+ * BandForge's own Google OAuth client (Web application). It identifies the app, not a user,
+ * and isn't secret: everyone signs in to their own channel through it.
+ */
+export const BUILT_IN_CLIENT_ID = '';
+
 export const SCOPE_UPLOAD = 'https://www.googleapis.com/auth/youtube.upload';
 export const SCOPE_READ = 'https://www.googleapis.com/auth/youtube.readonly';
 /** Needed only to add the video to a playlist (asked for when you pick one). */
@@ -13,7 +19,7 @@ export const SCOPE_MANAGE = 'https://www.googleapis.com/auth/youtube.force-ssl';
 
 // ---------------------------------------------------------------- client id
 
-/** The Google OAuth client id: set in Settings, or baked in at build time. */
+/** The Google OAuth client id: a developer override from Settings, the build env, or the built-in one. */
 export function googleClientId(): string {
   try {
     const own = localStorage.getItem(CLIENT_KEY)?.trim();
@@ -21,7 +27,7 @@ export function googleClientId(): string {
   } catch {
     /* private mode */
   }
-  return (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined)?.trim() ?? '';
+  return (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined)?.trim() || BUILT_IN_CLIENT_ID;
 }
 
 export function setGoogleClientId(id: string): void {

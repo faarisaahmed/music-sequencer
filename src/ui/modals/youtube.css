@@ -347,3 +347,11 @@
 .yt-art-video .seg {
   align-self: flex-start;
 }
+.yt-terms {
+  font-size: 11px;
+  line-height: 1.5;
+  padding-top: 10px;
+}
+.yt-terms a {
+  color: var(--accent-2);
+}

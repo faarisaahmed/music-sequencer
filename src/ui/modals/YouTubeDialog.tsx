@@ -461,6 +461,25 @@ export default function YouTubeDialog() {
         </div>
       </section>
 
+      <div className="faint yt-terms">
+        By publishing you agree to the{' '}
+        <a href="https://www.youtube.com/t/terms" target="_blank" rel="noreferrer">
+          YouTube Terms of Service
+        </a>
+        . BandForge uses YouTube API Services; see the{' '}
+        <a href="https://policies.google.com/privacy" target="_blank" rel="noreferrer">
+          Google Privacy Policy
+        </a>{' '}
+        and{' '}
+        <a href="./privacy.html" target="_blank" rel="noreferrer">
+          BandForge's privacy policy
+        </a>
+        . You can remove BandForge's access any time at{' '}
+        <a href="https://myaccount.google.com/permissions" target="_blank" rel="noreferrer">
+          myaccount.google.com/permissions
+        </a>
+        .
+      </div>
       {busy && (
         <div className="progress" style={{ marginTop: 6 }}>
           <div style={{ width: `${Math.round(phase!.f * 100)}%` }} />
@@ -595,55 +614,72 @@ function DoneView({ id, warning, privacy, channel }: { id: string; warning?: str
   );
 }
 
-/** First-time setup: BandForge needs a Google OAuth client id for this site. */
+/**
+ * Shown only when this copy of BandForge has no Google client built in (e.g. a self-hosted
+ * fork). Regular users never see it; the developer steps are tucked away.
+ */
 function SetupView({ onDone }: { onDone: (id: string) => void }) {
   const [v, setV] = useState('');
+  const [dev, setDev] = useState(false);
   const ok = looksLikeClientId(v);
   const origin = location.origin;
   return (
     <Modal
-      title="Set up YouTube publishing"
+      title="Publish to YouTube"
       width={620}
       footer={
-        <>
-          <button className="btn" onClick={closeModal}>
-            Cancel
+        dev ? (
+          <>
+            <button className="btn" onClick={closeModal}>
+              Cancel
+            </button>
+            <button
+              className="btn primary"
+              disabled={!ok}
+              onClick={() => {
+                setGoogleClientId(v);
+                onDone(v.trim());
+              }}
+            >
+              Save
+            </button>
+          </>
+        ) : (
+          <button className="btn primary" onClick={closeModal}>
+            OK
           </button>
-          <button
-            className="btn primary"
-            disabled={!ok}
-            onClick={() => {
-              setGoogleClientId(v);
-              onDone(v.trim());
-            }}
-          >
-            Save
-          </button>
-        </>
+        )
       }
     >
       <div className="yt-setup">
-        <p>To upload to YouTube, this copy of BandForge needs its own Google client ID. It's free and takes about five minutes, once:</p>
-        <ol>
-          <li>
-            Open the{' '}
-            <a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank" rel="noreferrer">
-              Google Cloud console
-            </a>
-            , create a project and turn on the <b>YouTube Data API v3</b>.
-          </li>
-          <li>
-            Under <b>Google Auth Platform</b>, set up the consent screen (External) and add yourself as a test user.
-          </li>
-          <li>
-            Create an <b>OAuth client ID</b> of type <b>Web application</b>, with this authorized JavaScript origin:
-            <code>{origin}</code>
-          </li>
-          <li>Paste the client ID here.</li>
-        </ol>
-        <input type="text" placeholder="1234567890-abc123.apps.googleusercontent.com" value={v} onChange={(e) => setV(e.target.value)} onKeyDown={(e) => e.stopPropagation()} autoFocus />
-        {v && !ok && <span className="yt-error-inline">That doesn't look like a client ID. It ends in .apps.googleusercontent.com</span>}
-        <p className="faint">It's saved in this browser only. You can change it later in Settings.</p>
+        <p>YouTube publishing isn't switched on for this copy of BandForge yet. You can still export your song as an audio file and upload it yourself.</p>
+        {!dev ? (
+          <button className="yt-link" onClick={() => setDev(true)}>
+            Running your own copy of BandForge? Set it up
+          </button>
+        ) : (
+          <>
+            <ol>
+              <li>
+                In the{' '}
+                <a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank" rel="noreferrer">
+                  Google Cloud console
+                </a>
+                , turn on the <b>YouTube Data API v3</b>.
+              </li>
+              <li>
+                Under <b>Google Auth Platform</b>, set up the consent screen (External).
+              </li>
+              <li>
+                Create an <b>OAuth client ID</b> of type <b>Web application</b> with this authorized JavaScript origin:
+                <code>{origin}</code>
+              </li>
+              <li>Paste the client ID here, or build it in with the VITE_GOOGLE_CLIENT_ID setting.</li>
+            </ol>
+            <input type="text" placeholder="1234567890-abc123.apps.googleusercontent.com" value={v} onChange={(e) => setV(e.target.value)} onKeyDown={(e) => e.stopPropagation()} autoFocus />
+            {v && !ok && <span className="yt-error-inline">That doesn't look like a client ID. It ends in .apps.googleusercontent.com</span>}
+          </>
+        )}
       </div>
     </Modal>
   );

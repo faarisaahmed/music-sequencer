@@ -260,6 +260,14 @@ export default function HomeScreen() {
       </main>
       <footer className="home-foot faint">
         Songs are saved automatically in this browser. Use <b>Export Project File</b> to back them up or move them to another computer.
+        <span className="home-links">
+          <a href="./privacy.html" target="_blank" rel="noreferrer">
+            Privacy Policy
+          </a>
+          <a href="./terms.html" target="_blank" rel="noreferrer">
+            Terms of Use
+          </a>
+        </span>
       </footer>
     </div>
   );

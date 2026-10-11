@@ -3,7 +3,7 @@ import type { Draft } from 'immer';
 import type { Project } from '../../model/types';
 import { closeModal, commit, openModal, toast, useStore } from '../../state/store';
 import { Keyboard } from 'lucide-react';
-import { googleClientId, looksLikeClientId, setGoogleClientId } from '../../publish/youtube';
+import { looksLikeClientId, setGoogleClientId } from '../../publish/youtube';
 import { setBpm, setKey, setTimeSig } from '../../state/actions';
 import { keyName, keyUsesFlats, makeKey, pitchClassName } from '../../model/music';
 import ScalePicker from '../common/ScalePicker';
@@ -172,17 +172,23 @@ export default function SettingsDialog() {
           <Keyboard size={14} /> Edit Shortcuts…
         </button>
       </div>
-      <div className="form-section">YouTube Publishing</div>
+      <div className="form-section">YouTube Publishing (developers)</div>
       <div className="form-grid">
-        <span className="label">Google client ID</span>
+        <span className="label">Own client ID</span>
         <input
           type="text"
-          defaultValue={googleClientId()}
-          placeholder="….apps.googleusercontent.com"
+          defaultValue={(() => {
+            try {
+              return localStorage.getItem('bf.googleClientId') ?? '';
+            } catch {
+              return '';
+            }
+          })()}
+          placeholder="Leave empty to use BandForge's"
           onKeyDown={(e) => e.stopPropagation()}
           onBlur={(e) => {
             const v = e.target.value.trim();
-            if (v === googleClientId()) return;
+            if (v === (localStorage.getItem('bf.googleClientId') ?? '')) return;
             if (v && !looksLikeClientId(v)) {
               toast("That doesn't look like a Google client ID", 'error');
               return;

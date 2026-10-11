@@ -70,7 +70,9 @@ await S(async () => {
 // Reached from the Export dialog.
 await page.click('.export-yt');
 await page.waitForSelector('.yt-setup');
-check('setupFirst', true);
+// Without a built-in client, regular users get a plain message; developer steps are tucked away.
+check('setupHiddenForUsers', /isn't switched on/.test(await page.locator('.yt-setup').textContent()) && (await page.locator('.yt-setup input').count()) === 0);
+await page.click('.yt-setup .yt-link');
 await page.fill('.yt-setup input', 'not-an-id');
 check('setupRejectsBad', await page.locator('.modal-foot .btn.primary').isDisabled());
 await page.fill('.yt-setup input', '123-abc.apps.googleusercontent.com');
@@ -109,6 +111,7 @@ await page.check('input[name=kids] >> nth=0');
 await page.click('.seg button:has-text("Creative Commons")');
 await page.locator('.yt-row select').nth(1).selectOption('PL1');
 await page.screenshot({ path: `${out}/youtube-dialog.png`, fullPage: true });
+check('termsLinks', (await page.locator('.yt-terms a[href="https://www.youtube.com/t/terms"]').count()) === 1 && (await page.locator('.yt-terms a[href="./privacy.html"]').count()) === 1);
 check('readyToPublish', await page.locator('.yt-publish').isEnabled(), await page.locator('.export-summary').textContent());
 
 await page.click('.yt-publish');
@@ -157,6 +160,10 @@ channelItems = [];
 await page.click('.yt-channel .btn.sm');
 await page.waitForSelector('.yt-error');
 check('noChannelMessage', /doesn’t have a YouTube channel/.test(await page.locator('.yt-error').textContent()));
+
+// Policy pages are served and linked from Home.
+const pol = await S(async () => [await (await fetch('./privacy.html')).text(), await (await fetch('./terms.html')).text()]);
+check('policyPages', /Limited Use/.test(pol[0]) && /youtube.upload/.test(pol[0]) && /YouTube Terms of Service/.test(pol[1]), pol.map((x) => x.slice(0, 80)));
 
 check('noErrors', errors.length === 0, errors);
 console.log(JSON.stringify(res, null, 1));
