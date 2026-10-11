@@ -136,6 +136,8 @@ export interface RenderOpts {
   partName?: string;
   composer?: string;
   tempo?: number;
+  /** Writing check: note ids to colour (red = out of range, amber = worth a look). */
+  flagged?: Map<string, 'range' | 'warn'>;
   /** Repeats, endings and jumps; `barOffset` is the song bar of the score's first measure. */
   form?: { marks: NavMark[]; voltas: Volta[]; barOffset: number };
   /** Tempo changes (display beats): drawn as ♩ = 90, or accel./rit. for gradual ones. */
@@ -498,6 +500,11 @@ function drawSystem(ctx: DrawCtx, plan: ScorePlan, li: number, layout: ScoreLayo
                   `${LETTERS[s.letter]}${s.alter === 1 ? '#' : s.alter === -1 ? 'b' : s.alter === 2 ? '##' : s.alter === -2 ? 'bb' : ''}/${s.octave}${piece.heads[idx] === 'x' ? '/x2' : ''}`,
               );
               sn = new StaveNote({ keys, duration: code, clef: vfClef(ref.clef), auto_stem: stemDir === undefined, stem_direction: stemDir });
+              if (opts.flagged?.size)
+                piece.noteIds.forEach((id, idx) => {
+                  const f = opts.flagged!.get(id);
+                  if (f) sn.setKeyStyle(idx, { fillStyle: f === 'range' ? '#d70015' : '#c77700', strokeStyle: f === 'range' ? '#d70015' : '#c77700' });
+                });
               if (ref.clef !== 'percussion')
                 spelled.forEach((s, idx) => {
                   const k2 = `${s.letter}:${s.octave}`;

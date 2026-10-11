@@ -1,0 +1,123 @@
+.review {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  overflow: hidden;
+}
+.review-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.review-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+.review-title svg {
+  color: var(--orange);
+}
+.review-title .dim {
+  font-size: 12px;
+}
+.review-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.review-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--border-soft);
+  background: var(--panel-2);
+  color: var(--text-dim);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font: 12px var(--font);
+  cursor: pointer;
+}
+.review-chip em {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--text);
+}
+.review-chip.on {
+  border-color: var(--accent);
+  color: var(--text);
+  background: rgba(47, 140, 255, 0.15);
+}
+.review-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.review-item {
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: var(--panel-2);
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+.review-item:hover {
+  border-color: var(--border);
+}
+.review-item.open {
+  border-color: var(--accent);
+}
+.review-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.review-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--orange);
+}
+.review-dot.range {
+  background: var(--record);
+}
+.review-dot.parallel {
+  background: var(--purple);
+}
+.review-dot.chord {
+  background: var(--yellow);
+}
+.review-bar {
+  font: 600 11px var(--mono);
+  color: var(--text-dim);
+  flex: none;
+  width: 52px;
+}
+.review-text {
+  flex: 1;
+  min-width: 0;
+}
+.review-hint {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-dim);
+  padding: 6px 0 2px 68px;
+}
+.review-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px 4px;
+  font-size: 13px;
+}
+.phone .review-hint {
+  padding-left: 16px;
+}

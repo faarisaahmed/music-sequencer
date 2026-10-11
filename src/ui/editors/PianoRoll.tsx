@@ -1,6 +1,7 @@
 // Piano roll MIDI editor: canvas-rendered grid & notes with full mouse/keyboard editing,
 // a velocity lane with dynamics tools, and a toolbar portalled into the editor header.
 import { meterOf, type Meter } from '../../model/timeline';
+import { useFlaggedNotes } from '../assistant/ReviewPanel';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTwoFingerPan } from '../mobile/touchPan';
@@ -81,6 +82,8 @@ export default function PianoRoll({ trackId, regionId }: Props) {
 }
 
 function PianoRollInner({ region, track, meter, bpb, selectedIds }: { region: MidiRegion; track: Track; meter: Meter; bpb: number; selectedIds: string[] }) {
+  // Writing check: out-of-range notes get a red outline, rubs and parallels an amber one.
+  const flagged = useFlaggedNotes();
   const project = useStore((s) => s.project)!;
   const regionId = region.id;
   const isDrums = track.type === 'drums';
@@ -258,8 +261,9 @@ function PianoRollInner({ region, track, meter, bpb, selectedIds }: { region: Mi
       ctx.beginPath();
       ctx.roundRect(x, y, nw, nh, Math.min(3, nh / 3));
       ctx.fill();
-      ctx.strokeStyle = sel ? '#ffffff' : 'rgba(0,0,0,0.55)';
-      ctx.lineWidth = sel ? 1.5 : 1;
+      const flag = flagged.get(n.id);
+      ctx.strokeStyle = sel ? '#ffffff' : flag === 'range' ? '#ff453a' : flag === 'warn' ? '#ffd60a' : 'rgba(0,0,0,0.55)';
+      ctx.lineWidth = sel ? 1.5 : flag ? 2 : 1;
       ctx.stroke();
       if (nh >= 11 && nw > 30 && alpha > 0.5) {
         ctx.fillStyle = 'rgba(0,0,0,0.7)';
@@ -292,7 +296,7 @@ function PianoRollInner({ region, track, meter, bpb, selectedIds }: { region: Mi
       ctx.fillRect(x, y, Math.abs(marquee.x1 - marquee.x0), Math.abs(marquee.y1 - marquee.y0));
       ctx.strokeRect(x + 0.5, y + 0.5, Math.abs(marquee.x1 - marquee.x0), Math.abs(marquee.y1 - marquee.y0));
     }
-  }, [size, scroll, ppb, rowH, region, selected, marquee, grid, scaleMode, scale, rgb, isDrums, meter, songBase, totalBeats, regionVisibleEnd]);
+  }, [size, scroll, ppb, rowH, region, selected, marquee, grid, scaleMode, scale, rgb, isDrums, meter, songBase, totalBeats, regionVisibleEnd, flagged]);
 
   // Keyboard
   useEffect(() => {

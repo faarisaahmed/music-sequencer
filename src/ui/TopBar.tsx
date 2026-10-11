@@ -22,6 +22,7 @@ import {
   Loader2,
   Music4,
   History,
+  ClipboardCheck,
 } from 'lucide-react';
 import { commit, openModal, redo, undo, useStore, useTransport, type DockTab } from '../state/store';
 import { closeProject, setKey } from '../state/actions';
@@ -281,6 +282,7 @@ export default function TopBar() {
         <DockButton tab="instrument" icon={<Piano size={17} />} label="Instrument / Keyboard" cmd="view.instrument" />
         <DockButton tab="mixer" icon={<SlidersVertical size={17} />} label="Mixer" cmd="view.mixer" />
         <DockButton tab="assistant" icon={<Music4 size={17} />} label="Chord Track" cmd="view.chords" />
+        <DockButton tab="review" icon={<ClipboardCheck size={17} />} label="Check My Writing" cmd="view.review" />
         <FullScoreButton />
         <button className="btn icon tb" data-tip="New Track" data-cmd="song.newTrack" onClick={() => openModal('newTrack')}>
           <Plus size={18} />

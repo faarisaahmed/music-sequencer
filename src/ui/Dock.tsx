@@ -6,6 +6,7 @@ import MixerPanel from './mixer/MixerPanel';
 import FxPanel from './mixer/FxPanel';
 import { lazy, Suspense } from 'react';
 import { PanelLoading } from './common/Lazy';
+import ReviewPanel from './assistant/ReviewPanel';
 
 const AssistantPanel = lazy(() => import('./assistant/AssistantPanel'));
 
@@ -15,6 +16,7 @@ const TABS: { id: DockTab; label: string; cmd: string }[] = [
   { id: 'instrument', label: 'Instrument', cmd: 'view.instrument' },
   { id: 'mixer', label: 'Mixer', cmd: 'view.mixer' },
   { id: 'assistant', label: 'Chord Track', cmd: 'view.chords' },
+  { id: 'review', label: 'Check', cmd: 'view.review' },
 ];
 
 export default function Dock() {
@@ -41,6 +43,7 @@ export default function Dock() {
         {tab === 'instrument' && <InstrumentPanel />}
         {tab === 'mixer' && <MixerPanel />}
         {tab === 'fx' && <FxPanel />}
+        {tab === 'review' && <ReviewPanel />}
         {tab === 'assistant' && (
           <Suspense fallback={<PanelLoading />}>
             <AssistantPanel />

@@ -100,6 +100,7 @@ export function useGlobalShortcuts(): void {
         ['view.instrument', () => dock('instrument')],
         ['view.mixer', () => dock('mixer')],
         ['view.chords', () => dock('assistant')],
+        ['view.review', () => dock('review')],
         ['view.fx', () => dock('fx')],
         ['view.sounds', () => useStore.setState({ libraryOpen: !s.libraryOpen })],
         ['view.musicalTyping', () => {

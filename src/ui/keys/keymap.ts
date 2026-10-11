@@ -50,6 +50,7 @@ export const COMMANDS: Command[] = [
   C('view.mixer', 'Mixer', 'Windows', ['X']),
   C('view.fx', 'Smart Controls & FX', 'Windows', ['B']),
   C('view.chords', 'Chord Track', 'Windows', ['W']),
+  C('view.review', 'Check My Writing (range, rubs, parallels)', 'Windows', ['Shift+W']),
   C('view.sounds', 'Sounds library', 'Windows', ['Y']),
   C('view.fullScore', 'Full score (whole song as sheet music)', 'Windows', ['Alt+F']),
   C('view.musicalTyping', 'Musical typing on / off', 'Windows', ['Mod+Shift+K']),

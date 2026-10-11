@@ -28,6 +28,7 @@ import {
   Users,
   FileMusic,
   Printer,
+  ClipboardCheck,
 } from 'lucide-react';
 import { commit, openModal, redo, undo, useStore, useTransport, type DockTab } from '../../state/store';
 import { closeProject } from '../../state/actions';
@@ -150,6 +151,7 @@ export default function MobileProject() {
         <Sheet title="More" onClose={() => setMore(false)}>
           <SheetItem icon={<SlidersHorizontal size={19} />} label="Smart Controls & Effects" onClick={() => (useStore.setState({ dockTab: 'fx', libraryOpen: false }), setMore(false))} />
           <SheetItem icon={<Music4 size={19} />} label="Chord Track" onClick={() => (useStore.setState({ dockTab: 'assistant', libraryOpen: false }), setMore(false))} />
+          <SheetItem icon={<ClipboardCheck size={19} />} label="Check My Writing" onClick={() => (useStore.setState({ dockTab: 'review', libraryOpen: false }), setMore(false))} />
           <SheetItem icon={<FileMusic size={19} />} label="Full Score" onClick={() => (openFullScore(), useStore.setState({ libraryOpen: false }), setMore(false))} />
           <SheetItem icon={<Library size={19} />} label="Sounds Library" onClick={() => (useStore.setState({ libraryOpen: true }), setMore(false))} />
           <SheetItem icon={<Plus size={19} />} label="New Track" onClick={() => (openModal('newTrack'), setMore(false))} />

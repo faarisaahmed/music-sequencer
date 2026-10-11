@@ -58,6 +58,7 @@ import { chordAt, chordName, setChordAt } from './score/chords';
 import { toMusicXml } from './score/musicxml';
 import { buildSource, formFor, tempoMarksFor, type Source } from './score/source';
 import { printDocs } from './score/print';
+import { useFlaggedNotes } from '../assistant/ReviewPanel';
 import './score.css';
 
 const DURATIONS: { v: number; key: string; label: string }[] = [
@@ -184,6 +185,7 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
 
   const src = useMemo(() => buildSource(project, full, regionId, grid, clefMode, concert), [project, full, regionId, grid, clefMode, concert]);
   const model = src?.model ?? null;
+  const flagged = useFlaggedNotes();
   const partKeys = useMemo(() => src?.parts.map((p) => p.writtenKey) ?? [], [src]);
 
   /** Draw the systems inside (or next to) the visible part of the scroll area. */
@@ -256,6 +258,7 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
         tempo: full ? project.bpm : undefined,
         tempoMarks: tempoMarksFor(project, src),
         form: formFor(project, src),
+        flagged,
         chords: src.chords,
         partLabels: src.labels,
       });
@@ -263,7 +266,7 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
       console.error('score layout failed', e);
       return null;
     }
-  }, [src, partKeys, width, zoom, project.timeSig, project.name, project.bpm, project.tempoChanges, project.navMarks, project.voltas, showDyn, full]);
+  }, [src, partKeys, width, zoom, project.timeSig, project.name, project.bpm, project.tempoChanges, project.navMarks, project.voltas, flagged, showDyn, full]);
   const layout = useMemo(() => (plan ? emptyLayout(plan) : null), [plan]);
 
   useLayoutEffect(() => {
