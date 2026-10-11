@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useStore } from './state/store';
 import { startAutosave } from './state/persistence';
+import { startSafety } from './state/safety';
 import HomeScreen from './ui/home/HomeScreen';
 import ProjectScreen from './ui/ProjectScreen';
 import { MenuHost } from './ui/common/menus';
@@ -22,6 +23,7 @@ export default function App() {
     if (!autosaveStarted) {
       autosaveStarted = true;
       startAutosave();
+      startSafety();
       void handleJamLinkOnStartup();
       // Pasting an invite link into an already-open tab.
       window.addEventListener('hashchange', () => {

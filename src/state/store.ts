@@ -111,6 +111,18 @@ export function commit(recipe: (p: Draft<Project>) => void): void {
   });
 }
 
+/** Swap in a whole different project state (e.g. restoring a version), as one undoable step. */
+export function replaceProject(next: Project): void {
+  const s = useStore.getState();
+  if (!s.project) return;
+  useStore.setState({
+    project: { ...next, id: s.project.id, updatedAt: Date.now() },
+    past: [...s.past.slice(-HISTORY_LIMIT), s.project],
+    future: [],
+  });
+  pruneSelection();
+}
+
 /**
  * Start a continuous gesture (drag etc.). The current project is pushed to history once;
  * subsequent `live` edits are not recorded individually. Call `endGesture` when done.

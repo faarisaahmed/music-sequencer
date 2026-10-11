@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Search, FolderOpen, FileMusic, MoreHorizontal, Music2, Trash2, Copy, Pencil, Download, Play, ChevronDown, ChevronRight, Users } from 'lucide-react';
+import { Plus, Search, FolderOpen, FileMusic, MoreHorizontal, Music2, Trash2, Copy, Pencil, Download, Play, ChevronDown, ChevronRight, Users, History, Archive } from 'lucide-react';
+import { BackupBanner, backUpAllSongs } from '../modals/SafetyPanels';
 import type { ProjectMeta } from '../../model/types';
 import { listProjects, loadProject, saveProject } from '../../state/persistence';
 import { duplicateProjectById, exportProjectFile, importMidiFile, importProjectFile, openProjectById, removeProject, createNewProject } from '../../state/actions';
@@ -93,6 +94,14 @@ export default function HomeScreen() {
     { label: 'Rename', icon: <Pencil size={14} />, onClick: () => setRenaming(s.id) },
     { label: 'Duplicate', icon: <Copy size={14} />, onClick: () => duplicateProjectById(s.id).then(refresh) },
     {
+      label: 'Version History',
+      icon: <History size={14} />,
+      onClick: async () => {
+        await openProjectById(s.id);
+        openModal('versions');
+      },
+    },
+    {
       label: 'Export Project File',
       icon: <Download size={14} />,
       onClick: async () => {
@@ -121,6 +130,7 @@ export default function HomeScreen() {
       else if (/\.json$/i.test(f.name)) await importProjectFile(f);
       else toast(`Open a song first to import audio (${f.name})`, 'error');
     }
+    void refresh();
   };
 
   return (
@@ -201,9 +211,17 @@ export default function HomeScreen() {
         </section>
 
         <section>
-          <h2 className="home-h2">
-            My Songs <span className="faint">{songs ? `(${songs.length})` : ''}</span>
-          </h2>
+          <BackupBanner />
+          <div className="home-section-head">
+            <h2 className="home-h2">
+              My Songs <span className="faint">{songs ? `(${songs.length})` : ''}</span>
+            </h2>
+            {!!songs?.length && (
+              <button className="btn ghost sm" onClick={() => void backUpAllSongs()} title="Save every song and recording in one file (or to your backup folder)">
+                <Archive size={14} /> Back Up All
+              </button>
+            )}
+          </div>
           {songs && songs.length === 0 && (
             <div className="home-empty">
               <Music2 size={40} />

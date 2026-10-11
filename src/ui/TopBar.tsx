@@ -21,6 +21,7 @@ import {
   Check,
   Loader2,
   Music4,
+  History,
 } from 'lucide-react';
 import { beginGesture, commit, endGesture, live, openModal, redo, undo, useStore, useTransport, type DockTab } from '../state/store';
 import { closeProject, setBpm, setKey } from '../state/actions';
@@ -215,10 +216,11 @@ function SaveIndicator() {
     };
   }, []);
   return (
-    <div className="save-ind" title={st === 'saved' ? 'All changes saved' : 'Saving…'}>
+    <button className="save-ind" data-tip={(st === 'saved' ? 'All changes saved. ' : 'Saving… ') + 'Click for Version History'} data-cmd="song.versions" onClick={() => openModal('versions')}>
       {st === 'saved' ? <Check size={13} /> : <Loader2 size={13} className="spin" />}
       <span>{st === 'saved' ? 'Saved' : 'Saving'}</span>
-    </div>
+      <History size={12} className="save-hist" />
+    </button>
   );
 }
 

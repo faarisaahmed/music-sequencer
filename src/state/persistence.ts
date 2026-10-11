@@ -44,6 +44,7 @@ export async function loadProject(id: string): Promise<Project | undefined> {
 
 export async function deleteProject(id: string): Promise<void> {
   await del(id, projectDb);
+  projectDeleteHooks.forEach((f) => f(id));
   const idx = ((await get(INDEX_KEY, projectDb)) as ProjectMeta[] | undefined) ?? [];
   await set(
     INDEX_KEY,
@@ -51,6 +52,8 @@ export async function deleteProject(id: string): Promise<void> {
     projectDb,
   );
 }
+
+export const projectDeleteHooks = new Set<(id: string) => void>();
 
 /** Collect all audio clip ids referenced by a project. */
 export function projectAudioIds(p: Project): string[] {
@@ -71,6 +74,9 @@ function status(s: SaveStatus) {
   saveListeners.forEach((f) => f(s));
 }
 
+/** Run after each successful save (versions, backup folder). */
+export const afterSaveHooks = new Set<(p: Project) => void>();
+
 export async function flushSave(): Promise<void> {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = null;
@@ -80,6 +86,7 @@ export async function flushSave(): Promise<void> {
     lastSaved = p;
     await saveProject(p);
     status('saved');
+    afterSaveHooks.forEach((f) => f(p));
   }
 }
 
@@ -95,6 +102,11 @@ export function startAutosave(): void {
     saveTimer = setTimeout(() => void flushSave(), 800);
   });
   window.addEventListener('beforeunload', () => void flushSave());
+  // Phones rarely fire beforeunload: save as soon as the page is hidden (app switch, lock screen).
+  window.addEventListener('pagehide', () => void flushSave());
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') void flushSave();
+  });
 }
 
 export function markSaved(p: Project): void {

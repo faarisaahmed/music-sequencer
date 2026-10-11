@@ -6,6 +6,7 @@ import HelpDialog from './HelpDialog';
 import TemplatesDialog from '../home/TemplatesDialog';
 import { CollabDialog, JoinDialog } from '../collab/CollabUI';
 import { lazy, Suspense } from 'react';
+import VersionsDialog from './VersionsDialog';
 
 const YouTubeDialog = lazy(() => import('./YouTubeDialog'));
 
@@ -23,6 +24,8 @@ export default function ModalHost() {
           <YouTubeDialog />
         </Suspense>
       );
+    case 'versions':
+      return <VersionsDialog />;
     case 'settings':
       return <SettingsDialog />;
     case 'help':

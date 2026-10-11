@@ -34,6 +34,8 @@ export const COMMANDS: Command[] = [
   C('song.save', 'Save', 'Song', ['Mod+S']),
   C('song.export', 'Export', 'Song', ['Mod+E']),
   C('song.youtube', 'Publish to YouTube', 'Song', []),
+  C('song.saveVersion', 'Save a version (to go back to later)', 'Song', ['Mod+Alt+S']),
+  C('song.versions', 'Version history', 'Song', []),
   C('song.newTrack', 'New track', 'Song', ['Mod+Alt+N']),
   C('track.prev', 'Select track above', 'Song', ['ArrowUp'], ['tracks']),
   C('track.next', 'Select track below', 'Song', ['ArrowDown'], ['tracks']),

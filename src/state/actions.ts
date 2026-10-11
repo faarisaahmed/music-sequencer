@@ -10,6 +10,7 @@ import { getEngine } from '../audio/engine';
 import { parseMidiFile } from '../audio/export';
 import { commit, draftRegion, findRegion, pruneSelection, toast, useStore } from './store';
 import { deleteProject, flushSave, loadProject, markSaved, saveProject, projectAudioIds } from './persistence';
+import { onProjectOpened } from './safety';
 
 // ------------------------------------------------------------------ projects
 
@@ -29,6 +30,7 @@ export async function openProject(p: Project): Promise<void> {
     cursor: 0,
     dockTab: null,
   });
+  onProjectOpened(p);
   await getEngine().loadProjectAudio(p);
 }
 
@@ -731,12 +733,33 @@ export async function exportProjectFile(p: Project): Promise<Blob> {
 export async function importProjectFile(file: File): Promise<void> {
   try {
     const json = JSON.parse(await file.text());
-    if (json.format !== 'bandforge') throw new Error('not a project');
+    if (json.format !== 'bandforge' && json.format !== 'bandforge-backup') throw new Error('not a project');
     for (const [id, a] of Object.entries(json.audio ?? {}) as [string, { name: string; type: string; data: string }][]) {
       const bin = atob(a.data);
       const bytes = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
       await addClip(id, new Blob([bytes], { type: a.type }), a.name);
+    }
+    if (json.format === 'bandforge-backup') {
+      // A "Back Up All Songs" file: bring back every song that isn't already here unchanged.
+      let added = 0;
+      let same = 0;
+      for (const raw of json.projects as Project[]) {
+        const here = await loadProject(raw.id);
+        if (here && here.updatedAt >= raw.updatedAt) {
+          same++;
+          continue;
+        }
+        const p = migrate(raw);
+        if (here) {
+          p.id = uid('p');
+          p.name = `${p.name} (from backup)`;
+        }
+        await saveProject(p);
+        added++;
+      }
+      toast(added ? `Restored ${added} song${added === 1 ? '' : 's'}${same ? ` (${same} already up to date)` : ''}` : 'All songs in the backup are already here', 'success');
+      return;
     }
     const p = migrate(json.project as Project);
     p.id = uid('p');

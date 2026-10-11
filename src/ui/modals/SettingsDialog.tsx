@@ -12,6 +12,7 @@ import { getAudioContext } from '../../audio/context';
 import InputSetup from '../instruments/InputSetup';
 import { NumberField, Toggle } from '../common/controls';
 import Modal from './Modal';
+import { SafetySettings } from './SafetyPanels';
 import '../mixer/mixer.css';
 
 const TIME_SIGS: [number, number][] = [
@@ -172,6 +173,8 @@ export default function SettingsDialog() {
           <Keyboard size={14} /> Edit Shortcuts…
         </button>
       </div>
+      <div className="form-section">Keep Songs Safe</div>
+      <SafetySettings />
       <div className="form-section">YouTube Publishing (developers)</div>
       <div className="form-grid">
         <span className="label">Own client ID</span>
