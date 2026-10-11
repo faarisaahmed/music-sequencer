@@ -132,7 +132,8 @@ const inView = async (page, sel) => { const b = await page.locator(sel).first().
 
   // Dialogs open as full-width sheets.
   await S(page, () => window.__bf.store.openModal('export'));
-  await page.waitForTimeout(400);
+  await page.waitForSelector('.modal');
+  await page.waitForTimeout(600); // slide-up animation
   const mb = await page.locator('.modal').boundingBox();
   check('dialogIsSheet', Math.abs(mb.width - page.viewportSize().width) < 2 && Math.abs(mb.y + mb.height - page.viewportSize().height) < 2, mb);
   await S(page, () => window.__bf.store.closeModal());

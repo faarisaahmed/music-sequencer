@@ -1,10 +1,9 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { openModal, useStore } from './state/store';
 import { importMidiFile, importProjectFile } from './state/actions';
 import { startAutosave } from './state/persistence';
 import { startSafety } from './state/safety';
 import HomeScreen from './ui/home/HomeScreen';
-import ProjectScreen from './ui/ProjectScreen';
 import { MenuHost } from './ui/common/menus';
 import Toasts from './ui/common/Toasts';
 import Tooltips from './ui/keys/Tooltips';
@@ -16,6 +15,18 @@ import { ChatPanel, JamStatusPill } from './ui/collab/CollabUI';
 import { handleJamLinkOnStartup } from './ui/collab/jamLinks';
 import { useCollab } from './collab/state';
 
+// The studio loads in the background while Home is showing, so opening a song is instant.
+const loadProject = () => import('./ui/ProjectScreen');
+const ProjectScreen = lazy(loadProject);
+
+function StudioLoading() {
+  return (
+    <div className="studio-loading">
+      <div className="studio-loading-bar" />
+    </div>
+  );
+}
+
 let autosaveStarted = false;
 
 export default function App() {
@@ -25,6 +36,8 @@ export default function App() {
       autosaveStarted = true;
       startAutosave();
       startSafety();
+      const idle = (window as unknown as { requestIdleCallback?: (f: () => void) => void }).requestIdleCallback ?? ((f: () => void) => setTimeout(f, 300));
+      idle(() => void loadProject());
       // Home-screen shortcut "New Song".
       if (new URLSearchParams(location.search).get('new') === '1') {
         history.replaceState(null, '', location.pathname + location.hash);
@@ -58,7 +71,13 @@ export default function App() {
   }, []);
   return (
     <>
-      {screen === 'home' ? <HomeScreen /> : <ProjectScreen />}
+      {screen === 'home' ? (
+        <HomeScreen />
+      ) : (
+        <Suspense fallback={<StudioLoading />}>
+          <ProjectScreen />
+        </Suspense>
+      )}
       <ModalHost />
       <MenuHost />
       <Tour />

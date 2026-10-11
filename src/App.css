@@ -756,3 +756,24 @@
 .lcd-big.lcd-off {
   color: #7f8aa0;
 }
+
+.studio-loading {
+  height: 100dvh;
+  background: var(--bg);
+  position: relative;
+  overflow: hidden;
+}
+.studio-loading-bar {
+  position: absolute;
+  top: 0;
+  left: -40%;
+  width: 40%;
+  height: 3px;
+  background: var(--accent);
+  animation: studio-load 1s ease-in-out infinite;
+}
+@keyframes studio-load {
+  to {
+    left: 100%;
+  }
+}

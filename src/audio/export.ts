@@ -68,19 +68,26 @@ export async function renderProject(p: Project, opts: RenderOptions = {}): Promi
       fresh = true;
     }
   };
-  scheduleUntil(CHUNK * 2);
-  const chunks = Math.floor(seconds / CHUNK);
-  for (let k = 1; k <= chunks; k++) {
-    const t = k * CHUNK;
-    if (t >= seconds) break;
-    oc.suspend(t).then(() => {
-      scheduleUntil(t + CHUNK * 2);
-      opts.onProgress?.(Math.min(1, t / seconds));
-      void oc.resume();
-    });
-  }
+  // Firefox can't pause an offline render, so it gets everything scheduled up front.
+  const canPause = typeof (oc as OfflineAudioContext & { suspend?: unknown }).suspend === 'function';
+  const chunks = canPause ? Math.floor(seconds / CHUNK) : 0;
   if (chunks < 1) scheduleUntil(Infinity);
-  const out = await oc.startRendering();
+  else {
+    scheduleUntil(CHUNK * 2);
+    for (let k = 1; k <= chunks; k++) {
+      const t = k * CHUNK;
+      if (t >= seconds) break;
+      oc.suspend(t).then(() => {
+        scheduleUntil(t + CHUNK * 2);
+        opts.onProgress?.(Math.min(1, t / seconds));
+        void oc.resume();
+      });
+    }
+  }
+  // Without pausing there are no progress steps: report from the render's own clock instead.
+  let ticker: ReturnType<typeof setInterval> | null = null;
+  if (!canPause && opts.onProgress) ticker = setInterval(() => opts.onProgress!(Math.min(0.99, oc.currentTime / seconds)), 200);
+  const out = await oc.startRendering().finally(() => ticker && clearInterval(ticker));
   // Fade the tail gently to avoid a cut-off.
   const fadeLen = Math.floor(sr * Math.min(tail, 1));
   for (let c = 0; c < out.numberOfChannels; c++) {

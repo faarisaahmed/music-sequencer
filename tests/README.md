@@ -24,6 +24,8 @@ node tests/tempo-meter.mjs <chromium-executable> http://localhost:5391/ /tmp   #
 node tests/repeats.mjs <chromium-executable> http://localhost:5391/ /tmp       # repeat/ending/D.S./D.C. order, engine jumps, export, MIDI, score, MusicXML
 node tests/parts.mjs <chromium-executable> http://localhost:5391/ /tmp         # print parts: transposed, multi-bar rests, full score, paper, MusicXML per part, ⌘P
 node tests/review.mjs <chromium-executable> http://localhost:5391/ /tmp        # writing check: range, rubs, chord clashes, parallels, marks in the score
+node tests/browser-smoke.mjs firefox   # real Firefox: studio, score, render, all export formats, video, MIDI, versions, timeline
+node tests/browser-smoke.mjs safari    # real Safari (run `sudo safaridriver --enable` once and allow Remote Automation)
 node tests/jam-qa-long.mjs <chromium-executable> http://localhost:5391/ 300   # frozen tab, recording, big join, soak
 ```
 

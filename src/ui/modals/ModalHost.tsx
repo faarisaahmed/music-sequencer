@@ -1,36 +1,28 @@
-import { useStore } from '../../state/store';
-import NewTrackDialog from './NewTrackDialog';
-import ExportDialog from './ExportDialog';
-import SettingsDialog from './SettingsDialog';
-import HelpDialog from './HelpDialog';
-import TemplatesDialog from '../home/TemplatesDialog';
-import { CollabDialog, JoinDialog } from '../collab/CollabUI';
 import { lazy, Suspense } from 'react';
-import VersionsDialog from './VersionsDialog';
+import { useStore } from '../../state/store';
 
+// Dialogs load when first opened.
+const NewTrackDialog = lazy(() => import('./NewTrackDialog'));
+const ExportDialog = lazy(() => import('./ExportDialog'));
+const SettingsDialog = lazy(() => import('./SettingsDialog'));
+const HelpDialog = lazy(() => import('./HelpDialog'));
+const TemplatesDialog = lazy(() => import('../home/TemplatesDialog'));
+const CollabDialog = lazy(() => import('../collab/CollabUI').then((m) => ({ default: m.CollabDialog })));
+const JoinDialog = lazy(() => import('../collab/CollabUI').then((m) => ({ default: m.JoinDialog })));
+const VersionsDialog = lazy(() => import('./VersionsDialog'));
 const YouTubeDialog = lazy(() => import('./YouTubeDialog'));
 const PartsDialog = lazy(() => import('../editors/score/PartsDialog'));
 
-export default function ModalHost() {
-  const modal = useStore((s) => s.modal);
-  if (!modal) return null;
-  switch (modal.kind) {
+function Body({ kind }: { kind: string }) {
+  switch (kind) {
     case 'newTrack':
       return <NewTrackDialog />;
     case 'export':
       return <ExportDialog />;
     case 'youtube':
-      return (
-        <Suspense fallback={null}>
-          <YouTubeDialog />
-        </Suspense>
-      );
+      return <YouTubeDialog />;
     case 'parts':
-      return (
-        <Suspense fallback={null}>
-          <PartsDialog />
-        </Suspense>
-      );
+      return <PartsDialog />;
     case 'versions':
       return <VersionsDialog />;
     case 'settings':
@@ -46,4 +38,14 @@ export default function ModalHost() {
     default:
       return null;
   }
+}
+
+export default function ModalHost() {
+  const modal = useStore((s) => s.modal);
+  if (!modal) return null;
+  return (
+    <Suspense fallback={null}>
+      <Body kind={modal.kind} />
+    </Suspense>
+  );
 }
