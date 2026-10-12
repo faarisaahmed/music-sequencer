@@ -2,7 +2,7 @@
 // rack (per-row mute/solo/volume/pan/tune and your own sounds), linked patterns,
 // pattern-only loop playback and swing. Step / Velocity / Note Repeat / Chance /
 // Loop Length editing modes.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AudioLines, Shuffle, ChevronLeft, ChevronRight, ChevronsRight, CopyPlus, Eraser, Link2, MoreHorizontal, Play, Plus, Square, Unlink } from 'lucide-react';
 import type { Draft } from 'immer';
@@ -18,6 +18,7 @@ import { grooveFor, grooveLabel } from '../../model/groove';
 import GroovePanel from '../groove/GroovePanel';
 import { addClip } from '../../audio/audioStore';
 import { Knob } from '../common/controls';
+import { useElementSize } from '../common/useElementSize';
 import { getEngine } from '../../audio/engine';
 import { showContextMenu, type MenuItem } from '../common/menus';
 import { clamp, isTyping } from '../common/drag';
@@ -112,10 +113,10 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
   const [extra, setExtraState] = useState<number[]>(mem.extra);
   const [hidden, setHiddenState] = useState<number[]>(mem.hidden);
   const slot = useToolbarSlot();
-  const [size, setSize] = useState({ w: 900, h: 300 });
   const [page, setPage] = useState(0);
   const [follow, setFollow] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const size = useElementSize(scrollRef, [], { w: 900, h: 300 });
   useTwoFingerPan(scrollRef);
   const dragRef = useRef<{ paintOn: boolean; visited: Set<string> } | null>(null);
 
@@ -127,14 +128,6 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
     setHiddenState(v);
     laneMemory.set(trackId, { extra, hidden: v });
   };
-
-  useLayoutEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
 
   const region = found?.region.kind === 'midi' ? found.region : null;
   const track = found?.track;

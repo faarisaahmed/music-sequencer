@@ -14,6 +14,7 @@ import { getAudioContext } from '../../audio/context';
 import { getEngine } from '../../audio/engine';
 import { HSlider } from '../common/controls';
 import { clamp, startDrag } from '../common/drag';
+import { useElementSize } from '../common/useElementSize';
 import './pianoroll.css';
 
 const PEAK_BINS = 6000;
@@ -34,23 +35,15 @@ export default function AudioEditor({ trackId, regionId }: { trackId: string; re
   const project = useStore((s) => s.project)!;
   const [audioVer, setAudioVer] = useState(0);
   const [ppb, setPpb] = useState(40);
-  const [size, setSize] = useState({ w: 0, h: 0 });
   const [scrollX, setScrollX] = useState(0);
   const [slot, setSlot] = useState<HTMLElement | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const size = useElementSize(scrollRef);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const didFit = useRef(false);
 
   useEffect(() => onAudioChange(() => setAudioVer((v) => v + 1)), []);
   useLayoutEffect(() => setSlot(document.getElementById('editor-toolbar-slot')), []);
-  useLayoutEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }));
-    ro.observe(el);
-    setSize({ w: el.clientWidth, h: el.clientHeight });
-    return () => ro.disconnect();
-  }, []);
 
   // The clip plays in real time from where its content starts; convert through the song's tempo.
   const tm = tempoOf(project);

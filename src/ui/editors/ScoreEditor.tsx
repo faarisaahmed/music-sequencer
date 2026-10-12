@@ -12,6 +12,7 @@ import { showContextMenu } from '../common/menus';
 import { getEngine } from '../../audio/engine';
 import { download, safeFileName } from '../../audio/export';
 import { isTyping, startDrag } from '../common/drag';
+import { useElementSize } from '../common/useElementSize';
 import { comboOf, isKey } from '../keys/keymap';
 import {
   diatonicShift,
@@ -115,9 +116,6 @@ interface TextEntry {
   t?: number; // display beat (chords)
 }
 
-/** Last measured score width, so re-opened editors lay out once at the right size. */
-let lastScoreWidth: number | null = null;
-
 export default function ScoreEditor({ regionId, full = false }: { trackId?: string; regionId?: string; full?: boolean }) {
   const project = useStore((s) => s.project)!;
   const selectedIds = useStore((s) => s.selectedNoteIds);
@@ -140,7 +138,6 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
   /** A selected rest (Flat-style): staff, voice and the beat it starts on. */
   const [restSel, setRestSel] = useState<{ gi: number; voice: 1 | 2; t: number } | null>(full ? null : { gi: 0, voice: 1, t: 0 });
   const [overNote, setOverNote] = useState(false);
-  const [width, setWidth] = useState<number | null>(lastScoreWidth);
   // Systems are drawn into the (mutable) layout outside React; this tiny store re-renders the overlays.
   const drawnStore = useMemo(() => {
     let version = 0;
@@ -166,22 +163,13 @@ export default function ScoreEditor({ regionId, full = false }: { trackId?: stri
     entryRef.current = entry;
   }, [entry]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollW = useElementSize(scrollRef).w;
+  const width = scrollW ? Math.max(500, scrollW - 48) : null;
   const svgRef = useRef<HTMLDivElement>(null);
   const lastInsert = useRef<{ t: number; dur: number; pitch: number; staff: number } | null>(null);
 
   const effDur = dur * (dotted ? 1.5 : 1) * (triplet ? 2 / 3 : 1);
   const velocity = DYNAMICS.find((d) => d.mark === dyn)?.vel ?? 0.64;
-
-  useLayoutEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => {
-      lastScoreWidth = Math.max(500, el.clientWidth - 48);
-      setWidth(lastScoreWidth);
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
 
   const src = useMemo(() => buildSource(project, full, regionId, grid, clefMode, concert), [project, full, regionId, grid, clefMode, concert]);
   const model = src?.model ?? null;

@@ -1,9 +1,10 @@
 // Realistic on-screen piano keyboard with glissando / scroll dragging.
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { noteName } from '../../model/music';
 import { getEngine } from '../../audio/engine';
 import { useStore } from '../../state/store';
 import { press, release, velocityFromY } from './player';
+import { useElementSize } from '../common/useElementSize';
 
 const WHITE_PCS = [0, 2, 4, 5, 7, 9, 11];
 const HAS_BLACK_AFTER = new Set([0, 2, 5, 7, 9]);
@@ -42,18 +43,9 @@ export interface KeyboardProps {
 
 export default function Keyboard({ start, whiteWidth, mode, legend, dimOutside, onScrollOctaves, range }: KeyboardProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(1000);
+  const width = useElementSize(ref, [], { w: 1000, h: 0 }).w;
   const trackId = useStore((s) => s.selectedTrackId);
   const lit = useLiveNotes(trackId);
-
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => setWidth(el.clientWidth));
-    ro.observe(el);
-    setWidth(el.clientWidth);
-    return () => ro.disconnect();
-  }, []);
 
   const nWhite = Math.max(7, Math.ceil(width / whiteWidth));
   const whites: number[] = [];

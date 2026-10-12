@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Plus, ZoomIn, ZoomOut, Maximize, Magnet, Crown, LayoutList, Gauge } from 'lucide-react';
 import { beginGesture, commit, endGesture, live, openModal, useStore, useTransport } from '../../state/store';
 import { GRID_OPTIONS, snap } from '../../model/music';
@@ -14,6 +14,7 @@ import ChordLane, { ChordToggleButton } from '../assistant/ChordLane';
 import { HEADER_W, RULER_H, useTracksUi } from './tracksUi';
 import { meterOf, type Meter } from '../../model/timeline';
 import { useTwoFingerPan } from '../mobile/touchPan';
+import { useElementSize } from '../common/useElementSize';
 import { shortcutLabel } from '../keys/keymap';
 import './tracks.css';
 import { PeerPlayheads } from '../collab/presence';
@@ -289,22 +290,13 @@ export default function TracksView() {
   const snapLine = useTracksUi((s) => s.snapLine);
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const viewW = useElementSize(scrollRef, [], { w: 1200, h: 0 }).w;
   useTwoFingerPan(scrollRef, { wheelPerLn: 100 });
-  const [viewW, setViewW] = useState(1200);
   useArmedMic(project.tracks);
 
   const meter = meterOf(project);
   const songBars = Math.max(project.lengthBars, Math.ceil(meter.barPos(contentEndBeat(project)) - 1e-6) + 4);
   const width = Math.max(viewW - HEADER_W, meter.barStart(songBars + 8) * ppb);
-
-  useLayoutEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => setViewW(el.clientWidth));
-    ro.observe(el);
-    setViewW(el.clientWidth);
-    return () => ro.disconnect();
-  }, []);
 
   // Ctrl/⌘ + wheel zooms around the mouse.
   useEffect(() => {

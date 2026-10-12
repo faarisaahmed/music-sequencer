@@ -5,6 +5,7 @@ import { useFlaggedNotes } from '../assistant/ReviewPanel';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTwoFingerPan } from '../mobile/touchPan';
+import { useElementSize } from '../common/useElementSize';
 import { MousePointer2, Pencil, ZoomIn, ZoomOut, Music, BarChart3, Repeat, Magnet, Waves, Shuffle } from 'lucide-react';
 import { grooveLabel } from '../../model/groove';
 import GroovePanel from '../groove/GroovePanel';
@@ -101,13 +102,13 @@ function PianoRollInner({ region, track, meter, bpb, selectedIds }: { region: Mi
   const [velLane, setVelLane] = useState(true);
   const [velH, setVelH] = useState(64);
   const [scroll, setScroll] = useState({ x: 0, y: 0 });
-  const [size, setSize] = useState({ w: 0, h: 0 });
   const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const [held, setHeld] = useState<Set<number>>(new Set());
   const [velPop, setVelPop] = useState<{ x: number; y: number } | null>(null);
   const [slot, setSlot] = useState<HTMLElement | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const size = useElementSize(scrollRef, [velLane]);
   useTwoFingerPan(scrollRef, { wheelPerLn: 1 / Math.log(1.0018) });
   const gridCanvas = useRef<HTMLCanvasElement>(null);
   const keysCanvas = useRef<HTMLCanvasElement>(null);
@@ -124,16 +125,6 @@ function PianoRollInner({ region, track, meter, bpb, selectedIds }: { region: Mi
   const songBase = region.start - region.offset; // absolute beat of content beat 0
 
   useLayoutEffect(() => setSlot(document.getElementById('editor-toolbar-slot')), []);
-
-  // Resize tracking
-  useLayoutEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }));
-    ro.observe(el);
-    setSize({ w: el.clientWidth, h: el.clientHeight });
-    return () => ro.disconnect();
-  }, [velLane]);
 
   // Initial zoom & scroll to the notes.
   useLayoutEffect(() => {
