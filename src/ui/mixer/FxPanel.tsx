@@ -28,13 +28,13 @@ interface FxCardDef {
   wide?: boolean;
 }
 const CARDS: FxCardDef[] = [
-  { id: 'eq', name: 'Channel EQ', color: '#ffd60a', keys: ['eqLow', 'eqMid', 'eqHigh'], wide: true },
-  { id: 'filter', name: 'Filter', color: '#ff9f0a', keys: ['filterCutoff'] },
-  { id: 'comp', name: 'Compressor', color: '#bf5af2', keys: ['compressor'] },
-  { id: 'drive', name: 'Amp Drive', color: '#ff453a', keys: ['drive'] },
-  { id: 'chorus', name: 'Chorus', color: '#64d2ff', keys: ['chorus'] },
-  { id: 'reverb', name: 'Reverb', color: '#32d0e6', keys: ['reverb'] },
-  { id: 'delay', name: 'Echo / Delay', color: '#30d158', keys: ['delay'] },
+  { id: 'eq', name: 'Channel EQ', color: '#e3c35a', keys: ['eqLow', 'eqMid', 'eqHigh'], wide: true },
+  { id: 'filter', name: 'Filter', color: '#e08a3c', keys: ['filterCutoff'] },
+  { id: 'comp', name: 'Compressor', color: '#a88cc2', keys: ['compressor'] },
+  { id: 'drive', name: 'Amp Drive', color: '#d9533b', keys: ['drive'] },
+  { id: 'chorus', name: 'Chorus', color: '#7fb8c4', keys: ['chorus'] },
+  { id: 'reverb', name: 'Reverb', color: '#6fb3b8', keys: ['reverb'] },
+  { id: 'delay', name: 'Echo / Delay', color: '#8fb573', keys: ['delay'] },
 ];
 
 const FX_PRESETS: Record<string, Partial<Record<FxKey, number>>> = {
@@ -81,12 +81,12 @@ function EqCurve({ fx, color }: { fx: TrackFx; color: string }) {
     pts.push(`${(i / 60) * w},${h / 2 - (d / 18) * (h / 2 - 4)}`);
   }
   return (
-    <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ background: '#16161a', borderRadius: 6 }}>
+    <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ background: '#1a1714', borderRadius: 6 }}>
       {[100, 1000, 10000].map((f) => {
         const x = (Math.log10(f / 20) / 3) * w;
-        return <line key={f} x1={x} x2={x} y1={0} y2={h} stroke="#2a2a30" />;
+        return <line key={f} x1={x} x2={x} y1={0} y2={h} stroke="#302c26" />;
       })}
-      <line x1={0} x2={w} y1={h / 2} y2={h / 2} stroke="#33333a" />
+      <line x1={0} x2={w} y1={h / 2} y2={h / 2} stroke="#3a352e" />
       <polygon points={`0,${h / 2} ${pts.join(' ')} ${w},${h / 2}`} fill={color} opacity={0.15} />
       <polyline points={pts.join(' ')} fill="none" stroke={color} strokeWidth={2} />
     </svg>
@@ -119,7 +119,7 @@ function FxCard({ def, t }: { def: FxCardDef; t: Track }) {
   return (
     <div className={'fx-card' + (on ? '' : ' off') + (def.wide ? ' fx-wide' : '')}>
       <div className="fx-card-head">
-        <span className="dot" style={{ background: on ? def.color : '#55555c' }} />
+        <span className="dot" style={{ background: on ? def.color : '#5e574b' }} />
         {def.name}
         <div className="spacer" />
         <button className={'btn sm icon' + (on ? ' active' : ' ghost')} title={on ? 'Bypass' : 'Enable'} onClick={toggle}>
@@ -160,7 +160,7 @@ function SamplerSource({ t }: { t: Track }) {
   return (
     <div className="col" style={{ gap: 8 }}>
       <div className="label">Sample</div>
-      <div style={{ height: 54, background: '#141418', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 1, padding: '0 6px' }}>
+      <div style={{ height: 54, background: '#181512', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 1, padding: '0 6px' }}>
         {peaks ? (
           Array.from({ length: 120 }, (_, i) => {
             const v = Math.max(Math.abs(peaks[i * 2]), Math.abs(peaks[i * 2 + 1]));
@@ -318,7 +318,7 @@ export default function FxPanel() {
           <span className="dim" style={{ width: 62, fontSize: 12 }}>
             Pan
           </span>
-          <HSlider value={(t.pan + 1) / 2} min={0} max={1} defaultValue={0.5} width="100%" color="#8e8e93" onChange={(v) => setT((x) => void (x.pan = v * 2 - 1))} />
+          <HSlider value={(t.pan + 1) / 2} min={0} max={1} defaultValue={0.5} width="100%" color="#99907c" onChange={(v) => setT((x) => void (x.pan = v * 2 - 1))} />
           <span className="mono faint" style={{ fontSize: 11, width: 52, textAlign: 'right' }}>
             {Math.abs(t.pan) < 0.02 ? 'C' : t.pan < 0 ? `L${Math.round(-t.pan * 50)}` : `R${Math.round(t.pan * 50)}`}
           </span>

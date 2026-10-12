@@ -11,11 +11,11 @@ export function drumFamily(pitch: number): DrumFamily {
 }
 
 export const FAMILY_COLOR: Record<DrumFamily, string> = {
-  kick: '#ec3fb0',
-  snare: '#f5a524',
-  hat: '#2fd3e0',
-  tom: '#34d058',
-  perc: '#a970ff',
+  kick: '#c9607a',
+  snare: '#e08a3c',
+  hat: '#6fb3b8',
+  tom: '#8fb573',
+  perc: '#a88cc2',
 };
 
 export function drumColor(pitch: number): string {

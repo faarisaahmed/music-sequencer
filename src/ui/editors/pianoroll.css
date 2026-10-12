@@ -3,7 +3,7 @@
   inset: 0;
   display: flex;
   flex-direction: column;
-  background: #1a1a1e;
+  background: #1e1b18;
   overflow: hidden;
 }
 .pr-toolbar {
@@ -38,9 +38,9 @@
 .pr-corner {
   width: 70px;
   flex-shrink: 0;
-  background: #1e1e23;
-  border-right: 1px solid #0c0c0e;
-  border-bottom: 1px solid #0c0c0e;
+  background: #23201b;
+  border-right: 1px solid #0e0d0b;
+  border-bottom: 1px solid #0e0d0b;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -108,7 +108,7 @@
   flex-shrink: 0;
   display: flex;
   position: relative;
-  border-top: 1px solid #0c0c0e;
+  border-top: 1px solid #0e0d0b;
 }
 .pr-vel-resize {
   position: absolute;
@@ -122,8 +122,8 @@
 .pr-vel-label {
   width: 70px;
   flex-shrink: 0;
-  background: #1e1e23;
-  border-right: 1px solid #0c0c0e;
+  background: #23201b;
+  border-right: 1px solid #0e0d0b;
   font-size: 10px;
   color: var(--text-faint);
   text-transform: uppercase;
@@ -142,9 +142,9 @@
 .pr-velpop {
   position: fixed;
   z-index: 1001;
-  background: rgba(30, 30, 34, 0.98);
+  background: rgba(34, 31, 27, 0.98);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 5px;
   box-shadow: var(--shadow);
   padding: 10px 12px;
 }
@@ -155,7 +155,7 @@
   inset: 0;
   display: flex;
   flex-direction: column;
-  background: #1a1a1e;
+  background: #1e1b18;
 }
 .ae-toolbar {
   display: flex;

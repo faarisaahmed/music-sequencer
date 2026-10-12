@@ -74,12 +74,12 @@ export function Knob({ value, min, max, onChange, label, size = 40, color = 'var
       }}
     >
       <svg width={size} height={size}>
-        <circle cx={cx} cy={cy} r={r - 2} fill="#18181c" stroke="#0b0b0d" strokeWidth={1} />
-        <path d={arc(a0, a1)} stroke="#3a3a42" strokeWidth={3} fill="none" strokeLinecap="round" />
+        <circle cx={cx} cy={cy} r={r - 2} fill="#1c1916" stroke="#0d0c0a" strokeWidth={1} />
+        <path d={arc(a0, a1)} stroke="#413d34" strokeWidth={3} fill="none" strokeLinecap="round" />
         {Math.abs(ang - startAng) > 0.5 && (
           <path d={arc(Math.min(startAng, ang), Math.max(startAng, ang))} stroke={color} strokeWidth={3} fill="none" strokeLinecap="round" />
         )}
-        <line x1={cx} y1={cy} x2={px} y2={py} stroke="#f0f0f4" strokeWidth={2} strokeLinecap="round" />
+        <line x1={cx} y1={cy} x2={px} y2={py} stroke="#f1e9d7" strokeWidth={2} strokeLinecap="round" />
       </svg>
       {label && <div className="knob-label">{label}</div>}
       {format && <div className="knob-value">{format(value)}</div>}
@@ -158,7 +158,7 @@ export function VFader({ value, min = 0, max = 1.25, onChange, height = 160, def
         );
       }}
     >
-      <div style={{ position: 'absolute', left: 11, width: 4, top: 0, bottom: 0, background: '#0b0b0d', borderRadius: 2 }} />
+      <div style={{ position: 'absolute', left: 11, width: 4, top: 0, bottom: 0, background: '#0d0c0a', borderRadius: 2 }} />
       <div
         style={{
           position: 'absolute',
@@ -167,7 +167,7 @@ export function VFader({ value, min = 0, max = 1.25, onChange, height = 160, def
           height: 34,
           bottom: `calc(${norm * 100}% - 17px)`,
           borderRadius: 4,
-          background: 'linear-gradient(#5b5b63, #3a3a41 45%, #1e1e22 50%, #3a3a41 55%, #55555d)',
+          background: 'linear-gradient(#645e51, #413c34 45%, #221f1b 50%, #413c34 55%, #5e584b)',
           boxShadow: '0 2px 5px rgba(0,0,0,0.6)',
         }}
       />

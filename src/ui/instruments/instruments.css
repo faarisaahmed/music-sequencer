@@ -3,7 +3,7 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #1a1a1d;
+  background: #1e1b17;
   min-height: 0;
 }
 .kp-bar {
@@ -11,8 +11,8 @@
   align-items: center;
   gap: 8px;
   padding: 7px 10px;
-  background: linear-gradient(#2a2a2f, #232328);
-  border-bottom: 1px solid #0e0e10;
+  background: linear-gradient(#2f2c26, #282520);
+  border-bottom: 1px solid #110f0d;
   flex-shrink: 0;
   flex-wrap: wrap;
 }
@@ -31,18 +31,18 @@
 }
 .btn.kp-btn {
   height: 32px;
-  background: #18181b;
-  border: 1px solid #3a3a41;
+  background: #1c1916;
+  border: 1px solid #413c34;
 }
 .btn.kp-btn:hover {
-  background: #2a2a30;
+  background: #302c26;
 }
 .btn.kp-btn.icon {
   width: 34px;
 }
 .btn.kp-btn.active {
-  background: rgba(47, 140, 255, 0.2);
-  border-color: rgba(47, 140, 255, 0.5);
+  background: rgba(232, 163, 61, 0.2);
+  border-color: rgba(232, 163, 61, 0.5);
   color: var(--accent-2);
 }
 .kp-oct {
@@ -68,7 +68,7 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #3b3b40;
+  background: #413d34;
   display: inline-block;
 }
 .on > .kp-led,
@@ -78,8 +78,8 @@
 }
 .btn.kp-picker {
   height: 32px;
-  background: #18181b;
-  border: 1px solid #3a3a41;
+  background: #1c1916;
+  border: 1px solid #413c34;
   max-width: 220px;
 }
 .kp-picker-name {
@@ -92,7 +92,7 @@
   min-height: 90px;
   position: relative;
   padding: 0 0 4px;
-  background: #0d0d0f;
+  background: #0f0e0c;
   box-shadow: inset 0 6px 8px -4px rgba(0, 0, 0, 0.9);
 }
 
@@ -109,10 +109,10 @@
   top: 0;
   bottom: 0;
   border-radius: 0 0 6px 6px;
-  background: linear-gradient(#e9e9eb 0%, #fbfbfb 18%, #f2f2f2 85%, #d9d9dc 100%);
-  border-left: 1px solid #9c9ca2;
-  border-right: 1px solid #c7c7cc;
-  box-shadow: inset 0 -6px 0 #d0d0d4, 0 2px 2px rgba(0, 0, 0, 0.5);
+  background: linear-gradient(#eae1d0 0%, #fbf2df 18%, #f2ead7 85%, #dad2c2 100%);
+  border-left: 1px solid #a89e88;
+  border-right: 1px solid #c9c2b3;
+  box-shadow: inset 0 -6px 0 #d1caba, 0 2px 2px rgba(0, 0, 0, 0.5);
   transition: background 0.05s;
 }
 .kb-white.down {
@@ -120,7 +120,7 @@
   box-shadow: inset 0 -2px 0 #b9c2d1, inset 0 4px 6px rgba(0, 0, 0, 0.15);
 }
 .kb-white.off-scale {
-  background: linear-gradient(#b9b9bd, #c9c9cd 80%, #b0b0b4);
+  background: linear-gradient(#c7baa0, #cac3b4 80%, #bdb199);
 }
 .kb-white.oor::before {
   content: '';
@@ -135,15 +135,15 @@
   height: 60%;
   z-index: 2;
   border-radius: 0 0 4px 4px;
-  background: linear-gradient(90deg, #111 0%, #2f2f33 18%, #1a1a1d 50%, #2b2b2f 82%, #0c0c0d 100%);
-  box-shadow: inset 0 -8px 0 #3b3b40, inset 0 -9px 0 #0a0a0b, 0 3px 4px rgba(0, 0, 0, 0.6);
+  background: linear-gradient(90deg, #111 0%, #34302a 18%, #1e1b17 50%, #302c26 82%, #0e0c0b 100%);
+  box-shadow: inset 0 -8px 0 #413d34, inset 0 -9px 0 #0c0a09, 0 3px 4px rgba(0, 0, 0, 0.6);
 }
 .kb-black.down {
   background: linear-gradient(90deg, #1b2533, #34465e 30%, #26364b 70%, #1a2330);
-  box-shadow: inset 0 -3px 0 #3b3b40, 0 1px 2px rgba(0, 0, 0, 0.6);
+  box-shadow: inset 0 -3px 0 #413d34, 0 1px 2px rgba(0, 0, 0, 0.6);
 }
 .kb-black.off-scale {
-  background: linear-gradient(90deg, #3a3a3e, #505055 50%, #3a3a3e);
+  background: linear-gradient(90deg, #403b33, #585246 50%, #403b33);
 }
 .kb-label {
   position: absolute;
@@ -151,7 +151,7 @@
   bottom: 12px;
   font-size: 12px;
   font-weight: 600;
-  color: #9b9ba3;
+  color: #a89e88;
   pointer-events: none;
 }
 .kb-legend {
@@ -168,7 +168,7 @@
 }
 .kb-black .kb-legend {
   bottom: 14px;
-  color: #8ec1ff;
+  color: #f5cf8e;
 }
 
 /* ---------------------------------------------------------- chord strips */
@@ -179,17 +179,17 @@
   height: 46%;
   min-height: 120px;
   flex-shrink: 0;
-  background: #141416;
-  border-bottom: 1px solid #0b0b0d;
+  background: #171512;
+  border-bottom: 1px solid #0d0c0a;
 }
 .chord-strip {
   flex: 1;
   display: flex;
   flex-direction: column;
-  border-radius: 8px;
+  border-radius: 4px;
   overflow: hidden;
-  background: #2b2b31;
-  border: 1px solid #3a3a42;
+  background: #312d27;
+  border: 1px solid #413d34;
   cursor: pointer;
   touch-action: none;
   position: relative;
@@ -214,13 +214,13 @@
   background: rgba(255, 255, 255, 0.04);
 }
 .chord-zone.bass {
-  background: #222227;
+  background: #27241f;
 }
 .chord-zone.first-bass {
   border-top: 2px solid #111;
 }
 .chord-zone.on {
-  background: linear-gradient(#5aa8ff, #2f8cff);
+  background: linear-gradient(#f2bd68, #e8a33d);
 }
 
 /* ---------------------------------------------------------- drum pads */
@@ -231,7 +231,7 @@
   align-items: center;
   justify-content: center;
   padding: 12px;
-  background: #121214;
+  background: #151310;
 }
 .pads {
   height: 100%;
@@ -244,8 +244,8 @@
 }
 .pad {
   position: relative;
-  border-radius: 10px;
-  background: linear-gradient(160deg, color-mix(in srgb, var(--c) 22%, #2a2a30), color-mix(in srgb, var(--c) 10%, #1c1c20));
+  border-radius: 5px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--c) 22%, #302c26), color-mix(in srgb, var(--c) 10%, #201d19));
   border: 1px solid color-mix(in srgb, var(--c) 30%, #333);
   display: flex;
   flex-direction: column;
@@ -311,7 +311,7 @@
 .aip-mic {
   width: 64px;
   height: 64px;
-  border-radius: 16px;
+  border-radius: 6px;
   background: var(--panel-2);
   display: flex;
   align-items: center;
@@ -331,7 +331,7 @@
 .aip-tips {
   width: 320px;
   background: var(--panel-2);
-  border-radius: 12px;
+  border-radius: 6px;
   padding: 14px 16px;
   font-size: 12.5px;
   color: var(--text-dim);
@@ -348,18 +348,18 @@
   position: relative;
   width: 160px;
   height: 10px;
-  border-radius: 5px;
-  background: #0b0b0d;
+  border-radius: 3px;
+  background: #0d0c0a;
   overflow: hidden;
 }
 .lvl.wide {
   width: 420px;
   height: 16px;
-  border-radius: 6px;
+  border-radius: 3px;
 }
 .lvl-fill {
   height: 100%;
-  background: linear-gradient(90deg, #30d158 0%, #30d158 65%, #ffd60a 85%, #ff453a 100%);
+  background: linear-gradient(90deg, #8fb573 0%, #8fb573 65%, #e3c35a 85%, #d9533b 100%);
   background-size: 420px 100%;
   transition: width 0.05s;
 }
@@ -398,15 +398,15 @@
   display: flex;
   gap: 12px;
   padding: 10px;
-  background: #18181b;
-  border-bottom: 1px solid #0e0e10;
+  background: #1c1916;
+  border-bottom: 1px solid #110f0d;
   flex-shrink: 0;
 }
 .smp-wave-box {
   flex: 1;
   height: 92px;
-  border-radius: 10px;
-  background: #0f0f12;
+  border-radius: 5px;
+  background: #12100e;
   border: 1px solid var(--border);
   position: relative;
   overflow: hidden;

@@ -13,10 +13,10 @@
 }
 .tour-spot {
   position: absolute;
-  border-radius: 10px;
+  border-radius: 5px;
   box-shadow:
     0 0 0 2px var(--accent),
-    0 0 0 6px rgba(47, 140, 255, 0.25),
+    0 0 0 6px rgba(232, 163, 61, 0.25),
     0 0 0 9999px rgba(0, 0, 0, 0.62);
   transition:
     left 0.28s ease,
@@ -27,9 +27,9 @@
 }
 .tour-card {
   position: absolute;
-  background: linear-gradient(170deg, #2e2e35, #25252b);
-  border: 1px solid #45454f;
-  border-radius: 14px;
+  background: linear-gradient(170deg, #34302a, #2a2722);
+  border: 1px solid #4e483e;
+  border-radius: 6px;
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
   padding: 16px 18px 14px;
   animation: pop-in 0.22s ease;
@@ -68,7 +68,7 @@
   padding-right: 18px;
 }
 .tour-body {
-  color: #c9c9d2;
+  color: #ccc5b6;
   line-height: 1.5;
   font-size: 13px;
 }
@@ -86,11 +86,11 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #4a4a54;
+  background: #534d43;
   cursor: pointer;
 }
 .tour-dots i.done {
-  background: #6d8fbf;
+  background: #8a8170;
 }
 .tour-dots i.on {
   background: var(--accent);
@@ -106,10 +106,10 @@
   transform: translateX(-50%);
   z-index: 15;
   width: min(560px, calc(100% - 40px));
-  background: rgba(36, 36, 42, 0.96);
+  background: rgba(41, 38, 33, 0.96);
   backdrop-filter: blur(12px);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 6px;
   box-shadow: var(--shadow);
   padding: 14px 16px;
   animation: pop-in 0.25s ease;
@@ -132,7 +132,7 @@
   align-items: center;
   gap: 9px;
   padding: 8px 10px;
-  border-radius: 9px;
+  border-radius: 5px;
   background: var(--panel-2);
   border: 1px solid transparent;
   cursor: pointer;
@@ -164,7 +164,7 @@
   gap: 8px;
   padding: 6px 14px 6px 10px;
   border-radius: 99px;
-  background: rgba(36, 36, 42, 0.96);
+  background: rgba(41, 38, 33, 0.96);
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
   font-size: 12px;
@@ -185,7 +185,7 @@
   justify-content: space-between;
   padding: 10px 12px;
   margin-bottom: 14px;
-  border-radius: 10px;
-  background: rgba(47, 140, 255, 0.12);
-  border: 1px solid rgba(47, 140, 255, 0.35);
+  border-radius: 5px;
+  background: rgba(232, 163, 61, 0.12);
+  border: 1px solid rgba(232, 163, 61, 0.35);
 }

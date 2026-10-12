@@ -403,7 +403,7 @@ export default function TracksView() {
                     </div>
                   </div>
                 </div>
-                <AutomationLane trackId={null} param="volume" points={project.masterAutomation} fallback={1} width={width} ppb={ppb} color="#c9a7ff" />
+                <AutomationLane trackId={null} param="volume" points={project.masterAutomation} fallback={1} width={width} ppb={ppb} color="#cbb6dc" />
               </div>
             </div>
           )}

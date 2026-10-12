@@ -1,33 +1,35 @@
 :root {
-  --bg: #121214;
-  --bg-2: #1b1b1f;
-  --panel: #232328;
-  --panel-2: #2b2b31;
-  --panel-3: #34343b;
-  --border: #3a3a42;
-  --border-soft: #2c2c33;
-  --text: #f2f2f5;
-  --text-dim: #a4a4ae;
-  --text-faint: #6e6e78;
-  --accent: #2f8cff;
-  --accent-2: #5aa8ff;
-  --record: #ff3b30;
-  --green: #34c759;
-  --yellow: #ffcc00;
-  --orange: #ff9f0a;
-  --purple: #bf5af2;
-  --cyan: #32d0e6;
-  --pink: #ff2d92;
-  --cycle: #f5c518;
-  --midi: #3ecf5a;
-  --drums: #e8b92a;
-  --audio: #3d9bff;
-  --radius: 8px;
-  --radius-sm: 5px;
+  --bg: #151310;
+  --bg-2: #1f1c18;
+  --panel: #282520;
+  --panel-2: #312d27;
+  --panel-3: #3b362f;
+  --border: #413d34;
+  --border-soft: #322e28;
+  --text: #f3ead8;
+  --text-dim: #b2a790;
+  --text-faint: #797161;
+  --accent: #e8a33d;
+  --accent-2: #f2bd68;
+  --on-accent: #1d1508;
+  --record: #d9452b;
+  --green: #8fb573;
+  --yellow: #e3c35a;
+  --orange: #e08a3c;
+  --purple: #a88cc2;
+  --cyan: #6fb3b8;
+  --pink: #d36d7f;
+  --cycle: #e3c35a;
+  --midi: #8fae6e;
+  --drums: #c98b3a;
+  --audio: #6d97b8;
+  --radius: 4px;
+  --radius-sm: 3px;
   --shadow: 0 10px 40px rgba(0, 0, 0, 0.55);
-  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  --mono: 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
+  --font: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --mono: 'IBM Plex Mono', 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
   color-scheme: dark;
+  accent-color: var(--accent);
 }
 
 * {
@@ -87,13 +89,13 @@ textarea:focus {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #3d3d45;
-  border-radius: 6px;
+  background: #444037;
+  border-radius: 3px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #4f4f58;
+  background: #585247;
   background-clip: padding-box;
   border: 2px solid transparent;
 }
@@ -130,7 +132,7 @@ textarea:focus {
 }
 .btn.primary {
   background: var(--accent);
-  color: white;
+  color: var(--on-accent);
 }
 .btn.primary:hover {
   background: var(--accent-2);
@@ -146,9 +148,9 @@ textarea:focus {
   background: var(--panel-2);
 }
 .btn.active {
-  background: rgba(47, 140, 255, 0.22);
+  background: rgba(232, 163, 61, 0.22);
   color: var(--accent-2);
-  border-color: rgba(47, 140, 255, 0.45);
+  border-color: rgba(232, 163, 61, 0.45);
 }
 .btn.icon {
   width: 30px;
@@ -250,10 +252,10 @@ textarea:focus {
   position: fixed;
   z-index: 1000;
   min-width: 190px;
-  background: rgba(40, 40, 46, 0.97);
+  background: rgba(46, 42, 36, 0.97);
   backdrop-filter: blur(20px);
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: 5px;
   box-shadow: var(--shadow);
   padding: 5px;
   font-size: 13px;
@@ -263,13 +265,13 @@ textarea:focus {
   align-items: center;
   gap: 9px;
   padding: 6px 10px;
-  border-radius: 5px;
+  border-radius: 3px;
   cursor: pointer;
   color: var(--text);
 }
 .menu-item:hover {
   background: var(--accent);
-  color: white;
+  color: var(--on-accent);
 }
 .menu-item.disabled {
   opacity: 0.4;
@@ -282,7 +284,7 @@ textarea:focus {
   padding-left: 18px;
 }
 .menu-item:hover .shortcut {
-  color: rgba(255, 255, 255, 0.75);
+  color: rgba(29, 21, 8, 0.6);
 }
 .menu-sep {
   height: 1px;
@@ -303,11 +305,11 @@ textarea:focus {
   position: fixed;
   z-index: 1000;
   display: flex;
-  background: rgba(20, 20, 22, 0.96);
-  border-radius: 10px;
+  background: rgba(23, 21, 18, 0.96);
+  border-radius: 5px;
   box-shadow: var(--shadow);
   overflow: hidden;
-  border: 1px solid #3a3a40;
+  border: 1px solid #413c34;
 }
 .pill-menu button {
   border: none;
@@ -316,13 +318,13 @@ textarea:focus {
   padding: 9px 15px;
   cursor: pointer;
   font-size: 13px;
-  border-right: 1px solid #3a3a40;
+  border-right: 1px solid #413c34;
 }
 .pill-menu button:last-child {
   border-right: none;
 }
 .pill-menu button:hover {
-  background: #3a3a40;
+  background: #413c34;
 }
 
 /* ------------------------------------------------------------------ modal */
@@ -340,7 +342,7 @@ textarea:focus {
 .modal {
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 6px;
   box-shadow: var(--shadow);
   min-width: 380px;
   max-width: 92vw;
@@ -397,7 +399,7 @@ textarea:focus {
   pointer-events: none;
 }
 .toast {
-  background: rgba(44, 44, 50, 0.97);
+  background: rgba(50, 46, 40, 0.97);
   border: 1px solid var(--border);
   padding: 9px 16px;
   border-radius: 99px;
@@ -410,7 +412,7 @@ textarea:focus {
   color: #ffb4ab;
 }
 .toast.success {
-  border-color: #2a6b3a;
+  border-color: #4b5e3a;
 }
 
 /* ------------------------------------------------------------------ sliders & knobs */
@@ -429,7 +431,7 @@ textarea:focus {
   height: 4px;
   margin-top: -2px;
   border-radius: 2px;
-  background: #0d0d10;
+  background: #100e0c;
   box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.6);
 }
 .hslider .fill {
@@ -448,7 +450,7 @@ textarea:focus {
   height: 14px;
   margin: -7px 0 0 -7px;
   border-radius: 50%;
-  background: #e8e8ee;
+  background: #eae2d0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
 }
 
@@ -480,8 +482,9 @@ textarea:focus {
 .toggle {
   width: 34px;
   height: 20px;
-  border-radius: 10px;
-  background: #3b3b42;
+  border-radius: 3px;
+  background: #423d35;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
   position: relative;
   cursor: pointer;
   transition: background 0.15s;
@@ -494,12 +497,12 @@ textarea:focus {
   left: 2px;
   width: 16px;
   height: 16px;
-  border-radius: 50%;
-  background: white;
+  border-radius: 2px;
+  background: var(--text);
   transition: transform 0.15s;
 }
 .toggle.on {
-  background: var(--green);
+  background: var(--accent);
 }
 .toggle.on::after {
   transform: translateX(14px);

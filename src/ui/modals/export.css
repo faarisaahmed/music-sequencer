@@ -74,7 +74,7 @@
 .song-info-panel {
   background: var(--panel-2);
   border: 1px solid var(--border-soft);
-  border-radius: 10px;
+  border-radius: 5px;
   padding: 12px;
   display: flex;
   flex-direction: column;
@@ -96,7 +96,7 @@
   width: 112px;
   height: 112px;
   flex: none;
-  border-radius: 8px;
+  border-radius: 4px;
   border: 1px dashed var(--border);
   background: var(--bg-2);
   cursor: pointer;
@@ -114,7 +114,7 @@
   border-color: var(--accent);
 }
 .info-cover.drag {
-  background: rgba(47, 140, 255, 0.12);
+  background: rgba(232, 163, 61, 0.12);
 }
 .info-cover img {
   width: 100%;
@@ -202,7 +202,7 @@
   padding: 10px 14px;
   border: 1px solid var(--border-soft);
   background: var(--panel-2);
-  border-radius: 10px;
+  border-radius: 5px;
   color: var(--text);
   cursor: pointer;
   text-align: left;

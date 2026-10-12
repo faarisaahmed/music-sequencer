@@ -36,7 +36,7 @@
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: 4px;
   background: var(--panel-2);
   border: 1px solid var(--border-soft);
 }
@@ -96,7 +96,7 @@
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: 4px;
   background: var(--panel-2);
   border: 1px solid var(--border-soft);
   flex-wrap: wrap;
@@ -126,9 +126,9 @@
   gap: 12px;
   padding: 10px 14px;
   margin-bottom: 14px;
-  border-radius: 10px;
-  background: rgba(255, 159, 10, 0.1);
-  border: 1px solid rgba(255, 159, 10, 0.35);
+  border-radius: 5px;
+  background: rgba(224, 138, 60, 0.1);
+  border: 1px solid rgba(224, 138, 60, 0.35);
   flex-wrap: wrap;
 }
 .backup-banner > svg {

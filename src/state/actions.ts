@@ -3,7 +3,7 @@ import { meterOf, tempoOf } from '../model/timeline';
 import { current, isDraft, type Draft } from 'immer';
 import type { Groove, MidiRegion, Note, Project, Region, ScaleType, Track, TrackType } from '../model/types';
 import { applyGroove, grooveFor } from '../model/groove';
-import { createAudioRegion, createMidiRegion, createProject, createTrack, uid } from '../model/defaults';
+import { createAudioRegion, createMidiRegion, createProject, createTrack, currentColor, uid } from '../model/defaults';
 import { snap } from '../model/music';
 import { getPreset } from '../audio/presets';
 import { addClip, getClipBlob } from '../audio/audioStore';
@@ -54,11 +54,13 @@ export function migrate(p: Project): Project {
     ...base,
     ...rest,
     chords: p.chords ?? [],
+    ...(p.sections ? { sections: p.sections.map((s) => ({ ...s, color: currentColor(s.color) })) } : {}),
     tracks: (p.tracks ?? []).map((t) => {
       const fresh = createTrack(t.type, t.instrument, t.name);
       return {
         ...fresh,
         ...stripDrummer(t),
+        color: currentColor(t.color ?? fresh.color),
         fx: { ...fresh.fx, ...t.fx },
         instrumentParams: t.instrumentParams ?? {},
         regions: (t.regions ?? []).map((r) =>

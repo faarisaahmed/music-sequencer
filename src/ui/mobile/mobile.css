@@ -43,7 +43,7 @@ html.phone select {
   border: none;
   background: transparent;
   color: var(--text);
-  border-radius: 10px;
+  border-radius: 5px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -72,7 +72,7 @@ html.phone select {
   justify-content: center;
   gap: 7px;
   padding: 0 6px;
-  border-radius: 10px;
+  border-radius: 5px;
 }
 .m-title span:first-child {
   overflow: hidden;
@@ -130,7 +130,7 @@ html.phone select {
   border-radius: 50%;
   border: none;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
   display: flex;
   align-items: center;
@@ -152,8 +152,8 @@ html.phone select {
   min-width: 0;
   height: 44px;
   border: 1px solid var(--border-soft);
-  background: #0c0c0e;
-  border-radius: 10px;
+  background: #0e0d0b;
+  border-radius: 5px;
   color: var(--text);
   display: flex;
   flex-direction: column;
@@ -163,9 +163,11 @@ html.phone select {
   margin-right: 4px;
 }
 .m-lcd b {
+  font-family: var(--mono);
+  font-weight: 500;
   font-size: 15px;
   line-height: 1.1;
-  color: #cfe6ff;
+  color: var(--accent);
 }
 .m-lcd span {
   font-size: 11px;
@@ -180,7 +182,7 @@ html.phone select {
 }
 .m-t.m-play.on {
   background: var(--green);
-  color: #06210f;
+  color: #1f2716;
 }
 .m-t.m-rec {
   color: var(--record);
@@ -235,7 +237,7 @@ html.phone select {
   width: 100%;
   max-height: 88dvh;
   background: var(--panel);
-  border-radius: 16px 16px 0 0;
+  border-radius: 6px 16px 0 0;
   border-top: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -279,7 +281,7 @@ html.phone select {
   color: var(--text);
   font: 15px var(--font);
   text-align: left;
-  border-radius: 10px;
+  border-radius: 5px;
   width: 100%;
 }
 .m-sheet-item:active {
@@ -535,7 +537,7 @@ html.touch .ss-name {
   min-width: 0;
   max-width: 100%;
   max-height: 94dvh;
-  border-radius: 16px 16px 0 0;
+  border-radius: 6px 16px 0 0;
   border-left: none;
   border-right: none;
   border-bottom: none;
@@ -705,7 +707,7 @@ html.touch .ss-name {
   height: 26px;
   border-radius: 50%;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-weight: 700;
   font-size: 13px;
   display: flex;

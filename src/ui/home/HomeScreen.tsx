@@ -12,7 +12,7 @@ import { download, safeFileName } from '../../audio/export';
 import { TEMPLATES } from '../../model/templates';
 import { resumeAudio } from '../../audio/context';
 import { maybeAutoStart } from '../onboarding/tourState';
-import { IconFor } from '../common/icons';
+import { BrandMark, IconFor } from '../common/icons';
 
 function formatDuration(sec: number): string {
   const t = Math.round(sec);
@@ -146,18 +146,7 @@ export default function HomeScreen() {
       <header className="home-header">
         <div className="brand">
           <div className="brand-logo">
-            <svg viewBox="0 0 32 32" width="30" height="30">
-              <defs>
-                <linearGradient id="lg" x1="0" x2="1" y1="0" y2="1">
-                  <stop offset="0" stopColor="#ff9f0a" />
-                  <stop offset="1" stopColor="#ff2d55" />
-                </linearGradient>
-              </defs>
-              <rect width="32" height="32" rx="8" fill="url(#lg)" />
-              <path d="M10 22V11l12-3v11" stroke="white" strokeWidth="2.4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-              <circle cx="8.3" cy="22" r="2.6" fill="white" />
-              <circle cx="20.3" cy="19" r="2.6" fill="white" />
-            </svg>
+            <BrandMark size={30} />
           </div>
           <div>
             <div className="brand-name">BandForge</div>

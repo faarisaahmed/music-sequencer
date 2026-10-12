@@ -2,9 +2,9 @@
 import type { Section } from './types';
 import { uid } from './defaults';
 
-export const SECTION_COLORS = ['#5b8cff', '#34c759', '#ff9f0a', '#bf5af2', '#ff375f', '#32d0e6', '#ffd60a', '#8e8e93'];
+export const SECTION_COLORS = ['#7d8fc0', '#8fb573', '#e08a3c', '#a88cc2', '#d36d7f', '#6fb3b8', '#e3c35a', '#99907c'];
 export const NAME_SEQUENCE = ['Intro', 'Verse', 'Chorus', 'Verse 2', 'Chorus 2', 'Bridge', 'Chorus 3', 'Outro'];
-const NAME_COLORS: Record<string, string> = { Intro: '#8e8e93', Verse: '#5b8cff', Chorus: '#ff9f0a', Bridge: '#bf5af2', Outro: '#32d0e6', 'Pre-Chorus': '#34c759', Breakdown: '#ff375f', Solo: '#ffd60a' };
+const NAME_COLORS: Record<string, string> = { Intro: '#99907c', Verse: '#7d8fc0', Chorus: '#e08a3c', Bridge: '#a88cc2', Outro: '#6fb3b8', 'Pre-Chorus': '#8fb573', Breakdown: '#d36d7f', Solo: '#e3c35a' };
 
 export function colorForName(name: string): string {
   const base = name.replace(/\s*\d+$/, '');

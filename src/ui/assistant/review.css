@@ -50,7 +50,7 @@
 .review-chip.on {
   border-color: var(--accent);
   color: var(--text);
-  background: rgba(47, 140, 255, 0.15);
+  background: rgba(232, 163, 61, 0.15);
 }
 .review-list {
   flex: 1;
@@ -61,7 +61,7 @@
   gap: 4px;
 }
 .review-item {
-  border-radius: 8px;
+  border-radius: 4px;
   padding: 6px 8px;
   background: var(--panel-2);
   border: 1px solid transparent;

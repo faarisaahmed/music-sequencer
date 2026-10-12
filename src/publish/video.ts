@@ -8,7 +8,7 @@ export type VideoStyle = 'still' | 'visualizer';
 
 const W = 1920;
 const H = 1080;
-const FONT = '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+const FONT = '"IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
 
 export function loadImage(src: string | Blob): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {

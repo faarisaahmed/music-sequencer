@@ -284,16 +284,16 @@ export function laneMenu(track: Track, beat: number): MenuItem[] {
 }
 
 const COLORS: [string, string][] = [
-  ['Green', '#3ecf5a'],
-  ['Mint', '#2fbf8f'],
-  ['Yellow', '#e8b92a'],
-  ['Orange', '#f0892a'],
-  ['Red', '#ef5350'],
-  ['Pink', '#ec4fa0'],
-  ['Purple', '#a46cf0'],
-  ['Blue', '#3d9bff'],
-  ['Cyan', '#28c4dc'],
-  ['Gray', '#9a9aa4'],
+  ['Sage', '#8fae6e'],
+  ['Moss', '#6fa58a'],
+  ['Ochre', '#c98b3a'],
+  ['Copper', '#e08a3c'],
+  ['Rust', '#d9533b'],
+  ['Rose', '#d36d7f'],
+  ['Lavender', '#a88cc2'],
+  ['Slate', '#6d97b8'],
+  ['Teal', '#6fb3b8'],
+  ['Stone', '#a89d87'],
 ];
 
 export function trackMenu(t: Track): MenuItem[] {

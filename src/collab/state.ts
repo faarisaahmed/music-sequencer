@@ -76,7 +76,7 @@ export function inSession(): boolean {
 
 const ADJ = ['Funky', 'Mellow', 'Groovy', 'Bright', 'Smooth', 'Jazzy', 'Cosmic', 'Electric', 'Velvet', 'Golden', 'Lucky', 'Breezy'];
 const NOUN = ['Bass', 'Drummer', 'Keys', 'Fiddle', 'Trumpet', 'Synth', 'Cello', 'Guitar', 'Harp', 'Banjo', 'Sax', 'Piano'];
-export const PEER_COLORS = ['#ff6b6b', '#ffa94d', '#ffd43b', '#69db7c', '#38d9a9', '#4dabf7', '#748ffc', '#da77f2', '#f783ac', '#a9e34b'];
+export const PEER_COLORS = ['#d9735b', '#e08a3c', '#e3c35a', '#8fb573', '#6fb3a0', '#6d97b8', '#8a8fc8', '#b494c8', '#d88a98', '#a7b56a'];
 
 export function loadIdentity(): { name: string; color: string } {
   let name = '';

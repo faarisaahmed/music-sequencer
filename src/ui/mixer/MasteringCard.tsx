@@ -12,10 +12,10 @@ export default function MasteringCard({ p }: { p: Project }) {
     commit((d) => {
       d.mastering = { ...DEFAULT_MASTERING, ...d.mastering, ...patch, preset: patch.preset ?? 'Custom' };
     });
-  const color = '#ff9f0a';
+  const color = '#e08a3c';
   return (
     <div className="strip mastering">
-      <div className="strip-color" style={{ background: 'linear-gradient(90deg,#ffd60a,#ff9f0a)' }} />
+      <div className="strip-color" style={{ background: 'linear-gradient(90deg,#e3c35a,#e08a3c)' }} />
       <div className="strip-head">
         <div style={{ minWidth: 0 }}>
           <div className="strip-name">Mastering</div>

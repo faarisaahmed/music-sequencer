@@ -2,7 +2,7 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #18181b;
+  background: #1c1916;
 }
 .ss-toolbar {
   display: flex;
@@ -41,7 +41,7 @@
   position: sticky;
   left: 0;
   z-index: 3;
-  background: #18181b;
+  background: #1c1916;
 }
 .ss-icon {
   border: none;
@@ -52,7 +52,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
+  border-radius: 3px;
   flex-shrink: 0;
 }
 .ss-icon:hover {
@@ -94,28 +94,30 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--c) 24%, #121215);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--c) 14%, #1f1c18);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 18%, transparent);
   cursor: pointer;
   overflow: hidden;
   transition: background 0.08s, box-shadow 0.12s;
 }
 .ss-cell.alt {
-  background: color-mix(in srgb, var(--c) 19%, #121215);
+  background: color-mix(in srgb, var(--c) 9%, #1a1714);
 }
 .ss-cell:hover {
-  background: color-mix(in srgb, var(--c) 34%, #121215);
+  background: color-mix(in srgb, var(--c) 28%, #1f1c18);
 }
+/* Lit pads: a flat, solid key with a lighter top edge, like a backlit hardware button. */
 .ss-cell.on {
-  background: radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--c) 55%, white) 0%, var(--c) 48%, color-mix(in srgb, var(--c) 80%, black) 100%);
-  box-shadow: 0 0 14px color-mix(in srgb, var(--c) 55%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  background: var(--c);
+  box-shadow: inset 0 2px 0 color-mix(in srgb, var(--c) 55%, white), inset 0 -2px 0 color-mix(in srgb, var(--c) 70%, black);
 }
 .ss-cell.on.detail {
-  background: color-mix(in srgb, var(--c) 30%, #121215);
+  background: color-mix(in srgb, var(--c) 30%, #151310);
   box-shadow: none;
 }
 .ss-cell.outside {
-  background: #1d1d21;
+  background: #211e1a;
   opacity: 0.55;
 }
 .ss-fill {
@@ -123,8 +125,8 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(color-mix(in srgb, var(--c) 70%, white), var(--c));
-  box-shadow: 0 0 10px color-mix(in srgb, var(--c) 60%, transparent);
+  background: var(--c);
+  box-shadow: inset 0 2px 0 color-mix(in srgb, var(--c) 55%, white);
 }
 .ss-val {
   position: absolute;
@@ -161,7 +163,7 @@
   position: absolute;
   top: 0;
   pointer-events: none;
-  border-radius: 6px;
+  border-radius: 3px;
   background: rgba(255, 255, 255, 0.16);
   box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.55);
   z-index: 2;
@@ -185,7 +187,7 @@
   border: 1px dashed var(--border);
   background: transparent;
   color: var(--text-dim);
-  border-radius: 6px;
+  border-radius: 3px;
   padding: 4px 10px;
   font-size: 12px;
   cursor: pointer;
@@ -201,22 +203,22 @@
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: #222227;
-  border-top: 1px solid #111114;
+  background: #27241f;
+  border-top: 1px solid #14120f;
 }
 .ss-patname {
   width: 170px;
   height: 34px;
   text-align: center;
-  background: #2e2e34 !important;
+  background: #343029 !important;
   border-color: transparent !important;
-  border-radius: 8px !important;
+  border-radius: 4px !important;
 }
 .ss-bbtn {
   height: 34px;
   width: 42px;
   padding: 0;
-  border-radius: 8px;
+  border-radius: 4px;
 }
 .ss-hint {
   font-size: 12px;
@@ -227,8 +229,8 @@
 }
 .ss-modes {
   display: flex;
-  background: #2e2e34;
-  border-radius: 8px;
+  background: #343029;
+  border-radius: 4px;
   padding: 2px;
   gap: 2px;
 }
@@ -238,7 +240,7 @@
   color: var(--text-dim);
   padding: 0 14px;
   height: 30px;
-  border-radius: 6px;
+  border-radius: 3px;
   cursor: pointer;
   font-size: 12px;
   white-space: nowrap;
@@ -247,7 +249,7 @@
   color: var(--text);
 }
 .ss-modes button.on {
-  background: #8e8e98;
+  background: #9b917d;
   color: #111;
   font-weight: 600;
 }
@@ -276,19 +278,19 @@
   flex-direction: column;
   gap: 2px;
   padding: 3px 5px;
-  border-radius: 6px;
+  border-radius: 3px;
   border: 1px solid var(--border-soft);
-  background: #202024;
+  background: #24211d;
   color: var(--text-dim);
   cursor: pointer;
   position: relative;
 }
 .ss-page:hover {
-  background: #2a2a2f;
+  background: #2f2c26;
 }
 .ss-page.on {
   border-color: var(--drums);
-  background: color-mix(in srgb, var(--drums) 16%, #202024);
+  background: color-mix(in srgb, var(--drums) 16%, #24211d);
   color: var(--text);
 }
 .ss-page.playing::after {
@@ -319,7 +321,7 @@
   flex: 1;
   height: 2px;
   border-radius: 1px;
-  background: #3a3a42;
+  background: #413d34;
 }
 .ss-page-map i.hit {
   background: var(--drums);
@@ -341,7 +343,7 @@
   padding: 0;
   border: none;
   border-radius: 4px;
-  background: #2b2b31;
+  background: #312d27;
   color: var(--text-faint);
   font-size: 10px;
   font-weight: 700;
@@ -351,12 +353,12 @@
   color: var(--text);
 }
 .ss-ms.on.mute {
-  background: #3d8bff;
-  color: #fff;
+  background: #e8a33d;
+  color: var(--on-accent);
 }
 .ss-ms.on.solo {
-  background: #f5c518;
-  color: #1a1a1a;
+  background: #e3c35a;
+  color: #1d1a16;
 }
 .ss-knob {
   flex-shrink: 0;
@@ -375,19 +377,19 @@
 .ss-play {
   height: 34px;
   padding: 0 14px;
-  border-radius: 8px;
-  background: #2e2e34;
+  border-radius: 4px;
+  background: #343029;
   font-weight: 600;
   flex-shrink: 0;
 }
 .ss-play.on {
   background: var(--green);
-  color: #08260f;
+  color: #1f2716;
 }
 .ss-patpick {
   height: 34px;
-  border-radius: 8px;
-  background: #2e2e34;
+  border-radius: 4px;
+  background: #343029;
   max-width: 190px;
   flex-shrink: 0;
   overflow: hidden;
@@ -410,8 +412,8 @@
 }
 .ss-swing {
   height: 34px;
-  border-radius: 8px;
-  background: #2e2e34;
+  border-radius: 4px;
+  background: #343029;
 }
 .ss-swing.on {
   color: var(--accent-2);

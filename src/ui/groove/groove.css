@@ -25,17 +25,17 @@
 .groove-viz {
   align-self: center;
   background: var(--bg-2);
-  border-radius: 7px;
+  border-radius: 4px;
 }
 .gv-line {
   stroke: var(--border);
 }
 .gv-tick {
-  stroke: #3a3a42;
+  stroke: #413d34;
   stroke-width: 1;
 }
 .gv-tick.beat {
-  stroke: #5b5b66;
+  stroke: #655f51;
   stroke-width: 2;
 }
 .gv-note {
@@ -57,7 +57,7 @@
   min-width: 0;
   padding: 5px 8px;
   border: 1px solid transparent;
-  border-radius: 7px;
+  border-radius: 4px;
   background: var(--panel-2);
   cursor: pointer;
   text-align: left;
@@ -66,8 +66,8 @@
   background: var(--panel-3);
 }
 .groove-preset.on {
-  border-color: rgba(47, 140, 255, 0.6);
-  background: rgba(47, 140, 255, 0.16);
+  border-color: rgba(232, 163, 61, 0.6);
+  background: rgba(232, 163, 61, 0.16);
 }
 .groove-preset b {
   font-size: 12px;

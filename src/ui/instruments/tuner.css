@@ -4,9 +4,9 @@
   align-items: center;
   gap: 2px;
   padding: 14px 18px;
-  background: #18181c;
+  background: #1c1916;
   border: 1px solid var(--border-soft);
-  border-radius: 12px;
+  border-radius: 6px;
   align-self: flex-start;
   flex-shrink: 0;
 }
@@ -14,10 +14,10 @@
   font-size: 30px;
   font-weight: 700;
   line-height: 1;
-  color: #ff9f0a;
+  color: #e08a3c;
 }
 .tuner.in-tune .tuner-note {
-  color: #30d158;
+  color: #8fb573;
 }
 .tuner-sub {
   font-size: 11px;

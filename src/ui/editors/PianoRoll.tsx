@@ -192,12 +192,12 @@ function PianoRollInner({ region, track, meter, bpb, selectedIds }: { region: Mi
     for (let p = pTop; p >= pBot; p--) {
       const y = (127 - p) * rowH - sy;
       const black = isBlackKey(p);
-      let fill = black ? '#1d1d22' : '#26262c';
-      if (!isDrums && scaleMode && inScale(p, scale)) fill = black ? '#232a33' : '#2a323c';
-      if (isDrums && DRUM_NAMES[p]) fill = '#2a2a31';
+      let fill = black ? '#221f1a' : '#2b2822';
+      if (!isDrums && scaleMode && inScale(p, scale)) fill = black ? '#2e2b25' : '#37332c';
+      if (isDrums && DRUM_NAMES[p]) fill = '#302c26';
       ctx.fillStyle = fill;
       ctx.fillRect(0, y, w, rowH);
-      ctx.fillStyle = p % 12 === 0 ? '#3a3a44' : '#1a1a1e';
+      ctx.fillStyle = p % 12 === 0 ? '#423d35' : '#1e1b18';
       ctx.fillRect(0, y + rowH - 1, w, 1);
     }
     // Inactive (outside region) shading
@@ -236,7 +236,7 @@ function PianoRollInner({ region, track, meter, bpb, selectedIds }: { region: Mi
     for (const bar of meter.bars(songBase + b0, songBase + b1 + 1)) ctx.fillRect(Math.round((bar.start - songBase) * ppb - sx), 0, 1, h);
     // Loop end marker
     if (region.loop) {
-      ctx.fillStyle = 'rgba(245,197,24,0.6)';
+      ctx.fillStyle = 'rgba(227, 195, 90,0.6)';
       ctx.fillRect(Math.round(region.contentLength * ppb - sx), 0, 2, h);
     }
 
@@ -253,12 +253,12 @@ function PianoRollInner({ region, track, meter, bpb, selectedIds }: { region: Mi
       ctx.roundRect(x, y, nw, nh, Math.min(3, nh / 3));
       ctx.fill();
       const flag = flagged.get(n.id);
-      ctx.strokeStyle = sel ? '#ffffff' : flag === 'range' ? '#ff453a' : flag === 'warn' ? '#ffd60a' : 'rgba(0,0,0,0.55)';
+      ctx.strokeStyle = sel ? '#fff6e3' : flag === 'range' ? '#d9533b' : flag === 'warn' ? '#e3c35a' : 'rgba(0,0,0,0.55)';
       ctx.lineWidth = sel ? 1.5 : flag ? 2 : 1;
       ctx.stroke();
       if (nh >= 11 && nw > 30 && alpha > 0.5) {
         ctx.fillStyle = 'rgba(0,0,0,0.7)';
-        ctx.font = '600 9px -apple-system, sans-serif';
+        ctx.font = '600 9px "IBM Plex Sans", sans-serif';
         ctx.fillText(isDrums ? (DRUM_NAMES[n.pitch] ?? noteName(n.pitch)) : noteName(n.pitch), x + 4, y + nh / 2 + 3.2, nw - 6);
       }
       ctx.globalAlpha = 1;
@@ -281,8 +281,8 @@ function PianoRollInner({ region, track, meter, bpb, selectedIds }: { region: Mi
     if (marquee) {
       const x = Math.min(marquee.x0, marquee.x1) - sx;
       const y = Math.min(marquee.y0, marquee.y1) - sy;
-      ctx.fillStyle = 'rgba(47,140,255,0.14)';
-      ctx.strokeStyle = 'rgba(90,168,255,0.9)';
+      ctx.fillStyle = 'rgba(232, 163, 61,0.14)';
+      ctx.strokeStyle = 'rgba(242, 189, 104,0.9)';
       ctx.lineWidth = 1;
       ctx.fillRect(x, y, Math.abs(marquee.x1 - marquee.x0), Math.abs(marquee.y1 - marquee.y0));
       ctx.strokeRect(x + 0.5, y + 0.5, Math.abs(marquee.x1 - marquee.x0), Math.abs(marquee.y1 - marquee.y0));
@@ -296,7 +296,7 @@ function PianoRollInner({ region, track, meter, bpb, selectedIds }: { region: Mi
     if (!ctx) return;
     const sy = scroll.y;
     ctx.clearRect(0, 0, KEYS_W, h);
-    ctx.fillStyle = '#18181b';
+    ctx.fillStyle = '#1c1916';
     ctx.fillRect(0, 0, KEYS_W, h);
     const pTop = Math.min(127, 127 - Math.floor(sy / rowH));
     const pBot = Math.max(0, 127 - Math.ceil((sy + h) / rowH));
@@ -306,45 +306,45 @@ function PianoRollInner({ region, track, meter, bpb, selectedIds }: { region: Mi
       const on = held.has(p);
       if (isDrums) {
         const named = DRUM_NAMES[p];
-        ctx.fillStyle = on ? accent : named ? '#2c2c33' : '#1f1f24';
+        ctx.fillStyle = on ? accent : named ? '#322e28' : '#24211c';
         ctx.fillRect(0, y, KEYS_W, rowH);
-        ctx.fillStyle = '#111114';
+        ctx.fillStyle = '#14120f';
         ctx.fillRect(0, y + rowH - 1, KEYS_W, 1);
         if (rowH >= 10) {
-          ctx.fillStyle = on ? '#000' : named ? '#e6e6ea' : '#6e6e78';
-          ctx.font = `${named ? 600 : 400} 10px -apple-system, sans-serif`;
+          ctx.fillStyle = on ? '#000' : named ? '#e7dfce' : '#797161';
+          ctx.font = `${named ? 600 : 400} 10px "IBM Plex Sans", sans-serif`;
           ctx.fillText(named ?? noteName(p), 6, y + rowH / 2 + 3.5, KEYS_W - 10);
         }
         continue;
       }
       const black = isBlackKey(p);
       // white key body behind every row
-      ctx.fillStyle = on && !black ? accent : '#ececf0';
+      ctx.fillStyle = on && !black ? accent : '#ede5d3';
       ctx.fillRect(0, y, KEYS_W, rowH);
       if (black) {
-        ctx.fillStyle = on ? accent : '#1b1b1f';
+        ctx.fillStyle = on ? accent : '#1f1c18';
         ctx.fillRect(0, y + 1, KEYS_W * 0.62, rowH - 2);
       }
       // separators between white keys (B/C and E/F boundaries, and midpoints of black keys)
       const pc = p % 12;
       if (pc === 0 || pc === 5) {
-        ctx.fillStyle = '#9a9aa2';
+        ctx.fillStyle = '#a79d87';
         ctx.fillRect(0, y + rowH - 1, KEYS_W, 1);
       } else if (black) {
-        ctx.fillStyle = '#b4b4bc';
+        ctx.fillStyle = '#c3b79d';
         ctx.fillRect(KEYS_W * 0.62, y + rowH / 2, KEYS_W * 0.38, 1);
       }
       if (pc === 0 && rowH >= 9) {
-        ctx.fillStyle = on ? '#000' : '#6a6a72';
-        ctx.font = '600 9.5px -apple-system, sans-serif';
+        ctx.fillStyle = on ? '#000' : '#746d5d';
+        ctx.font = '600 9.5px "IBM Plex Sans", sans-serif';
         ctx.fillText(noteName(p), KEYS_W - 24, y + rowH / 2 + 3.5);
       }
       if (scaleMode && inScale(p, scale) && !black) {
-        ctx.fillStyle = 'rgba(47,140,255,0.9)';
+        ctx.fillStyle = 'rgba(232, 163, 61,0.9)';
         ctx.fillRect(KEYS_W - 3, y + 1, 3, rowH - 2);
       }
     }
-    ctx.fillStyle = '#0c0c0e';
+    ctx.fillStyle = '#0e0d0b';
     ctx.fillRect(KEYS_W - 1, 0, 1, h);
   }, [size, scroll.y, rowH, held, isDrums, rgb, scaleMode, scale]);
 
@@ -354,14 +354,14 @@ function PianoRollInner({ region, track, meter, bpb, selectedIds }: { region: Mi
     const ctx = prepCanvas(rulerCanvas.current, w, RULER_H);
     if (!ctx) return;
     const sx = scroll.x;
-    ctx.fillStyle = '#1e1e23';
+    ctx.fillStyle = '#23201b';
     ctx.fillRect(0, 0, w, RULER_H);
     // Region extent band
     const bandStart = region.loop ? 0 : region.offset;
     const bandEnd = contentEnd;
-    ctx.fillStyle = region.loop ? 'rgba(245,197,24,0.28)' : `rgba(${rgb.join(',')},0.28)`;
+    ctx.fillStyle = region.loop ? 'rgba(227, 195, 90,0.28)' : `rgba(${rgb.join(',')},0.28)`;
     ctx.fillRect(bandStart * ppb - sx, RULER_H - 7, (bandEnd - bandStart) * ppb, 7);
-    ctx.fillStyle = region.loop ? '#f5c518' : `rgb(${rgb.join(',')})`;
+    ctx.fillStyle = region.loop ? '#e3c35a' : `rgb(${rgb.join(',')})`;
     const hx = bandEnd * ppb - sx;
     ctx.beginPath();
     ctx.moveTo(hx, RULER_H);
@@ -371,29 +371,29 @@ function PianoRollInner({ region, track, meter, bpb, selectedIds }: { region: Mi
     ctx.fill();
     const b0 = Math.floor(sx / ppb);
     const b1 = Math.ceil((sx + w) / ppb);
-    ctx.font = '600 10.5px -apple-system, sans-serif';
+    ctx.font = '600 10.5px "IBM Plex Sans", sans-serif';
     for (const bar of meter.bars(songBase + b0, songBase + b1 + 1)) {
       const x = Math.round((bar.start - songBase) * ppb - sx);
-      ctx.fillStyle = '#7a7a84';
+      ctx.fillStyle = '#867d6c';
       ctx.fillRect(x, 4, 1, RULER_H - 4);
-      ctx.fillStyle = '#d4d4da';
+      ctx.fillStyle = '#d6cfbe';
       const label = String(bar.bar + 1) + (meter.simple || meter.barAt(bar.start - 1e-6).len === bar.len ? '' : `  ${bar.sig[0]}/${bar.sig[1]}`);
       ctx.fillText(label, x + 4, 13);
       if (ppb < 14) continue;
       const beatLen = 4 / bar.sig[1];
       for (let k = 1; k * beatLen < bar.len - 1e-9; k++) {
         const bx = Math.round((bar.start + k * beatLen - songBase) * ppb - sx);
-        ctx.fillStyle = '#4a4a52';
+        ctx.fillStyle = '#524d42';
         ctx.fillRect(bx, RULER_H - 7, 1, 7);
         if (ppb * beatLen >= 48) {
-          ctx.fillStyle = '#6a6a72';
-          ctx.font = '9.5px -apple-system, sans-serif';
+          ctx.fillStyle = '#746d5d';
+          ctx.font = '9.5px "IBM Plex Sans", sans-serif';
           ctx.fillText(`${bar.bar + 1}.${k + 1}`, bx + 3, 13);
-          ctx.font = '600 10.5px -apple-system, sans-serif';
+          ctx.font = '600 10.5px "IBM Plex Sans", sans-serif';
         }
       }
     }
-    ctx.fillStyle = '#0c0c0e';
+    ctx.fillStyle = '#0e0d0b';
     ctx.fillRect(0, RULER_H - 1, w, 1);
   }, [size.w, scroll.x, ppb, region, contentEnd, songBase, meter, rgb]);
 
@@ -404,7 +404,7 @@ function PianoRollInner({ region, track, meter, bpb, selectedIds }: { region: Mi
     const ctx = prepCanvas(velCanvas.current, w, velH);
     if (!ctx) return;
     const sx = scroll.x;
-    ctx.fillStyle = '#1b1b1f';
+    ctx.fillStyle = '#1f1c18';
     ctx.fillRect(0, 0, w, velH);
     ctx.fillStyle = 'rgba(255,255,255,0.05)';
     for (const f of [0.25, 0.5, 0.75]) ctx.fillRect(0, Math.round(velH * (1 - f)), w, 1);

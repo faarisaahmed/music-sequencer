@@ -28,7 +28,7 @@
   width: 22px;
   height: 22px;
   font-size: 9px;
-  box-shadow: 0 0 0 2px #26262b;
+  box-shadow: 0 0 0 2px #2b2822;
 }
 .jam-avatar.more {
   background: var(--panel-3);
@@ -68,7 +68,7 @@
   flex-direction: column;
   gap: 10px;
   padding: 16px;
-  border-radius: 12px;
+  border-radius: 6px;
   border: 1px solid var(--border-soft);
   background: var(--panel-2);
 }
@@ -89,7 +89,7 @@
   align-items: center;
   gap: 10px;
   padding: 16px;
-  border-radius: 12px;
+  border-radius: 6px;
   background: var(--bg-2);
   border: 1px solid var(--border-soft);
   text-align: center;
@@ -98,7 +98,7 @@
   font-size: 30px;
   font-weight: 700;
   letter-spacing: 0.12em;
-  color: #e8f1ff;
+  color: #f6ead2;
   user-select: all;
 }
 .jam-status {
@@ -167,7 +167,7 @@
   right: 2px;
   min-width: 15px;
   height: 15px;
-  border-radius: 8px;
+  border-radius: 4px;
   background: var(--record);
   color: white;
   font-size: 9.5px;
@@ -187,9 +187,9 @@
   z-index: 300;
   display: flex;
   flex-direction: column;
-  background: rgba(36, 36, 42, 0.98);
+  background: rgba(41, 38, 33, 0.98);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 6px;
   box-shadow: var(--shadow);
   animation: pop-in 0.15s ease;
 }
@@ -244,7 +244,7 @@
   gap: 10px;
   max-width: min(680px, 92vw);
   padding: 8px 10px 8px 14px;
-  background: rgba(40, 40, 46, 0.98);
+  background: rgba(46, 42, 36, 0.98);
   border: 1px solid var(--border);
   border-radius: 99px;
   box-shadow: var(--shadow);
@@ -272,13 +272,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 0 1.5px #1b1b1f;
+  box-shadow: 0 0 0 1.5px #1f1c18;
 }
 .presence-outline {
   position: absolute;
   inset: 0;
   border: 2px solid;
-  border-radius: 6px;
+  border-radius: 3px;
   pointer-events: none;
   z-index: 3;
 }

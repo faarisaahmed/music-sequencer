@@ -76,7 +76,7 @@ export default function AudioEditor({ trackId, regionId }: { trackId: string; re
     c.style.height = h + 'px';
     const ctx = c.getContext('2d')!;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = '#17171b';
+    ctx.fillStyle = '#1b1815';
     ctx.fillRect(0, 0, w, h);
     const xOf = (beat: number) => pad + beat * ppb - scrollX;
     const top = 26;
@@ -96,16 +96,16 @@ export default function AudioEditor({ trackId, regionId }: { trackId: string; re
       const x = xOf(bar.start - songBase);
       ctx.fillStyle = 'rgba(255,255,255,0.13)';
       ctx.fillRect(Math.round(x), 0, 1, h);
-      ctx.fillStyle = '#9a9aa4';
-      ctx.font = '600 10px -apple-system, sans-serif';
+      ctx.fillStyle = '#a89d87';
+      ctx.font = '600 10px "IBM Plex Sans", sans-serif';
       ctx.fillText(String(bar.bar + 1), x + 3, 12);
     }
     // region area
     const rx0 = xOf(region.offset);
     const rx1 = xOf(regionEndC);
-    ctx.fillStyle = 'rgba(61,155,255,0.10)';
+    ctx.fillStyle = 'rgba(109, 151, 184,0.10)';
     ctx.fillRect(rx0, top, rx1 - rx0, h - top - 4);
-    ctx.fillStyle = 'rgba(61,155,255,0.5)';
+    ctx.fillStyle = 'rgba(109, 151, 184,0.5)';
     ctx.fillRect(rx0, top - 4, rx1 - rx0, 3);
     // centre line
     ctx.fillStyle = 'rgba(255,255,255,0.08)';
@@ -138,21 +138,21 @@ export default function AudioEditor({ trackId, regionId }: { trackId: string; re
         const g = inside ? envAt(cb) : region.gain;
         const yTop = mid - Math.min(1, hi * g) * amp;
         const yBot = mid - Math.max(-1, lo * g) * amp;
-        ctx.fillStyle = inside ? (Math.max(hi, -lo) * g > 0.99 ? '#ff6b5e' : '#5aa8ff') : 'rgba(120,130,150,0.35)';
+        ctx.fillStyle = inside ? (Math.max(hi, -lo) * g > 0.99 ? '#e0735e' : '#f2bd68') : 'rgba(138, 129, 112,0.35)';
         ctx.fillRect(x, yTop, 1, Math.max(1, yBot - yTop));
       }
     } else {
-      ctx.fillStyle = '#6e6e78';
-      ctx.font = '12px -apple-system, sans-serif';
+      ctx.fillStyle = '#797161';
+      ctx.font = '12px "IBM Plex Sans", sans-serif';
       ctx.fillText('Loading audio…', pad + 10, mid);
     }
     // Loop repeats ghost
     if (region.loop && buf) {
-      ctx.fillStyle = 'rgba(245,197,24,0.7)';
+      ctx.fillStyle = 'rgba(227, 195, 90,0.7)';
       ctx.fillRect(xOf(region.contentLength), top, 2, h - top - 4);
     }
     // Fade curves
-    ctx.strokeStyle = '#ffd60a';
+    ctx.strokeStyle = '#e3c35a';
     ctx.lineWidth = 1.5;
     if (region.fadeIn > 0) {
       ctx.beginPath();
@@ -376,8 +376,8 @@ export default function AudioEditor({ trackId, regionId }: { trackId: string; re
         </div>
         <div className="ae-trim" style={{ left: xOf(region.offset) }} title="Trim start" onPointerDown={(e) => dragHandle(e, 'trimL')} />
         <div className="ae-trim" style={{ left: xOf(regionEndC) }} title="Trim end" onPointerDown={(e) => dragHandle(e, 'trimR')} />
-        <div className="ae-handle" style={{ left: fadeInX, top: top + 4, borderColor: '#ffd60a' }} title="Fade in" onPointerDown={(e) => dragHandle(e, 'fadeIn')} />
-        <div className="ae-handle" style={{ left: fadeOutX, top: top + 4, borderColor: '#ffd60a' }} title="Fade out" onPointerDown={(e) => dragHandle(e, 'fadeOut')} />
+        <div className="ae-handle" style={{ left: fadeInX, top: top + 4, borderColor: '#e3c35a' }} title="Fade in" onPointerDown={(e) => dragHandle(e, 'fadeIn')} />
+        <div className="ae-handle" style={{ left: fadeOutX, top: top + 4, borderColor: '#e3c35a' }} title="Fade out" onPointerDown={(e) => dragHandle(e, 'fadeOut')} />
         <AudioPlayhead region={region} xOf={xOf} />
       </div>
       <div className="ae-info">

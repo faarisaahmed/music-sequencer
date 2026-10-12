@@ -7,15 +7,15 @@ import { Knob } from '../common/controls';
 import { showContextMenu } from '../common/menus';
 
 const COLORS: Record<InsertKey, string> = {
-  gate: '#8e8e93',
-  amp: '#ff6b3d',
-  deesser: '#5ac8fa',
-  autowah: '#ffcc00',
-  phaser: '#bf5af2',
-  flanger: '#ff2d92',
-  tremolo: '#30d158',
-  lofi: '#ff9f0a',
-  widener: '#64d2ff',
+  gate: '#99907c',
+  amp: '#d9693b',
+  deesser: '#7fb8c4',
+  autowah: '#e3c35a',
+  phaser: '#a88cc2',
+  flanger: '#d36d7f',
+  tremolo: '#8fb573',
+  lofi: '#e08a3c',
+  widener: '#7fb8c4',
 };
 
 const ORDER: InsertKey[] = ['gate', 'amp', 'deesser', 'autowah', 'phaser', 'flanger', 'tremolo', 'lofi', 'widener'];
@@ -60,7 +60,7 @@ function InsertCard({ t, k }: { t: Track; k: InsertKey }) {
   return (
     <div className={'fx-card' + (on ? '' : ' off') + (k === 'amp' ? ' fx-wide' : '')}>
       <div className="fx-card-head">
-        <span className="dot" style={{ background: on ? color : '#55555c' }} />
+        <span className="dot" style={{ background: on ? color : '#5e574b' }} />
         {INSERT_LABELS[k]}
         <div className="spacer" />
         <button className={'btn sm icon' + (on ? ' active' : ' ghost')} title={on ? 'Bypass' : 'Enable'} onClick={() => set(t, k, { on: !on })}>

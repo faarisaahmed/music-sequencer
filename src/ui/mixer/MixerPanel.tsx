@@ -88,14 +88,14 @@ function Strip({ t, selected }: { t: Track; selected: boolean }) {
       </div>
       <div className="strip-body">
         <div className="strip-knobs">
-          {k('Low', 'eqLow', '#ff9f0a', true, 0)}
-          {k('Comp', 'compressor', '#bf5af2', false, 0.2)}
-          {k('Mid', 'eqMid', '#ffd60a', true, 0)}
-          {k('Verb', 'reverb', '#32d0e6', false, 0.15)}
-          {k('High', 'eqHigh', '#64d2ff', true, 0)}
-          {k('Delay', 'delay', '#30d158', false, 0)}
+          {k('Low', 'eqLow', '#e08a3c', true, 0)}
+          {k('Comp', 'compressor', '#a88cc2', false, 0.2)}
+          {k('Mid', 'eqMid', '#e3c35a', true, 0)}
+          {k('Verb', 'reverb', '#6fb3b8', false, 0.15)}
+          {k('High', 'eqHigh', '#7fb8c4', true, 0)}
+          {k('Delay', 'delay', '#8fb573', false, 0)}
           <div style={{ gridColumn: 'span 2' }}>
-            <Knob size={28} label={'Pan ' + panFmt(t.pan)} bipolar min={-1} max={1} value={t.pan} defaultValue={0} color="#e5e5ea" onChange={(v) => set((x) => void (x.pan = v))} />
+            <Knob size={28} label={'Pan ' + panFmt(t.pan)} bipolar min={-1} max={1} value={t.pan} defaultValue={0} color="#e7dfcd" onChange={(v) => set((x) => void (x.pan = v))} />
           </div>
         </div>
         <div className="strip-fader-row" ref={faderRef}>
@@ -126,7 +126,7 @@ function MasterStrip({ p }: { p: Project }) {
   const [faderRef, fh] = useHeight<HTMLDivElement>();
   return (
     <div className="strip master">
-      <div className="strip-color" style={{ background: 'linear-gradient(90deg,#ff9f0a,#ff2d55)' }} />
+      <div className="strip-color" style={{ background: 'linear-gradient(90deg,#e08a3c,#d0586a)' }} />
       <div className="strip-head">
         <div style={{ minWidth: 0 }}>
           <div className="strip-name">Master</div>
