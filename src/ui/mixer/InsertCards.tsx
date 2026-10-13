@@ -11,9 +11,9 @@ const COLORS: Record<InsertKey, string> = {
   amp: '#d9693b',
   deesser: '#7fb8c4',
   autowah: '#e3c35a',
-  phaser: '#a88cc2',
-  flanger: '#d36d7f',
-  tremolo: '#8fb573',
+  phaser: '#a07ae0',
+  flanger: '#e06a8f',
+  tremolo: '#5dbb7a',
   lofi: '#e08a3c',
   widener: '#7fb8c4',
 };

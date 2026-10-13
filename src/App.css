@@ -569,7 +569,7 @@
 .mini-meter i {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, #8fb573, #8fb573 70%, #e3c35a 88%, #d9533b);
+  background: linear-gradient(90deg, #5dbb7a, #5dbb7a 70%, #e3c35a 88%, #e05a4a);
   transition: width 0.05s;
 }
 .tb-export {

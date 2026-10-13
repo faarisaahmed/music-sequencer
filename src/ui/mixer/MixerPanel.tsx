@@ -89,11 +89,11 @@ function Strip({ t, selected }: { t: Track; selected: boolean }) {
       <div className="strip-body">
         <div className="strip-knobs">
           {k('Low', 'eqLow', '#e08a3c', true, 0)}
-          {k('Comp', 'compressor', '#a88cc2', false, 0.2)}
+          {k('Comp', 'compressor', '#a07ae0', false, 0.2)}
           {k('Mid', 'eqMid', '#e3c35a', true, 0)}
-          {k('Verb', 'reverb', '#6fb3b8', false, 0.15)}
+          {k('Verb', 'reverb', '#45b8c4', false, 0.15)}
           {k('High', 'eqHigh', '#7fb8c4', true, 0)}
-          {k('Delay', 'delay', '#8fb573', false, 0)}
+          {k('Delay', 'delay', '#5dbb7a', false, 0)}
           <div style={{ gridColumn: 'span 2' }}>
             <Knob size={28} label={'Pan ' + panFmt(t.pan)} bipolar min={-1} max={1} value={t.pan} defaultValue={0} color="#e2dfd9" onChange={(v) => set((x) => void (x.pan = v))} />
           </div>

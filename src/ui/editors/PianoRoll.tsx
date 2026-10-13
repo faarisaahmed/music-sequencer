@@ -253,7 +253,7 @@ function PianoRollInner({ region, track, meter, bpb, selectedIds }: { region: Mi
       ctx.roundRect(x, y, nw, nh, Math.min(3, nh / 3));
       ctx.fill();
       const flag = flagged.get(n.id);
-      ctx.strokeStyle = sel ? '#f9f6f0' : flag === 'range' ? '#d9533b' : flag === 'warn' ? '#e3c35a' : 'rgba(0,0,0,0.55)';
+      ctx.strokeStyle = sel ? '#f9f6f0' : flag === 'range' ? '#e05a4a' : flag === 'warn' ? '#e3c35a' : 'rgba(0,0,0,0.55)';
       ctx.lineWidth = sel ? 1.5 : flag ? 2 : 1;
       ctx.stroke();
       if (nh >= 11 && nw > 30 && alpha > 0.5) {

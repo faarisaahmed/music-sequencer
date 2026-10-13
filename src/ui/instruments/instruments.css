@@ -359,7 +359,7 @@
 }
 .lvl-fill {
   height: 100%;
-  background: linear-gradient(90deg, #8fb573 0%, #8fb573 65%, #e3c35a 85%, #d9533b 100%);
+  background: linear-gradient(90deg, #5dbb7a 0%, #5dbb7a 65%, #e3c35a 85%, #e05a4a 100%);
   background-size: 420px 100%;
   transition: width 0.05s;
 }

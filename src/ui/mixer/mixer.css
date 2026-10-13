@@ -174,7 +174,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(to top, #8fb573 0%, #8fb573 65%, #e3c35a 85%, #d9533b 100%);
+  background: linear-gradient(to top, #5dbb7a 0%, #5dbb7a 65%, #e3c35a 85%, #e05a4a 100%);
   background-size: 100% var(--h, 100px);
   background-position: bottom;
 }

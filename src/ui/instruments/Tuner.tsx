@@ -92,11 +92,11 @@ export default function Tuner({ active }: { active: boolean }) {
           const a = ((c * 0.9 - 90) * Math.PI) / 180;
           const r1 = i % 5 === 0 ? 70 : 76;
           return (
-            <line key={i} x1={100 + Math.cos(a) * r1} y1={100 + Math.sin(a) * r1} x2={100 + Math.cos(a) * 84} y2={100 + Math.sin(a) * 84} stroke={c === 0 ? '#8fb573' : '#5a5753'} strokeWidth={i % 5 === 0 ? 2 : 1} />
+            <line key={i} x1={100 + Math.cos(a) * r1} y1={100 + Math.sin(a) * r1} x2={100 + Math.cos(a) * 84} y2={100 + Math.sin(a) * 84} stroke={c === 0 ? '#5dbb7a' : '#5a5753'} strokeWidth={i % 5 === 0 ? 2 : 1} />
           );
         })}
         <g transform={`rotate(${angle.toFixed(2)} 100 100)`}>
-          <line x1={100} y1={100} x2={100} y2={22} stroke={reading ? (inTune ? '#8fb573' : '#e08a3c') : '#3e3c3a'} strokeWidth={3} strokeLinecap="round" />
+          <line x1={100} y1={100} x2={100} y2={22} stroke={reading ? (inTune ? '#5dbb7a' : '#e08a3c') : '#3e3c3a'} strokeWidth={3} strokeLinecap="round" />
         </g>
         <circle cx={100} cy={100} r={6} fill="#ddd" />
       </svg>

@@ -5,20 +5,24 @@ export function uid(prefix = ''): string {
 }
 
 export const TRACK_COLORS: Record<TrackType, string[]> = {
-  instrument: ['#8fae6e', '#6fa58a', '#a7b56a', '#5e9a74'],
-  drums: ['#c98b3a', '#b8743a', '#c2a050'],
-  audio: ['#6d97b8', '#5a83a6', '#7d8fc0', '#5c9fb0'],
+  instrument: ['#5dbb7a', '#3fb5a5', '#a07ae0', '#4a9f6e'],
+  drums: ['#d99a3a', '#c9773a', '#d4ad4a'],
+  audio: ['#5b9be0', '#4f86d0', '#7a86e6', '#4fb7d6'],
 };
 
 /** Track and section colours from before the analog palette → their replacements, so older songs match. */
 const RETIRED_COLORS: Record<string, string> = {
-  '#3ecf5a': '#8fae6e', '#2fbf8f': '#6fa58a', '#7ed957': '#a7b56a', '#1fae6b': '#5e9a74',
-  '#e8b92a': '#c98b3a', '#f0a020': '#b8743a', '#d9c234': '#c2a050',
-  '#3d9bff': '#6d97b8', '#2c7be5': '#5a83a6', '#5b8cff': '#7d8fc0', '#22a6f0': '#5c9fb0',
-  '#34c759': '#8fb573', '#ff9f0a': '#e08a3c', '#bf5af2': '#a88cc2', '#ff375f': '#d36d7f',
-  '#32d0e6': '#6fb3b8', '#ffd60a': '#e3c35a', '#8e8e93': '#939089',
-  '#f0892a': '#e08a3c', '#ef5350': '#d9533b', '#ec4fa0': '#d36d7f', '#a46cf0': '#a88cc2', '#28c4dc': '#6fb3b8', '#9a9aa4': '#a19e96',
+  '#3ecf5a': '#5dbb7a', '#2fbf8f': '#3fb5a5', '#7ed957': '#8cc265', '#1fae6b': '#4a9f6e',
+  '#e8b92a': '#d99a3a', '#f0a020': '#c9773a', '#d9c234': '#d4ad4a',
+  '#3d9bff': '#5b9be0', '#2c7be5': '#4f86d0', '#5b8cff': '#7a86e6', '#22a6f0': '#4fb7d6',
+  '#34c759': '#5dbb7a', '#ff9f0a': '#e08a3c', '#bf5af2': '#a07ae0', '#ff375f': '#e06a8f',
+  '#32d0e6': '#45b8c4', '#ffd60a': '#e3c35a', '#8e8e93': '#939089',
+  '#f0892a': '#e08a3c', '#ef5350': '#e05a4a', '#ec4fa0': '#e06a8f', '#a46cf0': '#a07ae0', '#28c4dc': '#45b8c4', '#9a9aa4': '#a19e96',
   '#99907c': '#939089', '#a89d87': '#a19e96',
+  // The first analog palette (muted olive/slate) → the cleaner hues.
+  '#8fae6e': '#5dbb7a', '#6fa58a': '#3fb5a5', '#a7b56a': '#8cc265', '#5e9a74': '#4a9f6e', '#c98b3a': '#d99a3a', '#b8743a': '#c9773a', '#c2a050': '#d4ad4a',
+  '#6d97b8': '#5b9be0', '#5a83a6': '#4f86d0', '#7d8fc0': '#7a86e6', '#5c9fb0': '#4fb7d6', '#8fb573': '#5dbb7a', '#6fb3b8': '#45b8c4', '#a88cc2': '#a07ae0',
+  '#d36d7f': '#e06a8f', '#d9533b': '#e05a4a',
 };
 export function currentColor(c: string): string {
   return RETIRED_COLORS[c?.toLowerCase()] ?? c;

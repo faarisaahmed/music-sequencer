@@ -30,11 +30,11 @@ interface FxCardDef {
 const CARDS: FxCardDef[] = [
   { id: 'eq', name: 'Channel EQ', color: '#e3c35a', keys: ['eqLow', 'eqMid', 'eqHigh'], wide: true },
   { id: 'filter', name: 'Filter', color: '#e08a3c', keys: ['filterCutoff'] },
-  { id: 'comp', name: 'Compressor', color: '#a88cc2', keys: ['compressor'] },
-  { id: 'drive', name: 'Amp Drive', color: '#d9533b', keys: ['drive'] },
+  { id: 'comp', name: 'Compressor', color: '#a07ae0', keys: ['compressor'] },
+  { id: 'drive', name: 'Amp Drive', color: '#e05a4a', keys: ['drive'] },
   { id: 'chorus', name: 'Chorus', color: '#7fb8c4', keys: ['chorus'] },
-  { id: 'reverb', name: 'Reverb', color: '#6fb3b8', keys: ['reverb'] },
-  { id: 'delay', name: 'Echo / Delay', color: '#8fb573', keys: ['delay'] },
+  { id: 'reverb', name: 'Reverb', color: '#45b8c4', keys: ['reverb'] },
+  { id: 'delay', name: 'Echo / Delay', color: '#5dbb7a', keys: ['delay'] },
 ];
 
 const FX_PRESETS: Record<string, Partial<Record<FxKey, number>>> = {
