@@ -25,6 +25,8 @@ node tests/repeats.mjs <chromium-executable> http://localhost:5391/ /tmp       #
 node tests/parts.mjs <chromium-executable> http://localhost:5391/ /tmp         # print parts: transposed, multi-bar rests, full score, paper, MusicXML per part, ⌘P
 node tests/review.mjs <chromium-executable> http://localhost:5391/ /tmp        # writing check: range, rubs, chord clashes, parallels, marks in the score
 node tests/guides.mjs <chromium-executable> http://localhost:5391/ /tmp       # guides: every lesson renders, examples play/mute/stop, search, read tracking, ⇧G, phone
+node tests/takes.mjs <chromium-executable> http://localhost:5391/ /tmp        # takes: cycle-recorded audio passes, adding takes, take chip/menu, comping by splitting, reopen
+node tests/automation.mjs <chromium-executable> http://localhost:5391/ /tmp   # automation lanes for filter, reverb and echo: drawing, playback, knob hand-back, menus, export
 node tests/resize-jitter.mjs <chromium-executable> http://localhost:5391/ /tmp # resizing/opening panels never paints a frame at the old size (tracks, piano roll, score, full score, steps, mixer)
 node tests/browser-smoke.mjs firefox   # real Firefox: studio, score, render, all export formats, video, MIDI, versions, timeline
 node tests/browser-smoke.mjs safari    # real Safari (run `sudo safaridriver --enable` once and allow Remote Automation)

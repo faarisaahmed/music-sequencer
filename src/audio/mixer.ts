@@ -1,12 +1,17 @@
 // Audio graph: per-track channel strips, effect buses and master bus.
 // Context-agnostic so the same graph renders live and offline (export).
-import type { AutomationPoint, MasteringSettings, Project, Track } from '../model/types';
+import type { AutomationParam, AutomationPoint, MasteringSettings, Project, Track } from '../model/types';
 import { DRUM_LANES } from '../model/music';
 import { makeImpulse } from './context';
 import { getBuffer } from './audioStore';
 import { DrumKitInstrument, SamplerInstrument, SynthInstrument, driveCurve, type Instrument } from './instruments';
 import { getPreset } from './presets';
 import { InsertChain, MID_INSERTS, POST_INSERTS, PRE_INSERTS, STEREO_INSERTS } from './effects';
+import { filterHz } from '../model/automation';
+
+/** Send levels at full reverb / echo (shared with automation). */
+export const REVERB_SEND = 0.9;
+export const DELAY_SEND = 0.8;
 
 function softClipCurve(): Float32Array<ArrayBuffer> {
   const n = 4096;
@@ -63,7 +68,7 @@ const REVERB: Record<Project['reverbType'], [number, number, number, number]> = 
 
 export class Channel {
   readonly input: GainNode;
-  private filter: BiquadFilterNode;
+  readonly filter: BiquadFilterNode;
   private eqLow: BiquadFilterNode;
   private eqMid: BiquadFilterNode;
   private eqHigh: BiquadFilterNode;
@@ -81,8 +86,10 @@ export class Channel {
   readonly panner: StereoPannerNode;
   readonly muteGain: GainNode;
   readonly analyser: AnalyserNode;
-  private reverbSend: GainNode;
-  private delaySend: GainNode;
+  /** Parameters currently driven by automation lanes. */
+  private automated = new Set<AudioParam>();
+  readonly reverbSend: GainNode;
+  readonly delaySend: GainNode;
   instrument: Instrument | null = null;
   instrumentKey = '';
   private lastDrive = -1;
@@ -181,11 +188,25 @@ export class Channel {
     this.delaySend.connect(mixer.delayIn);
   }
 
-  apply(t: Track, audible: boolean, hasPanAutomation: boolean): void {
+  apply(t: Track, audible: boolean): void {
     const now = this.ctx.currentTime;
     const smooth = (p: AudioParam, v: number) => p.setTargetAtTime(v, now, 0.02);
     const fx = t.fx;
-    smooth(this.filter.frequency, 80 * Math.pow(250, fx.filterCutoff));
+    // Automated parameters are driven by the scheduler instead.
+    const auto = (k: AutomationParam) => (t.automation[k]?.length ?? 0) > 0;
+    // Back to the knob: when a lane was just cleared, drop what its automation had scheduled.
+    const rest = (p: AudioParam, v: number) => {
+      if (this.automated.has(p)) {
+        this.automated.delete(p);
+        p.cancelScheduledValues(now);
+      }
+      smooth(p, v);
+    };
+    if (auto('filter')) this.automated.add(this.filter.frequency);
+    if (auto('pan')) this.automated.add(this.panner.pan);
+    if (auto('reverb')) this.automated.add(this.reverbSend.gain);
+    if (auto('delay')) this.automated.add(this.delaySend.gain);
+    if (!auto('filter')) rest(this.filter.frequency, filterHz(fx.filterCutoff));
     smooth(this.eqLow.gain, fx.eqLow);
     smooth(this.eqMid.gain, fx.eqMid);
     smooth(this.eqHigh.gain, fx.eqHigh);
@@ -202,17 +223,17 @@ export class Channel {
     smooth(this.driveDry.gain, 1 - fx.drive * 0.7);
     smooth(this.chorusWet.gain, fx.chorus * 0.9);
     // Bypass idle stages entirely: an open filter, zero drive or zero chorus cost nothing.
-    const filterOn = fx.filterCutoff < 0.999;
+    const filterOn = fx.filterCutoff < 0.999 || auto('filter');
     this.link('filter', this.preOut, this.filter, filterOn);
     this.link('nofilter', this.preOut, this.eqLow, !filterOn);
     this.link('drive', this.compMakeup, this.shaper, fx.drive > 0.001);
     this.link('chorusL', this.postOut, this.chorusL, fx.chorus > 0.001);
     this.link('chorusR', this.postOut, this.chorusR, fx.chorus > 0.001);
     smooth(this.fader.gain, faderGain(t.volume));
-    if (!hasPanAutomation) smooth(this.panner.pan, t.pan);
+    if (!auto('pan')) rest(this.panner.pan, t.pan);
     smooth(this.muteGain.gain, audible ? 1 : 0);
-    smooth(this.reverbSend.gain, fx.reverb * 0.9);
-    smooth(this.delaySend.gain, fx.delay * 0.8);
+    if (!auto('reverb')) rest(this.reverbSend.gain, fx.reverb * REVERB_SEND);
+    if (!auto('delay')) rest(this.delaySend.gain, fx.delay * DELAY_SEND);
     for (const c of this.chains) c.update(fx.inserts);
   }
 
@@ -378,7 +399,7 @@ export class Mixer {
         this.channels.set(t.id, ch);
       }
       const audible = !t.mute && (!anySolo || t.solo);
-      ch.apply(t, audible, t.automation.pan.length > 0);
+      ch.apply(t, audible);
       const key = instrumentKey(t);
       if (ch.instrumentKey !== key) ch.setInstrument(createInstrument(this.ctx, t), key);
       ch.instrument?.setParams(t.instrumentParams);

@@ -49,6 +49,10 @@ function eachPointList(d: Draft<Project>, fn: (pts: Draft<AutomationPoint>[], se
   for (const t of d.tracks) {
     fn(t.automation.volume, (p) => (t.automation.volume = p), t.id + ':volume');
     fn(t.automation.pan, (p) => (t.automation.pan = p), t.id + ':pan');
+    for (const k of ['filter', 'reverb', 'delay'] as const) {
+      const pts = t.automation[k];
+      if (pts) fn(pts, (p) => (t.automation[k] = p), t.id + ':' + k);
+    }
   }
 }
 

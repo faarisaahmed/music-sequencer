@@ -671,7 +671,7 @@ const chapter: Chapter = {
           <Try>
             <Steps>
               <li>
-                To automate a track's volume, click the <Ui>A</Ui> button on the track header: it cycles through showing the <b>volume</b> lane, the <b>pan</b> lane and off. Click in the lane to add points and drag them to draw changes over time.
+                Click the <Ui>A</Ui> button on a track header to show its automation lane, then pick what it controls from the menu at the left of the lane: <b>Volume</b>, <b>Pan</b>, <b>Filter</b>, <b>Reverb</b> or <b>Echo</b>. Click in the lane to add points and drag them to draw changes over time. A dot next to a name in that menu means the lane already has points.
               </li>
               <li>
                 For a reference track, drag an audio file of the song onto the timeline to import it onto an audio track. Mute it while you work and solo it to compare. Delete or mute it before you export.
@@ -687,6 +687,9 @@ const chapter: Chapter = {
           <Pro>
             Mix engineers on big records often spend more time on automation than on EQ and compression combined: riding the vocal word by word, lifting a guitar riff for one bar, pulling a reverb back in the busy chorus. Static mixes sound like demos; moving mixes sound like records.
           </Pro>
+          <Tip title="Echo throws">
+            A classic automation trick: keep a vocal or lead almost dry, then push its <b>Echo</b> lane up for just the last word of a line, so that one word repeats into the gap. Draw the lane up for a beat and straight back down. It adds drama without making the whole part washy.
+          </Tip>
         </>
       ),
     },

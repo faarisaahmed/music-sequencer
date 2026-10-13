@@ -36,7 +36,7 @@ export async function backUpAllSongs(): Promise<void> {
 
 function useBackupInfo() {
   const [folder, setFolder] = useState<FolderStatus>({ kind: 'none' });
-  const [need, setNeed] = useState<{ count: number; snoozed: boolean }>({ count: 0, snoozed: true });
+  const [need, setNeed] = useState<{ count: number; snoozed: boolean; songs: number }>({ count: 0, snoozed: true, songs: 0 });
   useEffect(() => {
     const load = () => {
       void backupFolderStatus().then(setFolder);
@@ -137,10 +137,56 @@ export function SafetySettings() {
   );
 }
 
-/** Home screen reminder when songs haven't been backed up for a while. */
+/**
+ * Home screen backup prompts, most urgent first: folder backups paused (Chrome asks again after a
+ * restart), no backup folder set up yet, or songs not backed up for a week.
+ */
 export function BackupBanner() {
   const { folder, setFolder, need } = useBackupInfo();
-  if (need.snoozed || need.count === 0) return null;
+  if (need.snoozed) return null;
+  if (folder.kind === 'paused')
+    return (
+      <div className="backup-banner">
+        <ShieldAlert size={18} />
+        <div className="grow">
+          <b>Backups to “{folder.name}” are paused</b>
+          <span>The browser asks again after it restarts. Choose “Allow on every visit” when it asks and you won't see this again.</span>
+        </div>
+        <button className="btn sm primary" onClick={async () => setFolder(await resumeBackupFolder())}>
+          Resume Backups
+        </button>
+        <button className="btn ghost icon sm" title="Remind me tomorrow" onClick={() => void snoozeBackupReminder(1)}>
+          <X size={15} />
+        </button>
+      </div>
+    );
+  if (folder.kind === 'none' && canUseBackupFolder() && need.songs > 0)
+    return (
+      <div className="backup-banner">
+        <ShieldAlert size={18} />
+        <div className="grow">
+          <b>Keep your songs safe automatically</b>
+          <span>Songs live in this browser. Pick a backup folder (one in iCloud Drive, Dropbox or Google Drive is ideal) and every song is copied there as you work.</span>
+        </div>
+        <button
+          className="btn sm primary"
+          onClick={async () => {
+            try {
+              setFolder(await chooseBackupFolder());
+              toast('Backup folder set. Every song is copied there as you work', 'success');
+            } catch (e) {
+              if ((e as Error).name !== 'AbortError') toast('Could not use that folder: ' + (e as Error).message, 'error');
+            }
+          }}
+        >
+          Choose Backup Folder…
+        </button>
+        <button className="btn ghost icon sm" title="Not now (remind me in two weeks)" onClick={() => void snoozeBackupReminder(14)}>
+          <X size={15} />
+        </button>
+      </div>
+    );
+  if (need.count === 0) return null;
   return (
     <div className="backup-banner">
       <ShieldAlert size={18} />
@@ -150,15 +196,9 @@ export function BackupBanner() {
         </b>
         <span>Songs live in this browser. A backup keeps them safe if it's cleared or you switch devices.</span>
       </div>
-      {folder.kind === 'paused' ? (
-        <button className="btn sm primary" onClick={async () => setFolder(await resumeBackupFolder())}>
-          Resume Folder Backups
-        </button>
-      ) : (
-        <button className="btn sm primary" onClick={() => void backUpAllSongs()}>
-          Back Up Now
-        </button>
-      )}
+      <button className="btn sm primary" onClick={() => void backUpAllSongs()}>
+        Back Up Now
+      </button>
       <button className="btn ghost icon sm" title="Remind me in 3 days" onClick={() => void snoozeBackupReminder(3)}>
         <X size={15} />
       </button>

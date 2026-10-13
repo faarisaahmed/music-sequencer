@@ -1,5 +1,5 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Link2, Repeat } from 'lucide-react';
+import { Layers, Link2, Repeat } from 'lucide-react';
 import { isLinkedClip } from '../../model/patterns';
 import type { AudioRegion, MidiRegion, Region, TrackType } from '../../model/types';
 import { placedNotes, regionSegments } from '../../model/regions';
@@ -10,7 +10,7 @@ import { closeMenus, showContextMenu, showPillMenu } from '../common/menus';
 
 let pillTimer: ReturnType<typeof setTimeout> | null = null;
 import { dragFade, dragLoop, dragMove, dragResizeLeft, dragResizeRight } from './regionOps';
-import { openRegionEditor, regionMenu, regionPillItems } from './menus';
+import { openRegionEditor, regionMenu, regionPillItems, takesMenu } from './menus';
 import { useTracksUi } from './tracksUi';
 import { RegionPresence } from '../collab/presence';
 
@@ -337,6 +337,21 @@ function RegionView({ region: r, trackId, trackType, color, ppb, height, bpm }: 
           />
         ) : (
           <span>{r.name}</span>
+        )}
+        {r.kind === 'audio' && r.takes && r.takes.length > 1 && (
+          <button
+            className="region-take"
+            title="Choose which take plays"
+            onPointerDown={(e) => e.stopPropagation()}
+            onDoubleClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              const b = (e.currentTarget as HTMLElement).getBoundingClientRect();
+              showContextMenu({ clientX: b.left, clientY: b.bottom + 2 }, takesMenu(r.id));
+            }}
+          >
+            <Layers size={10} />
+            {r.takes.findIndex((k) => k.audioId === r.audioId) + 1}/{r.takes.length}
+          </button>
         )}
       </div>
       <div className="region-body" style={{ height: bodyH }}>

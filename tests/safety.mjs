@@ -121,6 +121,21 @@ await S(async () => {
 });
 await page.reload();
 await page.waitForTimeout(800);
+// Where the browser can keep a backup folder, Home first offers to set one up.
+check('folderSetupOffered', (await page.locator('.backup-banner b').textContent().catch(() => '')) === 'Keep your songs safe automatically' && (await page.locator('.backup-banner button:has-text("Choose Backup Folder")').count()) === 1, await page.locator('.backup-banner b').allTextContents());
+await page.click('.backup-banner button[title^="Not now"]');
+await page.waitForTimeout(300);
+check('folderSetupSnoozed', (await page.locator('.backup-banner').count()) === 0);
+// Without folder support (Safari, Firefox), the weekly reminder offers a backup file.
+await S(async () => {
+  const { set, createStore } = await import('/node_modules/.vite/deps/idb-keyval.js');
+  await set('backups', { done: {} }, createStore('bandforge-settings', 'settings'));
+});
+await page.addInitScript(() => {
+  delete window.showDirectoryPicker;
+});
+await page.reload();
+await page.waitForTimeout(800);
 check('reminderShown', await page.locator('.backup-banner').count() === 1 && /1 song hasn't been backed up/.test(await page.locator('.backup-banner b').textContent()), await page.locator('.backup-banner').count());
 await page.screenshot({ path: `${out}/backup-banner.png` });
 await page.click('.backup-banner button[title="Remind me in 3 days"]');

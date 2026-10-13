@@ -388,6 +388,13 @@
 .auto-help {
   font-size: 10.5px;
 }
+.auto-param {
+  height: 24px;
+  padding: 2px 6px !important;
+  font-size: 12px;
+  align-self: flex-start;
+  min-width: 110px;
+}
 .automation-lane {
   position: relative;
   flex-shrink: 0;
@@ -1011,4 +1018,30 @@ html.touch .tempo-pt::after {
   line-height: 13px;
   cursor: pointer;
   z-index: 3;
+}
+
+/* Take chooser on audio regions with several takes */
+.region-take {
+  flex-shrink: 0;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 13px;
+  padding: 0 5px;
+  border: none;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 700;
+  font-family: var(--mono);
+  cursor: pointer;
+}
+.region-take:hover {
+  background: rgba(0, 0, 0, 0.55);
+}
+.region.selected .region-take {
+  background: rgba(0, 0, 0, 0.18);
+  color: #111;
 }

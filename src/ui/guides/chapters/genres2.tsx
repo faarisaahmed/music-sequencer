@@ -218,7 +218,7 @@ const lessons: Lesson[] = [
               Add an <b>Analog Bass</b> and write the off-beat line above in the <Ui>Piano Roll</Ui> with the grid at 1/8. Put the chords on a <b>Classic Organ</b> or <b>Electric Piano</b> track with short notes.
             </li>
             <li>
-              For the breakdown, put the chords on a second track with a pad sound and turn its <Ui>Filter</Ui> cutoff down in <Ui>Smart Controls</Ui> (<K>B</K>). Use volume automation (the <Ui>A</Ui> button on the track header) to fade the pad in through the build.
+              For the breakdown and build, click the pad track's <Ui>A</Ui> button and choose <b>Filter</b> in the lane's menu. Draw the lane low at the start of the breakdown and ramp it up to the top across the last 8 bars before the drop: that's the filter sweep. Add a <b>Reverb</b> lane that rises with it for extra lift, then drops back down on the first beat of the drop.
             </li>
             <li>Lay the song out with the arrangement lane in 8-bar blocks before writing more music. Arrangement is half the song in this style.</li>
           </Steps>

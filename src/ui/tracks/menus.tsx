@@ -1,6 +1,6 @@
 // Context menus for regions, lanes and track headers.
 import { meterOf } from '../../model/timeline';
-import { Copy, Scissors, Trash2, ClipboardPaste, Repeat, SquarePen, Plus, FileAudio, Palette, Pencil, Music, Play, Unlink, Repeat1, Shuffle } from 'lucide-react';
+import { Copy, Scissors, Trash2, ClipboardPaste, Repeat, SquarePen, Plus, FileAudio, Palette, Pencil, Music, Play, Unlink, Repeat1, Shuffle, Check, Layers } from 'lucide-react';
 import { GROOVE_PRESETS, grooveLabel, swingPercent } from '../../model/groove';
 import { isLinkedClip, patternUseCounts } from '../../model/patterns';
 import type { Track } from '../../model/types';
@@ -27,10 +27,14 @@ import {
   toggleLoopRegions,
   transposeRegions,
   updateTrack,
+  chooseTake,
+  deleteOtherTakes,
 } from '../../state/actions';
 import { getEngine } from '../../audio/engine';
 import type { MenuItem } from '../common/menus';
 import { useTracksUi } from './tracksUi';
+import { AUTOMATION_PARAMS } from '../../model/types';
+import { AUTOMATION_LABEL, hasAutomation, pointsFor } from '../../model/automation';
 
 export function openRegionEditor(regionId: string): void {
   const p = useStore.getState().project;
@@ -71,6 +75,18 @@ export function convertToSampler(regionId: string): void {
     t.name = (f.region.name || 'Sample') + ' Sampler';
   });
   useStore.setState({ dockTab: 'instrument' });
+}
+
+/** The takes of an audio region: pick which one plays, or keep just that one. */
+export function takesMenu(regionId: string): MenuItem[] {
+  const f = findRegion(useStore.getState().project, regionId);
+  if (!f || f.region.kind !== 'audio' || !f.region.takes?.length) return [];
+  const r = f.region;
+  return [
+    ...r.takes!.map((k) => ({ label: k.name, icon: k.audioId === r.audioId ? <Check size={14} /> : <span style={{ width: 14 }} />, onClick: () => chooseTake(regionId, k.audioId) })),
+    { separator: true },
+    { label: 'Keep Only This Take', onClick: () => deleteOtherTakes(regionId) },
+  ];
 }
 
 /** Items for the region context menu. `clickBeat` = where on the timeline the menu was opened. */
@@ -164,6 +180,7 @@ export function regionMenu(regionId: string, clickBeat: number): MenuItem[] {
       },
     );
   } else {
+    if (r.kind === 'audio' && r.takes?.length) items.push({ separator: true }, { label: `Takes (${r.takes.findIndex((k) => k.audioId === r.audioId) + 1} of ${r.takes.length})`, icon: <Layers size={14} />, submenu: takesMenu(regionId) });
     items.push(
       { separator: true },
       {
@@ -326,27 +343,25 @@ export function trackMenu(t: Track): MenuItem[] {
     },
     { separator: true },
     {
-      label: t.showAutomation === 'volume' ? 'Hide Volume Automation' : 'Show Volume Automation',
-      onClick: () =>
-        updateTrack(t.id, (x) => {
-          x.showAutomation = x.showAutomation === 'volume' ? null : 'volume';
-        }),
-    },
-    {
-      label: t.showAutomation === 'pan' ? 'Hide Pan Automation' : 'Show Pan Automation',
-      onClick: () =>
-        updateTrack(t.id, (x) => {
-          x.showAutomation = x.showAutomation === 'pan' ? null : 'pan';
-        }),
-    },
-    {
-      label: 'Clear Automation',
-      disabled: !t.automation.volume.length && !t.automation.pan.length,
-      onClick: () =>
-        updateTrack(t.id, (x) => {
-          x.automation.volume = [];
-          x.automation.pan = [];
-        }),
+      label: 'Automation',
+      submenu: [
+        ...AUTOMATION_PARAMS.map((k) => ({
+          label: `${t.showAutomation === k ? 'Hide' : 'Show'} ${AUTOMATION_LABEL[k]}${pointsFor(t, k).length ? ' (drawn)' : ''}`,
+          onClick: () =>
+            updateTrack(t.id, (x) => {
+              x.showAutomation = x.showAutomation === k ? null : k;
+            }),
+        })),
+        { separator: true },
+        {
+          label: 'Clear All Automation',
+          disabled: !hasAutomation(t),
+          onClick: () =>
+            updateTrack(t.id, (x) => {
+              x.automation = { volume: [], pan: [] };
+            }),
+        },
+      ],
     },
     { separator: true },
     { label: 'New Track…', icon: <Plus size={14} />, onClick: () => openModal('newTrack') },

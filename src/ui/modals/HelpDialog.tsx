@@ -69,7 +69,7 @@ export default function HelpDialog() {
           Drag the right edge of a region to make it longer, turn on looping to repeat it, and press <b>{shortcutLabel('region.split')}</b> to cut it at the playhead.
         </li>
         <li>
-          Shape the mix in the <b>Mixer</b> ({shortcutLabel('view.mixer')}) and <b>Smart Controls</b> ({shortcutLabel('view.fx')}). Draw volume curves in a track’s automation lane for fades and dynamics.
+          Shape the mix in the <b>Mixer</b> ({shortcutLabel('view.mixer')}) and <b>Smart Controls</b> ({shortcutLabel('view.fx')}). Draw volume, pan, filter, reverb and echo changes in a track’s automation lane (the <b>A</b> button) for fades, sweeps and build-ups.
         </li>
         <li>
           Change tempo and key in the display at the top. When you’re done, <b>Export</b> to MP3, WAV or MIDI.

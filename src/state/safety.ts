@@ -174,7 +174,7 @@ export async function snoozeBackupReminder(days = 3): Promise<void> {
 }
 
 /** Songs changed since their last backup and at least a week old (so brand-new doodles don't nag). */
-export async function songsNeedingBackup(): Promise<{ count: number; snoozed: boolean }> {
+export async function songsNeedingBackup(): Promise<{ count: number; snoozed: boolean; songs: number }> {
   const st = await backupState();
   const list = await listProjects();
   const week = 7 * 86_400_000;
@@ -183,7 +183,7 @@ export async function songsNeedingBackup(): Promise<{ count: number; snoozed: bo
     if (d && d.updatedAt >= m.updatedAt) return false;
     return Date.now() - (d?.at ?? m.createdAt) > week;
   }).length;
-  return { count, snoozed: !!st.snoozeUntil && st.snoozeUntil > Date.now() };
+  return { count, snoozed: !!st.snoozeUntil && st.snoozeUntil > Date.now(), songs: list.length };
 }
 
 async function audioOf(projects: Project[]): Promise<Record<string, { name: string; type: string; data: string }>> {

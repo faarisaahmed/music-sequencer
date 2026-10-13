@@ -1,13 +1,14 @@
 import { memo, useState } from 'react';
 import type { Draft } from 'immer';
-import type { AutomationPoint, Project } from '../../model/types';
+import type { AutomationParam, AutomationPoint, Project } from '../../model/types';
+import { AUTOMATION_RANGE, filterHz } from '../../model/automation';
 import { snap } from '../../model/music';
 import { beginGesture, commit, endGesture, live, useStore } from '../../state/store';
 import { startDrag } from '../common/drag';
 import { showContextMenu } from '../common/menus';
 import { AUTOMATION_H } from './tracksUi';
 
-type Param = 'volume' | 'pan';
+type Param = AutomationParam;
 
 interface Props {
   /** Track id, or null for the master track. */
@@ -25,10 +26,16 @@ const PAD = 7;
 function pointsOf(d: Draft<Project>, trackId: string | null, param: Param): Draft<AutomationPoint>[] | null {
   if (trackId === null) return d.masterAutomation;
   const t = d.tracks.find((x) => x.id === trackId);
-  return t ? t.automation[param] : null;
+  if (!t) return null;
+  return (t.automation[param] ??= []);
 }
 
 export function formatAutomation(param: Param, v: number): string {
+  if (param === 'filter') {
+    const hz = filterHz(v);
+    return v >= 0.999 ? 'Open' : hz >= 1000 ? `${(hz / 1000).toFixed(1)} kHz` : `${Math.round(hz)} Hz`;
+  }
+  if (param === 'reverb' || param === 'delay') return `${Math.round(v * 100)}%`;
   if (param === 'pan') return v === 0 ? 'C' : v < 0 ? `L${Math.round(-v * 100)}` : `R${Math.round(v * 100)}`;
   if (v <= 0.0001) return '−∞ dB';
   return `${(20 * Math.log10(v * v)).toFixed(1)} dB`;
@@ -36,7 +43,7 @@ export function formatAutomation(param: Param, v: number): string {
 
 function AutomationLane({ trackId, param, points, fallback, width, ppb, color }: Props) {
   const H = AUTOMATION_H;
-  const [min, max] = param === 'pan' ? [-1, 1] : [0, 1.25];
+  const [min, max] = AUTOMATION_RANGE[param];
   const [hint, setHint] = useState<{ x: number; y: number; text: string } | null>(null);
   const toY = (v: number) => PAD + (1 - (v - min) / (max - min)) * (H - PAD * 2);
   const fromY = (y: number) => Math.max(min, Math.min(max, min + (1 - (y - PAD) / (H - PAD * 2)) * (max - min)));
@@ -127,7 +134,7 @@ function AutomationLane({ trackId, param, points, fallback, width, ppb, color }:
         {param === 'volume' && <line x1={0} x2={width} y1={toY(1)} y2={toY(1)} className="auto-center" />}
         {points.length ? (
           <>
-            {param === 'volume' && <path d={area} className="auto-area" />}
+            {param !== 'pan' && <path d={area} className="auto-area" />}
             <path d={path} className="auto-line" />
             {points.map((p, i) => (
               <circle

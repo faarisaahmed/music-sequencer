@@ -29,6 +29,8 @@ interface RecordingState {
   cycle: boolean;
   // audio
   recorder?: PcmRecorder;
+  /** Where the transport started (audio-context time and beat), to line the recording up. */
+  origin?: { ctxTime: number; beat: number };
 }
 
 type LiveListener = (pitch: number, on: boolean, trackId: string, velocity?: number) => void;
@@ -249,7 +251,7 @@ class Engine {
     }
     const loopStart = pat ? pat.start : p.loop.start;
     const loopEnd = pat ? pat.end : p.loop.end;
-    const loopOn = !!pat || (p.loop.enabled && p.loop.end > p.loop.start && !(this.rec?.kind === 'audio'));
+    const loopOn = !!pat || (p.loop.enabled && p.loop.end > p.loop.start && !(this.rec && !this.rec.cycle));
     // Repeats and jumps (the cycle area and recording take priority).
     const spans = !loopOn && !this.rec ? this.formSpans(p) : null;
     this.sources = this.sources.filter((s) => s.end > now);
@@ -474,7 +476,8 @@ class Engine {
       return;
     }
     await resumeAudio();
-    const cycle = p.loop.enabled && track.type !== 'audio';
+    // With the cycle on, recording repeats over it: MIDI passes merge, audio passes become takes.
+    const cycle = p.loop.enabled && p.loop.end > p.loop.start;
     const startBeat = cycle ? p.loop.start : s.cursor;
     // Count in one bar of the meter you're about to play in.
     const preroll = p.countIn ? meterOf(p).lenAt(startBeat) : 0;
@@ -499,6 +502,7 @@ class Engine {
     this.countInUntil = preroll ? startBeat : -Infinity;
     useStore.setState({ recording: true, countingIn: preroll > 0, selectedTrackId: track.id });
     await this.play(startBeat - preroll);
+    if (this.rec && this.segments[0]) this.rec.origin = { ...this.segments[0] };
   }
 
   get recordingInfo(): { trackId: string; startBeat: number; notes: Note[]; kind: string } | null {
@@ -557,27 +561,62 @@ class Engine {
         }
         const tm = tempoOf(p);
         const recStartCtx = recorder.startTime >= 0 ? recorder.startTime : this.ctx.currentTime;
-        const beatAtRecStart = this.beatAtSafe(recStartCtx);
+        const origin = rec.origin ?? { ctxTime: recStartCtx, beat: this.beatAtSafe(recStartCtx) };
         const latency = (this.ctx.baseLatency || 0) + (this.ctx.outputLatency || 0) + useInputSettings.getState().latencyMs / 1000;
         // Seconds of the recording to discard so that audio lines up with startBeat.
-        const skip = Math.max(0, tm.span(beatAtRecStart, rec.startBeat) + latency);
+        const skip = Math.max(0, origin.ctxTime - recStartCtx + tm.span(origin.beat, rec.startBeat) + latency);
         const startSample = Math.floor(skip * raw.sampleRate);
         const len = raw.length - startSample;
         if (len < raw.sampleRate * 0.1) return;
-        const trimmed = this.ctx.createBuffer(raw.numberOfChannels, len, raw.sampleRate);
-        for (let c = 0; c < raw.numberOfChannels; c++) trimmed.copyToChannel(raw.getChannelData(c).subarray(startSample), c);
-        const id = uid('a');
-        await addBuffer(id, trimmed, 'Recording');
-        const lengthBeats = tm.beat(tm.sec(rec.startBeat) + trimmed.duration) - rec.startBeat;
+        // One take per pass over the cycle (a last partial pass counts if it's at least a third long).
+        const passLen = rec.cycle ? Math.floor(tm.span(p.loop.start, p.loop.end) * raw.sampleRate) : len;
+        const passes: AudioBuffer[] = [];
+        for (let from = startSample; from < raw.length; from += passLen) {
+          const n = Math.min(passLen, raw.length - from);
+          if (passes.length && n < passLen / 3) break;
+          if (n < raw.sampleRate * 0.1) break;
+          const buf = this.ctx.createBuffer(raw.numberOfChannels, n, raw.sampleRate);
+          for (let c = 0; c < raw.numberOfChannels; c++) buf.copyToChannel(raw.getChannelData(c).subarray(from, from + n), c);
+          passes.push(buf);
+        }
+        const ids: string[] = [];
+        for (const buf of passes) {
+          const id = uid('a');
+          await addBuffer(id, buf, 'Recording');
+          ids.push(id);
+        }
+        const beatsOf = (buf: AudioBuffer) => tm.beat(tm.sec(rec.startBeat) + buf.duration) - rec.startBeat;
+        const lengthBeats = rec.cycle ? p.loop.end - p.loop.start : beatsOf(passes[0]);
+        // The take that plays: the last complete pass.
+        const full = passes.map((b, i) => (b.length >= passLen - 1 ? i : -1)).filter((i) => i >= 0);
+        const active = ids[full.length ? full[full.length - 1] : ids.length - 1];
+        let takeCount = 0;
         commit((d) => {
           const t = d.tracks.find((x) => x.id === rec.trackId);
           if (!t) return;
-          const r = createAudioRegion(rec.startBeat, lengthBeats, id, t.name);
-          t.regions.push(r);
+          // Recording again from where an earlier recording starts adds takes to it.
+          const host = t.regions.find((r) => r.kind === 'audio' && Math.abs(r.start - r.offset - rec.startBeat) < 1e-3 && r.start < rec.startBeat + lengthBeats);
+          if (host && host.kind === 'audio') {
+            const takes = host.takes?.length ? host.takes : [{ audioId: host.audioId, name: 'Take 1' }];
+            for (const id of ids) takes.push({ audioId: id, name: `Take ${takes.length + 1}` });
+            host.takes = takes;
+            host.audioId = active;
+            host.length = Math.max(host.length, rec.startBeat + lengthBeats - host.start);
+            host.contentLength = Math.max(host.contentLength, host.offset + host.length);
+            takeCount = takes.length;
+          } else {
+            const r = createAudioRegion(rec.startBeat, lengthBeats, active, t.name);
+            if (ids.length > 1) r.takes = ids.map((id, i) => ({ audioId: id, name: `Take ${i + 1}` }));
+            t.regions.push(r);
+            takeCount = ids.length;
+          }
           const bars = Math.ceil(meterOf(p).barPos(rec.startBeat + lengthBeats) - 1e-6) + 4;
           if (bars > d.lengthBars) d.lengthBars = bars;
         });
-        toast('Audio recorded', 'success');
+        toast(
+          takeCount <= 1 ? 'Audio recorded' : ids.length > 1 ? `Recorded ${ids.length} takes. The take chip on the region switches between them` : `Added take ${takeCount}. The take chip on the region switches between them`,
+          'success',
+        );
       } catch (e) {
         console.error(e);
         toast('Could not decode recording', 'error');

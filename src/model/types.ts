@@ -92,13 +92,22 @@ export interface AudioRegion extends RegionBase {
   fadeIn: number;
   fadeOut: number;
   reversed?: boolean;
+  /**
+   * Alternate recordings of the same passage, each starting at the same beat as audioId's.
+   * audioId is the take that plays; split the region to use different takes in different places.
+   */
+  takes?: { audioId: string; name: string }[];
 }
 
 export type Region = MidiRegion | AudioRegion;
 
+/** What a track's automation lane can control. */
+export type AutomationParam = 'volume' | 'pan' | 'filter' | 'reverb' | 'delay';
+export const AUTOMATION_PARAMS: AutomationParam[] = ['volume', 'pan', 'filter', 'reverb', 'delay'];
+
 export interface AutomationPoint {
   beat: number;
-  value: number; // volume: 0..1 (maps to track gain multiplier), pan: -1..1
+  value: number; // volume: 0..1 (maps to track gain multiplier), pan: -1..1, filter/reverb/delay: 0..1
 }
 
 export type AmpModel = 'clean' | 'crunch' | 'british' | 'highgain' | 'bass';
@@ -167,8 +176,14 @@ export interface Track {
   automation: {
     volume: AutomationPoint[];
     pan: AutomationPoint[];
+    /** Filter cutoff 0..1 (same scale as fx.filterCutoff; 1 = open). */
+    filter?: AutomationPoint[];
+    /** Reverb send 0..1. */
+    reverb?: AutomationPoint[];
+    /** Echo send 0..1. */
+    delay?: AutomationPoint[];
   };
-  showAutomation?: 'volume' | 'pan' | null;
+  showAutomation?: AutomationParam | null;
   /** Transpose applied at playback for MIDI tracks (semitones). */
   transpose: number;
   height?: number;

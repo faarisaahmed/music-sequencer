@@ -4,7 +4,8 @@ import type { AudioRegion, AutomationPoint, Project } from '../model/types';
 import { placedNotes, regionSegments } from '../model/regions';
 import { applyGroove, grooveFor } from '../model/groove';
 import { getBuffer } from './audioStore';
-import { automationValueAt, type Mixer } from './mixer';
+import { automationValueAt, DELAY_SEND, REVERB_SEND, type Mixer } from './mixer';
+import { filterHz } from '../model/automation';
 
 export interface ActiveSource {
   src: AudioBufferSourceNode;
@@ -49,6 +50,9 @@ export function scheduleRange(p: Project, mixer: Mixer, b0: number, b1: number, 
     // Automation
     scheduleAutomation(t.automation.volume, ch.autoGain.gain, b0, b1, toTime, opts.fresh, 1, (v) => v * v);
     if (t.automation.pan.length) scheduleAutomation(t.automation.pan, ch.panner.pan, b0, b1, toTime, opts.fresh, t.pan, (v) => v);
+    if (t.automation.filter?.length) scheduleAutomation(t.automation.filter, ch.filter.frequency, b0, b1, toTime, opts.fresh, t.fx.filterCutoff, filterHz, 0.0625);
+    if (t.automation.reverb?.length) scheduleAutomation(t.automation.reverb, ch.reverbSend.gain, b0, b1, toTime, opts.fresh, t.fx.reverb, (v) => v * REVERB_SEND);
+    if (t.automation.delay?.length) scheduleAutomation(t.automation.delay, ch.delaySend.gain, b0, b1, toTime, opts.fresh, t.fx.delay, (v) => v * DELAY_SEND);
 
     for (const r of t.regions) {
       if (r.muted) continue;
@@ -105,6 +109,8 @@ function scheduleAutomation(
   fresh: boolean,
   fallback: number,
   map: (v: number) => number,
+  /** Ramp in steps this many beats apart, so a non-linear map (like filter Hz) sweeps evenly. */
+  step = 0,
 ): void {
   if (!points.length) {
     if (fresh) {
@@ -117,9 +123,12 @@ function scheduleAutomation(
     param.cancelScheduledValues(toTime(b0));
     param.setValueAtTime(map(automationValueAt(points, b0, fallback)), toTime(b0));
   }
-  for (const pt of points) {
-    if (pt.beat > b0 && pt.beat <= b1) param.linearRampToValueAtTime(map(pt.value), toTime(pt.beat));
-  }
+  if (step) {
+    for (let b = Math.ceil(b0 / step + 1e-9) * step; b < b1; b += step) param.linearRampToValueAtTime(map(automationValueAt(points, b, fallback)), toTime(b));
+  } else
+    for (const pt of points) {
+      if (pt.beat > b0 && pt.beat <= b1) param.linearRampToValueAtTime(map(pt.value), toTime(pt.beat));
+    }
   param.linearRampToValueAtTime(map(automationValueAt(points, b1, fallback)), toTime(b1));
 }
 

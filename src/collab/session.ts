@@ -598,7 +598,11 @@ function askForClip(id: string, tried: Set<string>): void {
 }
 
 function noteClipOrigins(d: Delta, from: string): void {
-  for (const { region } of d.regions ?? []) if (region.kind === 'audio') clipOrigin.set(region.audioId, from);
+  for (const { region } of d.regions ?? [])
+    if (region.kind === 'audio') {
+      clipOrigin.set(region.audioId, from);
+      for (const k of region.takes ?? []) clipOrigin.set(k.audioId, from);
+    }
   for (const t of d.tracks ?? []) if (t.samplerAudioId) clipOrigin.set(t.samplerAudioId, from);
 }
 

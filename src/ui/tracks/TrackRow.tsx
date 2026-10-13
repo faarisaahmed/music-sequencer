@@ -15,6 +15,8 @@ import AutomationLane from './AutomationLane';
 import { laneMenu, trackMenu } from './menus';
 import { AUTOMATION_H, useTracksUi } from './tracksUi';
 import { TrackPresence } from '../collab/presence';
+import { AUTOMATION_PARAMS, type AutomationParam } from '../../model/types';
+import { AUTOMATION_LABEL, pointsFor, restingValue } from '../../model/automation';
 
 function Meter({ trackId }: { trackId: string }) {
   const level = useTransport((s) => s.levels[trackId] ?? 0);
@@ -139,10 +141,10 @@ function TrackHeader({ track, height, selected }: { track: Track; height: number
           </button>
           <button
             className={'th-btn auto' + (track.showAutomation ? ' on' : '')}
-            title="Show automation (volume → pan → off)"
+            title="Show automation: draw changes to volume, pan, filter, reverb or echo over time"
             onClick={() =>
               updateTrack(track.id, (t) => {
-                t.showAutomation = t.showAutomation === 'volume' ? 'pan' : t.showAutomation === 'pan' ? null : 'volume';
+                t.showAutomation = t.showAutomation ? null : (AUTOMATION_PARAMS.find((p) => pointsFor(t, p).length) ?? 'volume');
               })
             }
           >
@@ -320,28 +322,30 @@ function TrackRow({ track, width, ppb, height, bpm, onMarquee }: RowProps) {
       {auto && (
         <div className="track-row auto-row" style={{ height: AUTOMATION_H }}>
           <div className="auto-header" style={{ ['--c' as string]: track.color }}>
-            <div className="seg">
-              {(['volume', 'pan'] as const).map((p) => (
-                <button
-                  key={p}
-                  className={auto === p ? 'on' : ''}
-                  onClick={() =>
-                    updateTrack(track.id, (t) => {
-                      t.showAutomation = p;
-                    })
-                  }
-                >
-                  {p === 'volume' ? 'Volume' : 'Pan'}
-                </button>
+            <select
+              className="auto-param"
+              value={auto}
+              title="Which setting this lane controls"
+              onChange={(e) =>
+                updateTrack(track.id, (t) => {
+                  t.showAutomation = e.target.value as AutomationParam;
+                })
+              }
+            >
+              {AUTOMATION_PARAMS.map((p) => (
+                <option key={p} value={p}>
+                  {AUTOMATION_LABEL[p]}
+                  {pointsFor(track, p).length ? ' •' : ''}
+                </option>
               ))}
-            </div>
+            </select>
             <div className="auto-help faint">Click to add · drag · double-click deletes</div>
           </div>
           <AutomationLane
             trackId={track.id}
             param={auto}
-            points={track.automation[auto]}
-            fallback={auto === 'volume' ? 1 : track.pan}
+            points={pointsFor(track, auto)}
+            fallback={restingValue(track, auto)}
             width={width}
             ppb={ppb}
             color={track.color}

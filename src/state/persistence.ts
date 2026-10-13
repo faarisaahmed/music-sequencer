@@ -63,7 +63,11 @@ export function projectAudioIds(p: Project): string[] {
   for (const t of p.tracks) {
     if (t.samplerAudioId) ids.add(t.samplerAudioId);
     for (const d of Object.values(t.drumSamples ?? {})) ids.add(d.audioId);
-    for (const r of t.regions) if (r.kind === 'audio') ids.add(r.audioId);
+    for (const r of t.regions)
+      if (r.kind === 'audio') {
+        ids.add(r.audioId);
+        for (const k of r.takes ?? []) ids.add(k.audioId);
+      }
   }
   return [...ids];
 }

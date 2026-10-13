@@ -778,3 +778,21 @@ export async function importProjectFile(file: File): Promise<void> {
     toast('That file is not a BandForge project', 'error');
   }
 }
+
+// ---------- Takes (several recordings of the same passage in one audio region)
+
+/** Play a different take in an audio region. */
+export function chooseTake(regionId: string, audioId: string): void {
+  commit((d) => {
+    const r = draftRegion(d, regionId);
+    if (r?.kind === 'audio' && r.takes?.some((k) => k.audioId === audioId)) r.audioId = audioId;
+  });
+}
+
+/** Keep only the take that's playing. */
+export function deleteOtherTakes(regionId: string): void {
+  commit((d) => {
+    const r = draftRegion(d, regionId);
+    if (r?.kind === 'audio') delete r.takes;
+  });
+}
