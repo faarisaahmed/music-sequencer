@@ -57,6 +57,7 @@ export const COMMANDS: Command[] = [
   C('view.zoomIn', 'Zoom in', 'Windows', ['Mod+=']),
   C('view.zoomOut', 'Zoom out', 'Windows', ['Mod+-']),
   C('view.shortcuts', 'Keyboard shortcuts & help', 'Windows', ['?']),
+  C('view.guides', 'Guides: learn to write music', 'Windows', ['Shift+G']),
   // Editing (regions in the tracks area, notes in the editors)
   C('edit.copy', 'Copy', 'Editing', ['Mod+C'], EDIT),
   C('edit.cut', 'Cut', 'Editing', ['Mod+X'], EDIT),

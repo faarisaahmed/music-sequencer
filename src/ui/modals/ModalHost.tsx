@@ -12,6 +12,7 @@ const JoinDialog = lazy(() => import('../collab/CollabUI').then((m) => ({ defaul
 const VersionsDialog = lazy(() => import('./VersionsDialog'));
 const YouTubeDialog = lazy(() => import('./YouTubeDialog'));
 const PartsDialog = lazy(() => import('../editors/score/PartsDialog'));
+const GuidesView = lazy(() => import('../guides/GuidesView'));
 
 function Body({ kind }: { kind: string }) {
   switch (kind) {
@@ -27,6 +28,8 @@ function Body({ kind }: { kind: string }) {
       return <VersionsDialog />;
     case 'settings':
       return <SettingsDialog />;
+    case 'guides':
+      return <GuidesView />;
     case 'help':
       return <HelpDialog />;
     case 'templates':

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Search, FolderOpen, FileMusic, MoreHorizontal, Music2, Trash2, Copy, Pencil, Download, Play, ChevronDown, ChevronRight, Users, History, Archive } from 'lucide-react';
+import { Plus, Search, FolderOpen, FileMusic, MoreHorizontal, Music2, Trash2, Copy, Pencil, Download, Play, ChevronDown, ChevronRight, Users, History, Archive, BookOpen } from 'lucide-react';
 import { BackupBanner, backUpAllSongs } from '../modals/SafetyPanels';
 import { InstallButton } from '../mobile/install';
 import type { ProjectMeta } from '../../model/types';
@@ -159,6 +159,9 @@ export default function HomeScreen() {
           <input type="search" placeholder="Search songs" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
         <InstallButton />
+        <button className="btn" onClick={() => openModal('guides')} title="Guides: learn to write music, from your first note to a finished song">
+          <BookOpen size={15} /> <span className="btn-label">Guides</span>
+        </button>
         <button className="btn" onClick={() => openModal('collab')} title="Join a friend's jam session with a code or link">
           <Users size={15} /> <span className="btn-label">Join a Jam</span>
         </button>

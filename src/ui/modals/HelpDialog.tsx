@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Compass, Keyboard } from 'lucide-react';
+import { BookOpen, Compass, Keyboard } from 'lucide-react';
 import ShortcutsPanel from '../keys/ShortcutsPanel';
 import { shortcutLabel } from '../keys/keymap';
-import { closeModal, useStore } from '../../state/store';
+import { closeModal, openModal, useStore } from '../../state/store';
 import { startTour } from '../onboarding/tourState';
 import '../onboarding/onboarding.css';
 import Modal from './Modal';
@@ -44,6 +44,14 @@ export default function HelpDialog() {
           }}
         >
           <Compass size={14} /> Take the tour
+        </button>
+      </div>
+      <div className="help-tour">
+        <div>
+          <b>Want to learn to write music?</b> The Guides cover theory, chords, melody, arranging, drums, mixing and styles, with examples you can play.
+        </div>
+        <button className="btn sm" onClick={() => openModal('guides')}>
+          <BookOpen size={14} /> Open Guides
         </button>
       </div>
       <div className="form-section">Getting started</div>

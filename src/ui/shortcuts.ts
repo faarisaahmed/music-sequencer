@@ -108,6 +108,7 @@ export function useGlobalShortcuts(): void {
           toast(s.musicalTyping ? 'Musical typing off' : 'Musical typing on: play with A S D F…');
         }],
         ['view.shortcuts', () => openModal('help')],
+        ['view.guides', () => openModal('guides')],
         ['view.fullScore', () => (s.dockTab === 'editor' && s.editorMode === 'fullscore' ? useStore.setState({ dockTab: null, dockMaximized: false }) : openFullScore())],
         ['track.mute', () => toggleTrack('mute')],
         ['track.solo', () => toggleTrack('solo')],

@@ -6,6 +6,7 @@ import {
   Circle,
   Download,
   HelpCircle,
+  BookOpen,
   History,
   LayoutList,
   Library,
@@ -162,6 +163,7 @@ export default function MobileProject() {
           <SheetItem icon={<History size={19} />} label="Version History" onClick={() => (openModal('versions'), setMore(false))} />
           <SheetItem icon={<Users size={19} />} label="Jam Session" onClick={() => (openModal('collab'), setMore(false))} />
           <SheetItem icon={<Settings size={19} />} label="Song Settings" onClick={() => (openModal('settings'), setMore(false))} />
+          <SheetItem icon={<BookOpen size={19} />} label="Guides" onClick={() => (openModal('guides'), setMore(false))} />
           <SheetItem icon={<HelpCircle size={19} />} label="Help" onClick={() => (openModal('help', { tab: 'start' }), setMore(false))} />
           {install && (
             <SheetItem

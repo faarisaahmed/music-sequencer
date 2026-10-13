@@ -16,6 +16,7 @@ import {
   Download,
   Settings,
   HelpCircle,
+  BookOpen,
   Plus,
   Volume2,
   Check,
@@ -368,6 +369,9 @@ export default function TopBar() {
         </button>
         <button className="btn icon tb" title="Song settings" onClick={() => openModal('settings')}>
           <Settings size={17} />
+        </button>
+        <button className="btn icon tb" data-tip="Guides: learn to write music" data-cmd="view.guides" onClick={() => openModal('guides')}>
+          <BookOpen size={17} />
         </button>
         <button className="btn icon tb" data-tip="Keyboard shortcuts & help" data-cmd="view.shortcuts" onClick={() => openModal('help')}>
           <HelpCircle size={17} />
