@@ -5,8 +5,8 @@
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#151310",
-  "theme_color": "#151310",
+  "background_color": "#141312",
+  "theme_color": "#141312",
   "categories": [
     "music",
     "productivity"

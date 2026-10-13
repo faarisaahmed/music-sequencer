@@ -95,7 +95,7 @@ function Strip({ t, selected }: { t: Track; selected: boolean }) {
           {k('High', 'eqHigh', '#7fb8c4', true, 0)}
           {k('Delay', 'delay', '#8fb573', false, 0)}
           <div style={{ gridColumn: 'span 2' }}>
-            <Knob size={28} label={'Pan ' + panFmt(t.pan)} bipolar min={-1} max={1} value={t.pan} defaultValue={0} color="#e7dfcd" onChange={(v) => set((x) => void (x.pan = v))} />
+            <Knob size={28} label={'Pan ' + panFmt(t.pan)} bipolar min={-1} max={1} value={t.pan} defaultValue={0} color="#e2dfd9" onChange={(v) => set((x) => void (x.pan = v))} />
           </div>
         </div>
         <div className="strip-fader-row" ref={faderRef}>

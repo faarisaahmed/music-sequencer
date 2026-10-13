@@ -76,7 +76,7 @@ export default function AudioEditor({ trackId, regionId }: { trackId: string; re
     c.style.height = h + 'px';
     const ctx = c.getContext('2d')!;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = '#1b1815';
+    ctx.fillStyle = '#191817';
     ctx.fillRect(0, 0, w, h);
     const xOf = (beat: number) => pad + beat * ppb - scrollX;
     const top = 26;
@@ -96,7 +96,7 @@ export default function AudioEditor({ trackId, regionId }: { trackId: string; re
       const x = xOf(bar.start - songBase);
       ctx.fillStyle = 'rgba(255,255,255,0.13)';
       ctx.fillRect(Math.round(x), 0, 1, h);
-      ctx.fillStyle = '#a89d87';
+      ctx.fillStyle = '#a19e96';
       ctx.font = '600 10px "IBM Plex Sans", sans-serif';
       ctx.fillText(String(bar.bar + 1), x + 3, 12);
     }
@@ -138,11 +138,11 @@ export default function AudioEditor({ trackId, regionId }: { trackId: string; re
         const g = inside ? envAt(cb) : region.gain;
         const yTop = mid - Math.min(1, hi * g) * amp;
         const yBot = mid - Math.max(-1, lo * g) * amp;
-        ctx.fillStyle = inside ? (Math.max(hi, -lo) * g > 0.99 ? '#e0735e' : '#f2bd68') : 'rgba(138, 129, 112,0.35)';
+        ctx.fillStyle = inside ? (Math.max(hi, -lo) * g > 0.99 ? '#e0735e' : '#f2bd68') : 'rgba(133, 129, 124,0.35)';
         ctx.fillRect(x, yTop, 1, Math.max(1, yBot - yTop));
       }
     } else {
-      ctx.fillStyle = '#797161';
+      ctx.fillStyle = '#74716c';
       ctx.font = '12px "IBM Plex Sans", sans-serif';
       ctx.fillText('Loading audio…', pad + 10, mid);
     }

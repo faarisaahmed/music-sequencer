@@ -293,7 +293,7 @@ const COLORS: [string, string][] = [
   ['Lavender', '#a88cc2'],
   ['Slate', '#6d97b8'],
   ['Teal', '#6fb3b8'],
-  ['Stone', '#a89d87'],
+  ['Stone', '#a19e96'],
 ];
 
 export function trackMenu(t: Track): MenuItem[] {

@@ -320,8 +320,8 @@
   gap: 12px;
   padding: 0 10px;
   background: var(--panel);
-  border-bottom: 1px solid #0e0d0b;
-  box-shadow: 0 1px 0 rgba(255, 240, 215, 0.04) inset;
+  border-bottom: 1px solid #0d0d0c;
+  box-shadow: 0 1px 0 rgba(246, 241, 232, 0.04) inset;
   position: relative;
   z-index: 20;
 }
@@ -433,10 +433,10 @@
   display: flex;
   align-items: stretch;
   height: 40px;
-  background: #0e0c09;
-  border: 1px solid #050403;
+  background: #0d0c0b;
+  border: 1px solid #040404;
   border-radius: 3px;
-  box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.8), 0 1px 0 rgba(255, 240, 215, 0.05);
+  box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.8), 0 1px 0 rgba(246, 241, 232, 0.05);
   padding: 0 4px;
 }
 .lcd-cell {
@@ -470,7 +470,7 @@
 .lcd-sep {
   width: 1px;
   margin: 7px 0;
-  background: #2a241b;
+  background: #272421;
 }
 .lcd-input {
   width: 52px;
@@ -562,7 +562,7 @@
 }
 .mini-meter > div {
   height: 4px;
-  background: #0f0d0b;
+  background: #0e0d0d;
   border-radius: 2px;
   overflow: hidden;
 }
@@ -643,9 +643,9 @@
   height: 6px;
   flex-shrink: 0;
   cursor: ns-resize;
-  background: #0e0d0b;
-  border-top: 1px solid #302c26;
-  border-bottom: 1px solid #302c26;
+  background: #0d0d0c;
+  border-top: 1px solid #2e2c2a;
+  border-bottom: 1px solid #2e2c2a;
   position: relative;
 }
 .dock-splitter::after {
@@ -657,7 +657,7 @@
   height: 2px;
   margin-left: -20px;
   border-radius: 1px;
-  background: #524d42;
+  background: #4f4d49;
 }
 .dock {
   flex-shrink: 0;
@@ -677,8 +677,8 @@
   align-items: center;
   gap: 2px;
   padding: 4px 8px;
-  background: #211e1a;
-  border-bottom: 1px solid #14120f;
+  background: #1f1e1d;
+  border-bottom: 1px solid #131211;
   flex-shrink: 0;
 }
 .dock-tab {

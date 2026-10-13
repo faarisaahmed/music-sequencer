@@ -16,8 +16,9 @@ const RETIRED_COLORS: Record<string, string> = {
   '#e8b92a': '#c98b3a', '#f0a020': '#b8743a', '#d9c234': '#c2a050',
   '#3d9bff': '#6d97b8', '#2c7be5': '#5a83a6', '#5b8cff': '#7d8fc0', '#22a6f0': '#5c9fb0',
   '#34c759': '#8fb573', '#ff9f0a': '#e08a3c', '#bf5af2': '#a88cc2', '#ff375f': '#d36d7f',
-  '#32d0e6': '#6fb3b8', '#ffd60a': '#e3c35a', '#8e8e93': '#99907c',
-  '#f0892a': '#e08a3c', '#ef5350': '#d9533b', '#ec4fa0': '#d36d7f', '#a46cf0': '#a88cc2', '#28c4dc': '#6fb3b8', '#9a9aa4': '#a89d87',
+  '#32d0e6': '#6fb3b8', '#ffd60a': '#e3c35a', '#8e8e93': '#939089',
+  '#f0892a': '#e08a3c', '#ef5350': '#d9533b', '#ec4fa0': '#d36d7f', '#a46cf0': '#a88cc2', '#28c4dc': '#6fb3b8', '#9a9aa4': '#a19e96',
+  '#99907c': '#939089', '#a89d87': '#a19e96',
 };
 export function currentColor(c: string): string {
   return RETIRED_COLORS[c?.toLowerCase()] ?? c;

@@ -123,10 +123,10 @@ export function TrackIcon({ track, size = 20 }: { track: Track; size?: number })
 export function BrandMark({ size = 28 }: { size?: number }) {
   return (
     <svg viewBox="0 0 32 32" width={size} height={size} aria-hidden="true">
-      <rect x="0.5" y="0.5" width="31" height="31" rx="5" fill="#1d1a16" stroke="#e8a33d" />
+      <rect x="0.5" y="0.5" width="31" height="31" rx="5" fill="#1b1a19" stroke="#e8a33d" />
       <rect x="7" y="15" width="3" height="10" rx="0.5" fill="#e8a33d" />
       <rect x="12" y="9" width="3" height="16" rx="0.5" fill="#e8a33d" />
-      <rect x="17" y="6" width="3" height="19" rx="0.5" fill="#f3ead8" />
+      <rect x="17" y="6" width="3" height="19" rx="0.5" fill="#eeeae4" />
       <rect x="22" y="12" width="3" height="13" rx="0.5" fill="#e8a33d" />
     </svg>
   );

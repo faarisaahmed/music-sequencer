@@ -1,7 +1,7 @@
 /* ---------------------------------------------------------- chord track */
 .chord-row {
-  background: #191713;
-  border-bottom: 1px solid #100e0c;
+  background: #181716;
+  border-bottom: 1px solid #0f0e0e;
 }
 .chord-header {
   --c: var(--cycle);
@@ -30,7 +30,7 @@
   top: 4px;
   bottom: 4px;
   border-radius: 3px;
-  background: linear-gradient(#3a3320, #2d2818);
+  background: linear-gradient(#35332c, #2a2822);
   border: 1px solid #6b5a22;
   color: #ffe9a3;
   font-weight: 650;
@@ -64,7 +64,7 @@
   position: fixed;
   z-index: 950;
   width: 400px;
-  background: rgba(41, 38, 33, 0.98);
+  background: rgba(39, 38, 36, 0.98);
   border: 1px solid var(--border);
   border-radius: 6px;
   box-shadow: var(--shadow);
@@ -115,7 +115,7 @@
 }
 .cp-chip:hover {
   border-color: var(--cycle);
-  background: #3a3320;
+  background: #35332c;
 }
 .cp-chip.on {
   border-color: var(--cycle);

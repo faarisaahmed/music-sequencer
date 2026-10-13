@@ -152,7 +152,7 @@ html.phone select {
   min-width: 0;
   height: 44px;
   border: 1px solid var(--border-soft);
-  background: #0e0d0b;
+  background: #0d0d0c;
   border-radius: 5px;
   color: var(--text);
   display: flex;

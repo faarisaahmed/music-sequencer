@@ -7,10 +7,10 @@
   max-width: 320px;
   padding: 5px 9px;
   border-radius: 4px;
-  background: rgba(26, 23, 20, 0.97);
-  border: 1px solid #413d34;
+  background: rgba(24, 23, 22, 0.97);
+  border: 1px solid #3f3d3a;
   box-shadow: 0 6px 22px rgba(0, 0, 0, 0.5);
-  color: #eee5d4;
+  color: #e9e5e0;
   font-size: 12px;
   line-height: 1.35;
   pointer-events: none;
@@ -23,8 +23,8 @@
 }
 .bf-tip kbd {
   font-size: 11px;
-  background: #36322b;
-  border-color: #534d43;
+  background: #343230;
+  border-color: #504d4a;
   color: #fff;
 }
 
@@ -150,7 +150,7 @@
   display: none;
   align-items: center;
   justify-content: center;
-  background: #645d50;
+  background: #605d59;
   color: white;
   cursor: pointer;
 }

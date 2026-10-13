@@ -31,11 +31,11 @@
   stroke: var(--border);
 }
 .gv-tick {
-  stroke: #413d34;
+  stroke: #3f3d3a;
   stroke-width: 1;
 }
 .gv-tick.beat {
-  stroke: #655f51;
+  stroke: #615f5a;
   stroke-width: 2;
 }
 .gv-note {

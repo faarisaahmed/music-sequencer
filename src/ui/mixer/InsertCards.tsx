@@ -7,7 +7,7 @@ import { Knob } from '../common/controls';
 import { showContextMenu } from '../common/menus';
 
 const COLORS: Record<InsertKey, string> = {
-  gate: '#99907c',
+  gate: '#939089',
   amp: '#d9693b',
   deesser: '#7fb8c4',
   autowah: '#e3c35a',
@@ -60,7 +60,7 @@ function InsertCard({ t, k }: { t: Track; k: InsertKey }) {
   return (
     <div className={'fx-card' + (on ? '' : ' off') + (k === 'amp' ? ' fx-wide' : '')}>
       <div className="fx-card-head">
-        <span className="dot" style={{ background: on ? color : '#5e574b' }} />
+        <span className="dot" style={{ background: on ? color : '#5a5753' }} />
         {INSERT_LABELS[k]}
         <div className="spacer" />
         <button className={'btn sm icon' + (on ? ' active' : ' ghost')} title={on ? 'Bypass' : 'Enable'} onClick={() => set(t, k, { on: !on })}>
