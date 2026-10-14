@@ -478,7 +478,9 @@ function PianoRollInner({ region, track, meter, bpb, selectedIds }: { region: Mi
     audition(n.pitch, n.velocity);
     if (dragToSize && 'pointerId' in e) {
       startDrag(e, ({ dx, event }) => {
-        const end = start + len + dx / ppb;
+        // The note's end follows the pointer; a click without dragging keeps the default length.
+        if (Math.abs(dx) < 3) return;
+        const end = Math.max(start, beat) + dx / ppb;
         const d = noSnap(event) ? Math.max(0.03, end - start) : Math.max(grid, snap(end, grid) - start);
         editRegion(
           regionId,
