@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { flushSync } from 'react-dom';
 import {
   ChevronLeft,
   Library,
@@ -24,6 +25,7 @@ import {
   Music4,
   History,
   ClipboardCheck,
+  MoreHorizontal,
 } from 'lucide-react';
 import { commit, openModal, redo, undo, useStore, useTransport, type DockTab } from '../state/store';
 import { closeProject, setKey } from '../state/actions';
@@ -36,7 +38,8 @@ import ScalePicker from './common/ScalePicker';
 import { saveListeners, type SaveStatus } from '../state/persistence';
 import { HSlider } from './common/controls';
 import { startDrag } from './common/drag';
-import FullScoreButton from './editors/score/FullScoreButton';
+import FullScoreButton, { openFullScore } from './editors/score/FullScoreButton';
+import { showContextMenu, type MenuItem } from './common/menus';
 import { meterOf, tempoOf } from '../model/timeline';
 import { MAX_BPM, MIN_BPM, setTempoAt, tempoGesture } from '../state/timelineActions';
 import { CollabBar } from './collab/CollabUI';
@@ -51,21 +54,21 @@ function MetronomeIcon({ size = 17 }: { size?: number }) {
   );
 }
 
+function toggleDock(tab: DockTab) {
+  const { dockTab } = useStore.getState();
+  useStore.setState({ dockTab: dockTab === tab ? null : tab, dockMaximized: false });
+}
+
 function DockButton({ tab, icon, label, cmd }: { tab: DockTab; icon: React.ReactNode; label: string; cmd: string }) {
   const dockTab = useStore((s) => s.dockTab);
   return (
-    <button
-      className={'btn icon tb' + (dockTab === tab ? ' active' : '')}
-      data-tip={label}
-      data-cmd={cmd}
-      onClick={() => useStore.setState({ dockTab: dockTab === tab ? null : tab, dockMaximized: false })}
-    >
+    <button className={'btn icon tb' + (dockTab === tab ? ' active' : '')} data-tip={label} data-cmd={cmd} onClick={() => toggleDock(tab)}>
       {icon}
     </button>
   );
 }
 
-function Lcd() {
+function Lcd({ compact = false }: { compact?: boolean }) {
   const project = useStore((s) => s.project)!;
   const position = useTransport((s) => s.position);
   const playing = useStore((s) => s.playing);
@@ -140,19 +143,28 @@ function Lcd() {
         <div className="lcd-small">KEY</div>
         {keyOpen && <KeyPopover onClose={() => setKeyOpen(false)} />}
       </div>
-      <div className="lcd-sep" />
-      <div className="lcd-cell" style={{ position: 'relative', cursor: 'pointer' }} onClick={() => setSwingOpen(!swingOpen)} title={`Song swing: ${grooveLabel(project.groove)}. Click to choose a swing feel for the whole song.`}>
-        <div className={'lcd-big' + (isStraight(project.groove) ? ' lcd-off' : '')}>{isStraight(project.groove) ? 'Off' : `${swingPercent(project.groove)}%`}</div>
-        <div className="lcd-small">{isStraight(project.groove) ? 'SWING' : `SWING ${project.groove!.grid}TH`}</div>
-        {swingOpen && <GroovePanel scope={{ kind: 'song' }} onClose={() => setSwingOpen(false)} />}
-      </div>
-      <div className="lcd-sep" />
-      <div className="lcd-cell" style={{ cursor: 'pointer' }} onClick={() => openModal('settings')} title="Time signature here">
-        <div className="lcd-big mono">
-          {sigHere[0]}/{sigHere[1]}
-        </div>
-        <div className="lcd-small">TIME</div>
-      </div>
+      {!compact && (
+        <>
+          <div className="lcd-sep" />
+          <div
+            className="lcd-cell"
+            style={{ position: 'relative', cursor: 'pointer' }}
+            onClick={() => setSwingOpen(!swingOpen)}
+            title={`Song swing: ${grooveLabel(project.groove)}. Click to choose a swing feel for the whole song.`}
+          >
+            <div className={'lcd-big' + (isStraight(project.groove) ? ' lcd-off' : '')}>{isStraight(project.groove) ? 'Off' : `${swingPercent(project.groove)}%`}</div>
+            <div className="lcd-small">{isStraight(project.groove) ? 'SWING' : `SWING ${project.groove!.grid}TH`}</div>
+            {swingOpen && <GroovePanel scope={{ kind: 'song' }} onClose={() => setSwingOpen(false)} />}
+          </div>
+          <div className="lcd-sep" />
+          <div className="lcd-cell" style={{ cursor: 'pointer' }} onClick={() => openModal('settings')} title="Time signature here">
+            <div className="lcd-big mono">
+              {sigHere[0]}/{sigHere[1]}
+            </div>
+            <div className="lcd-small">TIME</div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -229,6 +241,63 @@ function SaveIndicator() {
   );
 }
 
+/**
+ * How much the top bar has to compact to fit its width (0 = everything shown). Measured after
+ * layout and before paint, so a resize never shows a frame with the bar overflowing.
+ *   1: no song title / labels, shorter volume slider   2: no volume slider, icon-only Export
+ *   3: Settings, Guides, Help move to the ⋯ menu      4: so do Undo/Redo, Chord Track, Check My
+ *      Writing, Full Score and count-in, and the display drops swing and time
+ *   5: so do the metronome and the save indicator
+ */
+const MAX_FIT = 5;
+
+function useTopBarFit(ref: RefObject<HTMLDivElement | null>): number {
+  const [fit, setFit] = useState(0);
+  const fitRef = useRef(0);
+  fitRef.current = fit;
+  // Width the bar needed at each level, so it can tell when there's room to show more again.
+  const need = useRef<number[]>([]);
+
+  const step = (): number | null => {
+    const el = ref.current;
+    if (!el) return null;
+    const cs = getComputedStyle(el);
+    const kids = [...el.children] as HTMLElement[];
+    const w = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + (parseFloat(cs.columnGap) || 0) * (kids.length - 1) + kids.reduce((sum, k) => sum + k.getBoundingClientRect().width, 0);
+    const l = fitRef.current;
+    need.current[l] = w;
+    if (w > el.clientWidth + 0.5 && l < MAX_FIT) return l + 1;
+    const less = need.current[l - 1];
+    if (l > 0 && less !== undefined && less <= el.clientWidth) return l - 1;
+    return null;
+  };
+
+  // After every render (contents can change width) …
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- runs every render on purpose; it settles in a step or two
+  useLayoutEffect(() => {
+    const next = step();
+    if (next !== null) setFit(next);
+  });
+  // … and whenever the bar or one of its groups resizes.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      for (let i = 0; i < 2 * MAX_FIT; i++) {
+        const next = step();
+        if (next === null) break;
+        flushSync(() => setFit(next));
+        fitRef.current = next;
+      }
+    });
+    ro.observe(el);
+    for (const k of el.children) ro.observe(k);
+    return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return fit;
+}
+
 export default function TopBar() {
   const project = useStore((s) => s.project)!;
   const playing = useStore((s) => s.playing);
@@ -238,9 +307,44 @@ export default function TopBar() {
   const canRedo = useStore((s) => s.future.length > 0);
   const engine = getEngine();
   const [editingName, setEditingName] = useState(false);
+  const metronome = project.metronome;
+  const countIn = project.countIn;
+  const barRef = useRef<HTMLDivElement>(null);
+  const fit = useTopBarFit(barRef);
+
+  const [swingOpen, setSwingOpen] = useState(false);
+
+  // The ⋯ menu holds whatever the bar no longer has room for.
+  const openMore = (e: React.MouseEvent) => {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const on = (label: string, active: boolean) => (active ? label + ' ✓' : label);
+    const items: MenuItem[] = [];
+    if (fit >= 4) {
+      items.push(
+        { label: 'Undo', cmd: 'edit.undo', icon: <Undo2 size={14} />, disabled: !canUndo, onClick: undo },
+        { label: 'Redo', cmd: 'edit.redo', icon: <Redo2 size={14} />, disabled: !canRedo, onClick: redo },
+        { separator: true },
+        { label: 'Chord Track', cmd: 'view.chords', icon: <Music4 size={14} />, onClick: () => toggleDock('assistant') },
+        { label: 'Check My Writing', cmd: 'view.review', icon: <ClipboardCheck size={14} />, onClick: () => toggleDock('review') },
+        { label: 'Full Score', cmd: 'view.fullScore', onClick: openFullScore },
+        { separator: true },
+        { label: `Song Swing: ${grooveLabel(project.groove)}…`, onClick: () => setSwingOpen(true) },
+      );
+      if (fit >= 5) items.push({ label: on('Metronome', metronome), cmd: 'transport.metronome', onClick: () => commit((d) => void (d.metronome = !d.metronome)) });
+      items.push({ label: on('Count-in Before Recording', countIn), onClick: () => commit((d) => void (d.countIn = !d.countIn)) });
+      if (fit >= 5) items.push({ label: 'Version History', icon: <History size={14} />, onClick: () => openModal('versions') });
+      items.push({ separator: true });
+    }
+    items.push(
+      { label: 'Song Settings', icon: <Settings size={14} />, onClick: () => openModal('settings') },
+      { label: 'Guides', cmd: 'view.guides', icon: <BookOpen size={14} />, onClick: () => openModal('guides') },
+      { label: 'Shortcuts & Help', cmd: 'view.shortcuts', icon: <HelpCircle size={14} />, onClick: () => openModal('help') },
+    );
+    showContextMenu({ clientX: r.right - 220, clientY: r.bottom + 4 }, items);
+  };
 
   return (
-    <div className="topbar">
+    <div className="topbar" ref={barRef} data-fit={fit}>
       <div className="tb-group">
         <button className="btn ghost tb-back" onClick={() => void closeProject()} title="Back to My Songs">
           <ChevronLeft size={18} />
@@ -271,7 +375,7 @@ export default function TopBar() {
             {project.name}
           </div>
         )}
-        <SaveIndicator />
+        {fit < 5 && <SaveIndicator />}
       </div>
 
       <div className="tb-group">
@@ -282,9 +386,13 @@ export default function TopBar() {
         <DockButton tab="editor" icon={<SquarePen size={17} />} label="Editor" cmd="view.editor" />
         <DockButton tab="instrument" icon={<Piano size={17} />} label="Instrument / Keyboard" cmd="view.instrument" />
         <DockButton tab="mixer" icon={<SlidersVertical size={17} />} label="Mixer" cmd="view.mixer" />
-        <DockButton tab="assistant" icon={<Music4 size={17} />} label="Chord Track" cmd="view.chords" />
-        <DockButton tab="review" icon={<ClipboardCheck size={17} />} label="Check My Writing" cmd="view.review" />
-        <FullScoreButton />
+        {fit < 4 && (
+          <>
+            <DockButton tab="assistant" icon={<Music4 size={17} />} label="Chord Track" cmd="view.chords" />
+            <DockButton tab="review" icon={<ClipboardCheck size={17} />} label="Check My Writing" cmd="view.review" />
+            <FullScoreButton />
+          </>
+        )}
         <button className="btn icon tb" data-tip="New Track" data-cmd="song.newTrack" onClick={() => openModal('newTrack')}>
           <Plus size={18} />
         </button>
@@ -303,7 +411,8 @@ export default function TopBar() {
           </button>
           <button
             className={'btn icon tb' + (project.loop.enabled ? ' cycle-on' : '')}
-            data-tip="Loop (cycle) — drag the yellow strip in the ruler to set bars" data-cmd="transport.cycle"
+            data-tip="Loop (cycle) — drag the yellow strip in the ruler to set bars"
+            data-cmd="transport.cycle"
             onClick={() =>
               commit((d) => {
                 d.loop.enabled = !d.loop.enabled;
@@ -313,69 +422,92 @@ export default function TopBar() {
             <Repeat size={16} />
           </button>
         </div>
-        <Lcd />
+        <Lcd compact={fit >= 4} />
         <div className="transport">
-          <button
-            className={'btn icon tb' + (project.metronome ? ' active' : '')}
-            data-tip="Metronome" data-cmd="transport.metronome"
-            onClick={() =>
-              commit((d) => {
-                d.metronome = !d.metronome;
-              })
-            }
-          >
-            <MetronomeIcon />
-          </button>
-          <button
-            className={'btn tb sm count-in' + (project.countIn ? ' active' : '')}
-            title="Count-in before recording"
-            onClick={() =>
-              commit((d) => {
-                d.countIn = !d.countIn;
-              })
-            }
-          >
-            1234
-          </button>
+          {fit < 5 && (
+            <button
+              className={'btn icon tb' + (project.metronome ? ' active' : '')}
+              data-tip="Metronome"
+              data-cmd="transport.metronome"
+              onClick={() =>
+                commit((d) => {
+                  d.metronome = !d.metronome;
+                })
+              }
+            >
+              <MetronomeIcon />
+            </button>
+          )}
+          {fit < 4 && (
+            <button
+              className={'btn tb sm count-in' + (project.countIn ? ' active' : '')}
+              title="Count-in before recording"
+              onClick={() =>
+                commit((d) => {
+                  d.countIn = !d.countIn;
+                })
+              }
+            >
+              1234
+            </button>
+          )}
         </div>
       </div>
 
       <div className="tb-group right">
         <CollabBar />
-        <button className="btn icon tb" data-tip="Undo" data-cmd="edit.undo" disabled={!canUndo} onClick={undo}>
-          <Undo2 size={17} />
-        </button>
-        <button className="btn icon tb" data-tip="Redo" data-cmd="edit.redo" disabled={!canRedo} onClick={redo}>
-          <Redo2 size={17} />
-        </button>
-        <div className="row master-vol" title="Master volume">
-          <Volume2 size={15} className="dim" />
-          <HSlider
-            value={project.masterVolume}
-            min={0}
-            max={1.25}
-            defaultValue={0.85}
-            width={80}
-            onChange={(v) =>
-              commit((d) => {
-                d.masterVolume = v;
-              })
-            }
-          />
-          <MasterMeter />
-        </div>
+        {fit < 4 && (
+          <>
+            <button className="btn icon tb" data-tip="Undo" data-cmd="edit.undo" disabled={!canUndo} onClick={undo}>
+              <Undo2 size={17} />
+            </button>
+            <button className="btn icon tb" data-tip="Redo" data-cmd="edit.redo" disabled={!canRedo} onClick={redo}>
+              <Redo2 size={17} />
+            </button>
+          </>
+        )}
+        {fit < 2 && (
+          <div className="row master-vol" title="Master volume">
+            <Volume2 size={15} className="dim" />
+            <HSlider
+              value={project.masterVolume}
+              min={0}
+              max={1.25}
+              defaultValue={0.85}
+              width={80}
+              onChange={(v) =>
+                commit((d) => {
+                  d.masterVolume = v;
+                })
+              }
+            />
+            <MasterMeter />
+          </div>
+        )}
         <button className="btn primary tb-export" data-tip="Export song" data-cmd="song.export" onClick={() => openModal('export')}>
-          <Download size={15} /> Export
+          <Download size={15} />
+          {fit < 2 && ' Export'}
         </button>
-        <button className="btn icon tb" title="Song settings" onClick={() => openModal('settings')}>
-          <Settings size={17} />
-        </button>
-        <button className="btn icon tb" data-tip="Guides: learn to write music" data-cmd="view.guides" onClick={() => openModal('guides')}>
-          <BookOpen size={17} />
-        </button>
-        <button className="btn icon tb" data-tip="Keyboard shortcuts & help" data-cmd="view.shortcuts" onClick={() => openModal('help')}>
-          <HelpCircle size={17} />
-        </button>
+        {fit < 3 ? (
+          <>
+            <button className="btn icon tb" title="Song settings" onClick={() => openModal('settings')}>
+              <Settings size={17} />
+            </button>
+            <button className="btn icon tb" data-tip="Guides: learn to write music" data-cmd="view.guides" onClick={() => openModal('guides')}>
+              <BookOpen size={17} />
+            </button>
+            <button className="btn icon tb" data-tip="Keyboard shortcuts & help" data-cmd="view.shortcuts" onClick={() => openModal('help')}>
+              <HelpCircle size={17} />
+            </button>
+          </>
+        ) : (
+          <div className="tb-more-wrap">
+            <button className="btn icon tb tb-more" data-tip="More" onClick={openMore}>
+              <MoreHorizontal size={18} />
+            </button>
+            {swingOpen && <GroovePanel scope={{ kind: 'song' }} placement="down-left" onClose={() => setSwingOpen(false)} />}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -384,16 +516,25 @@ export default function TopBar() {
 function MasterMeter() {
   const l = useTransport((s) => s.levels.__masterL ?? 0);
   const r = useTransport((s) => s.levels.__masterR ?? 0);
-  const w = (v: number) => `${Math.min(100, (Math.max(0, 1 + Math.log10(Math.max(v, 1e-4)) / 2.4)) * 100)}%`;
+  const w = (v: number) => `${Math.min(100, Math.max(0, 1 + Math.log10(Math.max(v, 1e-4)) / 2.4) * 100)}%`;
   return (
     <div className="mini-meter">
       <div>
-        <i style={{ width: w(l), background: l > 0.98 ? 'var(--record)' : undefined }} />
+        <i
+          style={{
+            width: w(l),
+            background: l > 0.98 ? 'var(--record)' : undefined,
+          }}
+        />
       </div>
       <div>
-        <i style={{ width: w(r), background: r > 0.98 ? 'var(--record)' : undefined }} />
+        <i
+          style={{
+            width: w(r),
+            background: r > 0.98 ? 'var(--record)' : undefined,
+          }}
+        />
       </div>
     </div>
   );
 }
-

@@ -17,6 +17,12 @@
   background: #1e1d1c;
   border-bottom: 1px solid #0f0e0e;
   font-size: 12px;
+  /* Its contents compact with its own width (narrow windows, tablets), never running off the edge. */
+  container-type: inline-size;
+  overflow: hidden;
+}
+.tv-toolbar > * {
+  flex-shrink: 0;
 }
 .tv-toolbar select {
   height: 24px;
@@ -27,14 +33,32 @@
   width: 90px;
   accent-color: var(--accent);
 }
+.tv-toolbar > .tv-hint {
+  flex-shrink: 1;
+  min-width: 0;
+}
 .tv-hint {
   font-size: 11px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-@media (max-width: 1250px) {
+@container (max-width: 1250px) {
   .tv-hint {
+    display: none;
+  }
+}
+/* Toggle buttons go icon-only, then the zoom slider goes (the − / + buttons stay). */
+@container (max-width: 860px) {
+  html:not(.phone) .tv-toolbar .tv-lbl {
+    display: none;
+  }
+  html:not(.phone) .tv-toolbar .btn.sm {
+    gap: 0;
+  }
+}
+@container (max-width: 640px) {
+  .tv-zoom {
     display: none;
   }
 }

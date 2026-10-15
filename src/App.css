@@ -575,48 +575,43 @@
 .tb-export {
   margin: 0 4px;
 }
+.tb-more-wrap {
+  position: relative;
+  display: flex;
+}
 
-@media (max-width: 1500px) {
-  .tb-title,
-  .save-ind span,
-  .tb-back span {
-    display: none;
-  }
-  .master-vol .hslider {
-    width: 60px !important;
-  }
+/* The top bar compacts in steps to fit its width (TopBar measures it and sets data-fit). */
+.topbar > * {
+  flex-shrink: 0;
 }
-/* Narrow windows: stop absolutely centring the transport so nothing overlaps. */
-@media (max-width: 1500px) {
-  .tb-center {
-    position: static;
-    transform: none;
-    margin: 0 auto;
-    gap: 6px;
-  }
-  .tb-group.right {
-    margin-left: 0;
-  }
-  .topbar {
-    gap: 8px;
-  }
+.topbar:not([data-fit='0']) .tb-title,
+.topbar:not([data-fit='0']) .save-ind span,
+.topbar:not([data-fit='0']) .tb-back span {
+  display: none;
 }
-@media (max-width: 1360px) {
-  .master-vol .hslider,
-  .master-vol .mini-meter {
-    display: none !important;
-  }
-  .tb-export span,
-  .btn.tb.icon {
-    width: 30px;
-  }
-  .lcd-cell {
-    padding: 0 8px;
-    min-width: 48px;
-  }
-  .lcd-pos {
-    min-width: 96px;
-  }
+.topbar[data-fit='1'] .master-vol .hslider {
+  width: 60px !important;
+}
+.topbar:not([data-fit='0']) {
+  gap: 8px;
+}
+.topbar:not([data-fit='0']) .tb-center {
+  gap: 6px;
+}
+.topbar:not([data-fit='0']):not([data-fit='1']) .btn.tb.icon {
+  width: 30px;
+}
+.topbar:not([data-fit='0']):not([data-fit='1']) .tb-export {
+  width: 34px;
+  padding: 0;
+  justify-content: center;
+}
+.topbar:not([data-fit='0']):not([data-fit='1']) .lcd-cell {
+  padding: 0 8px;
+  min-width: 48px;
+}
+.topbar:not([data-fit='0']):not([data-fit='1']) .lcd-pos {
+  min-width: 96px;
 }
 
 .workspace {

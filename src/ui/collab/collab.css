@@ -329,12 +329,10 @@
   padding: 0 9px;
   gap: 5px;
 }
-@media (max-width: 1500px) {
-  .tb-jam-label {
-    display: none;
-  }
-  .btn.tb.jam-open {
-    width: 34px;
-    padding: 0;
-  }
+.topbar:not([data-fit='0']) .tb-jam-label {
+  display: none;
+}
+.topbar:not([data-fit='0']) .btn.tb.jam-open {
+  width: 34px;
+  padding: 0;
 }

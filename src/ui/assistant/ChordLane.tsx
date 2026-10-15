@@ -20,7 +20,7 @@ export function ChordToggleButton() {
   const on = chordsVisible(project, show);
   return (
     <button className={'btn sm' + (on ? ' active' : '')} onClick={() => useAssistantUi.setState({ showChords: !on })} title="Show the chord track">
-      <Music4 size={13} /> Chords
+      <Music4 size={13} /> <span className="tv-lbl">Chords</span>
     </button>
   );
 }

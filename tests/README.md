@@ -28,6 +28,7 @@ node tests/guides.mjs <chromium-executable> http://localhost:5391/ /tmp       # 
 node tests/takes.mjs <chromium-executable> http://localhost:5391/ /tmp        # takes: cycle-recorded audio passes, adding takes, take chip/menu, comping by splitting, reopen
 node tests/automation.mjs <chromium-executable> http://localhost:5391/ /tmp   # automation lanes for filter, reverb and echo: drawing, playback, knob hand-back, menus, export
 node tests/resize-jitter.mjs <chromium-executable> http://localhost:5391/ /tmp # resizing/opening panels never paints a frame at the old size (tracks, piano roll, score, full score, steps, mixer)
+node tests/topbar-fit.mjs <chromium-executable> http://localhost:5391/ /tmp # the top bar and tracks toolbar fit any window width (compact in steps, ⋯ menu), never paint an overflowing frame
 node tests/browser-smoke.mjs firefox   # real Firefox: studio, score, render, all export formats, video, MIDI, versions, timeline
 node tests/browser-smoke.mjs safari    # real Safari (run `sudo safaridriver --enable` once and allow Remote Automation)
 node tests/jam-qa-long.mjs <chromium-executable> http://localhost:5391/ 300   # frozen tab, recording, big join, soak

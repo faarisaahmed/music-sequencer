@@ -248,7 +248,7 @@ function Toolbar({ viewW }: { viewW: number }) {
           <ZoomIn size={15} />
         </button>
         <button className="btn ghost sm" title="Zoom to fit the song" onClick={fit}>
-          <Maximize size={13} /> Fit
+          <Maximize size={13} /> <span className="tv-lbl">Fit</span>
         </button>
       </div>
       <div className="seg" title="Track height">
@@ -263,10 +263,10 @@ function Toolbar({ viewW }: { viewW: number }) {
         ))}
       </div>
       <button className={'btn sm' + (showMaster ? ' active' : '')} onClick={() => useTracksUi.setState({ showMaster: !showMaster })} title="Show the master track (song volume automation, fade-outs)">
-        <Crown size={13} /> Master Track
+        <Crown size={13} /> <span className="tv-lbl">Master Track</span>
       </button>
       <button className={'btn sm' + (showArrangement ? ' active' : '')} onClick={() => useTracksUi.setState({ showArrangement: !showArrangement })} title="Show the arrangement track (song sections)">
-        <LayoutList size={13} /> Arrangement
+        <LayoutList size={13} /> <span className="tv-lbl">Arrangement</span>
       </button>
       <TempoToggleButton />
       <ChordToggleButton />
@@ -483,7 +483,7 @@ function TempoToggleButton() {
       onClick={() => !has && useTracksUi.setState({ showTempo: !show })}
       title={has ? 'This song has tempo, time-signature or repeat marks, so the lane stays visible' : 'Show the Tempo & Form lane: tempo and time-signature changes, repeats, endings and D.S./D.C.'}
     >
-      <Gauge size={13} /> Tempo
+      <Gauge size={13} /> <span className="tv-lbl">Tempo</span>
     </button>
   );
 }
