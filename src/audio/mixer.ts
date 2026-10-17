@@ -1,10 +1,10 @@
 // Audio graph: per-track channel strips, effect buses and master bus.
 // Context-agnostic so the same graph renders live and offline (export).
-import type { AutomationParam, AutomationPoint, MasteringSettings, Project, Track } from '../model/types';
+import { DEFAULT_SAMPLER, type AutomationParam, type AutomationPoint, type MasteringSettings, type Project, type Track } from '../model/types';
 import { DRUM_LANES } from '../model/music';
 import { makeImpulse } from './context';
 import { getBuffer } from './audioStore';
-import { DrumKitInstrument, SamplerInstrument, SynthInstrument, driveCurve, type Instrument } from './instruments';
+import { DrumKitInstrument, SamplerInstrument, SynthInstrument, UserSamplerInstrument, driveCurve, type Instrument } from './instruments';
 import { getPreset } from './presets';
 import { InsertChain, MID_INSERTS, POST_INSERTS, PRE_INSERTS, STEREO_INSERTS } from './effects';
 import { filterHz } from '../model/automation';
@@ -449,7 +449,7 @@ export class Mixer {
 
 export function instrumentKey(t: Track): string {
   if (t.type === 'audio') return 'audio';
-  return t.instrument + (t.instrument === 'user-sampler' ? ':' + (t.samplerAudioId ?? '') + ':' + (t.samplerRoot ?? 60) + ':' + (t.samplerAudioId && getBuffer(t.samplerAudioId) ? 1 : 0) : '');
+  return t.instrument + (t.instrument === 'user-sampler' ? ':' + (t.samplerAudioId ?? '') + ':' + (t.samplerRoot ?? 60) + ':' + (t.samplerAudioId && getBuffer(t.samplerAudioId) ? 1 : 0) + ':' + JSON.stringify(t.sampler ?? null) : '');
 }
 
 /** Put the track's own row samples (once loaded) into its drum kit. */
@@ -479,10 +479,11 @@ export function createInstrument(ctx: BaseAudioContext, t: Track): Instrument | 
       applyDrumSamples(inst, t);
       break;
     case 'user-sampler': {
-      const buf = t.samplerAudioId ? getBuffer(t.samplerAudioId) : undefined;
-      const map = new Map<number, AudioBuffer>();
-      if (buf) map.set(t.samplerRoot ?? 60, buf);
-      inst = new SamplerInstrument(ctx, { samples: {}, release: 0.3, velocityFilter: false }, map);
+      const id = t.samplerAudioId;
+      const settings = t.sampler ?? DEFAULT_SAMPLER;
+      const buf = id ? (getBuffer(id) ?? null) : null;
+      const rev = id && settings.reverse ? (getBuffer(id, true) ?? null) : null;
+      inst = new UserSamplerInstrument(ctx, buf, rev, t.samplerRoot ?? 60, settings);
       break;
     }
   }

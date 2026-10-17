@@ -60,6 +60,12 @@ export default function HelpDialog() {
           Press <b>+</b> in the top bar to add a track — a <b>Software Instrument</b>, <b>Drums</b>, an <b>Audio Recorder</b> for your mic, or a <b>Sampler</b>.
         </li>
         <li>
+          Find sounds in the <b>Sounds</b> library ({shortcutLabel('view.sounds')}): search by name or by feel (<i>warm</i>, <i>80s</i>, <i>bass</i>), press ▶ to hear one without changing your track, and ★ your favourites.
+        </li>
+        <li>
+          In a <b>Sampler</b>, record or import any sound, trim it, and play it across the keys (<b>Classic</b> / <b>One-Shot</b>), or chop it into slices (<b>Slice</b>) and turn them into a drum kit. Your sounds stay in <b>My Samples</b> for every song.
+        </li>
+        <li>
           Play with your computer keyboard, the on-screen keys (<b>{shortcutLabel('view.instrument')}</b>) or a MIDI keyboard. Press <b>{shortcutLabel('transport.record')}</b> to record what you play.
         </li>
         <li>

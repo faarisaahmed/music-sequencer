@@ -2,6 +2,7 @@
 // in the live AudioContext and in an OfflineAudioContext (for export).
 import { midiToFreq } from '../model/music';
 import { loadBuffer } from './context';
+import { SLICE_BASE, type SamplerSettings } from '../model/types';
 
 export interface Instrument {
   readonly output: AudioNode;
@@ -240,6 +241,133 @@ export class SamplerInstrument extends BaseInstrument {
     src.onended = () => {
       g.disconnect();
     };
+    return voice;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// User sampler (your own sound: trimmed, pitched, one-shot or sliced)
+// ---------------------------------------------------------------------------
+
+/** Start and end (seconds into the buffer) of the region a key plays, or null if it plays nothing. */
+export function samplerRegion(s: SamplerSettings, dur: number, pitch: number): { from: number; to: number; pitched: boolean } | null {
+  const start = Math.max(0, Math.min(1, s.start)) * dur;
+  const end = Math.max(0, Math.min(1, s.end)) * dur;
+  if (end - start < 0.005) return null;
+  if (s.mode !== 'slice') return { from: start, to: end, pitched: true };
+  const cuts = sliceStarts(s);
+  const k = pitch - SLICE_BASE;
+  if (k < 0 || k >= cuts.length) return null;
+  return { from: cuts[k] * dur, to: k + 1 < cuts.length ? cuts[k + 1] * dur : end, pitched: false };
+}
+
+/** Where each slice starts (fractions): the trimmed start, then every marker inside the trim. */
+export function sliceStarts(s: SamplerSettings): number[] {
+  const inside = (s.slices ?? []).filter((x) => x > s.start + 1e-4 && x < s.end - 1e-4).sort((a, b) => a - b);
+  return [s.start, ...inside];
+}
+
+export class UserSamplerInstrument extends BaseInstrument {
+  private fwd: AudioBuffer | null;
+  private rev: AudioBuffer | null;
+  private root: number;
+  private s: SamplerSettings;
+  /** Slice mode: a new hit on the same key cuts the last one (like a drum machine pad). */
+  private lastByKey = new Map<number, Voice>();
+
+  constructor(ctx: BaseAudioContext, buf: AudioBuffer | null, rev: AudioBuffer | null, root: number, s: SamplerSettings) {
+    super(ctx);
+    this.fwd = buf;
+    this.rev = rev;
+    this.root = root;
+    this.s = s;
+  }
+
+  protected startVoice(pitch: number, velocity: number, time: number): Voice | null {
+    const s = this.s;
+    const buf = s.reverse ? this.rev : this.fwd;
+    if (!buf) return null;
+    const reg = samplerRegion(s, buf.duration, pitch);
+    if (!reg) return null;
+    // Reversed: the same stretch of sound, read from the reversed copy.
+    const from = s.reverse ? buf.duration - reg.to : reg.from;
+    const len = reg.to - reg.from;
+    const ctx = this.ctx;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const semis = (reg.pitched ? pitch - this.root : 0) + this.p('tune', 0);
+    const rate = Math.pow(2, semis / 12);
+    src.playbackRate.value = rate;
+    const looping = s.mode === 'classic' && !!s.loop && len > 0.05;
+    if (looping) {
+      src.loop = true;
+      src.loopStart = from;
+      src.loopEnd = from + len;
+    }
+    const g = ctx.createGain();
+    const attack = Math.max(this.p('attack', 0.003), s.fadeIn ?? 0, 0.002);
+    const release = this.p('release', 0.3);
+    const peak = velGain(velocity);
+    g.gain.setValueAtTime(0, time);
+    g.gain.linearRampToValueAtTime(peak, time + attack);
+    const playTime = len / rate;
+    const naturalEnd = looping ? Infinity : time + playTime;
+    const fadeOut = Math.min(s.fadeOut ?? 0, playTime * 0.9);
+    if (!looping) {
+      // Fade the tail (and always a tiny one, so a trimmed end never clicks).
+      const f = Math.max(fadeOut, 0.004);
+      g.gain.setValueAtTime(peak, Math.max(time + attack, naturalEnd - f));
+      g.gain.linearRampToValueAtTime(0, naturalEnd);
+    }
+    let last: AudioNode = src;
+    const tone = this.p('tone', 0.5);
+    if (tone < 0.98) {
+      const f = ctx.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = 300 * Math.pow(60, tone);
+      f.Q.value = 0.4;
+      src.connect(f);
+      last = f;
+    }
+    last.connect(g).connect(this.output);
+    if (looping) src.start(time, from);
+    else src.start(time, from, len);
+    const holdsToEnd = s.mode !== 'classic';
+    let ended = false;
+    const voice: Voice = {
+      endTime: naturalEnd,
+      release: (t: number) => {
+        if (ended || holdsToEnd) return;
+        ended = true;
+        const at = Math.max(t, time + attack);
+        if (at >= naturalEnd) return;
+        g.gain.cancelScheduledValues(at);
+        g.gain.setValueAtTime(peak, at);
+        g.gain.setTargetAtTime(0, at, release / 4);
+        const stopAt = at + release * 1.25 + 0.05;
+        voice.endTime = Math.min(naturalEnd, stopAt);
+        try {
+          src.stop(stopAt);
+        } catch {
+          /* already stopped */
+        }
+      },
+      stopHard: (t: number) => {
+        ended = true;
+        g.gain.cancelScheduledValues(t);
+        g.gain.setTargetAtTime(0, t, 0.01);
+        try {
+          src.stop(t + 0.06);
+        } catch {
+          /* noop */
+        }
+      },
+    };
+    if (s.mode === 'slice') {
+      this.lastByKey.get(pitch)?.stopHard(time);
+      this.lastByKey.set(pitch, voice);
+    }
+    src.onended = () => g.disconnect();
     return voice;
   }
 }

@@ -621,6 +621,100 @@ const chapter: Chapter = {
         </>
       ),
     },
+
+    // ------------------------------------------------------------------ sampling
+    {
+      id: 'sampling',
+      title: 'Sampling: make an instrument out of any sound',
+      minutes: 8,
+      summary: 'Turn your voice, a pot lid or a drum break into something you can play. Learn which Sampler mode fits which sound, why pitching a sample too far ruins it, and how producers chop and rearrange a recording into a brand-new beat.',
+      keywords: 'sampler sample sampling chop chopping slice slices break breakbeat one-shot one shot root note pitch trim fade loop my samples drum kit record import boom bap lofi hip hop',
+      body: () => (
+        <>
+          <Lead>
+            A sampler plays a recording instead of a built-in sound. That one idea built hip-hop, jungle and half of modern pop: a single word, a door slam or two bars of an old drum break becomes a playable instrument. In BandForge it's the <Ui>Sampler</Ui> track.
+          </Lead>
+
+          <h2>Three ways to play a sound</h2>
+          <p>The same sample behaves very differently depending on the mode. Picking the right one is most of the skill.</p>
+          <Cards
+            items={[
+              { title: 'Classic', tag: 'sung notes · plucks · pads · bass', color: '#5dbb7a', body: 'Every key plays the sound at a different pitch, and it stops when you let go. Use it for anything with a pitch you want to play as a melody or chords. Turn on Loop for sounds that should hold as long as the key does, like an "ahh" or a bowed note.' },
+              { title: 'One-Shot', tag: 'hits · risers · vocal chops · FX', color: '#e8a33d', body: 'The whole sound always plays to the end, however short you press the key. Use it for things that should never be cut off: a cymbal swell, a reversed crash, a shouted "hey!".' },
+              { title: 'Slice', tag: 'drum breaks · phrases · loops', color: '#a07ae0', body: 'The recording is chopped into pieces and each key plays one piece, from C4 upward. This is how a drum break becomes a kit, or a sung phrase becomes words you can rearrange.' },
+            ]}
+          />
+
+          <h2>The root note, and why samples sound like chipmunks</h2>
+          <p>
+            A sampler changes pitch by playing the recording faster or slower, like speeding up a tape. Up an octave means double speed: the sound gets <b>higher and shorter</b>, and a voice's character (its formants) rises with it, which is the chipmunk effect. Down an octave is half speed: lower, longer and muddier.
+          </p>
+          <p>
+            So the sampler has to know what note the recording already is: the <b>root</b>. BandForge listens for it when you import or record, and shows it next to <Ui>Root</Ui> (press <Ui>Detect</Ui> to check again after trimming). If the root is wrong, everything you play will be out of key with the rest of your song.
+          </p>
+          <Spec
+            rows={[
+              ['Sounds natural', 'within about 5 semitones of the root'],
+              ['Noticeably "sampled"', '5 to 12 semitones away'],
+              ['A special effect', 'more than an octave away'],
+            ]}
+          />
+          <Tip>Recording your own sample? Sing or play it near the middle of the range you'll use it in. A note you'll play around C4 should be recorded around C4, not two octaves below.</Tip>
+
+          <h2>Trim, fade, and loop</h2>
+          <p>
+            Drag the orange handles to cut off silence and noise. The start matters most: if there's even a twentieth of a second of air before the sound, every note will feel <b>late</b> against the beat. Trim right up to the start of the sound.
+          </p>
+          <p>
+            A sound cut off mid-wave makes a click. A short <Ui>Fade Out</Ui> (a few hundredths of a second) removes it. A longer <Ui>Fade In</Ui> turns any sound into a soft swell, which is a quick way to make a pad from a single held note.
+          </p>
+          <Watch>Looping a sound that changes a lot (a strum, a word) gives an obvious "wah-wah-wah" repeat. Loop only sounds that stay steady while held: sustained vowels, organ, bowed strings, synth tones. Trim the loop to the steady middle part.</Watch>
+
+          <h2>Chopping a break</h2>
+          <p>
+            Producers take a drum break, chop it at each hit, then <b>play the hits in a new order</b>. The groove and the sound come from the recording, but the rhythm is yours. That rearranging is the creative part, and it's what keeps the result from being a copy.
+          </p>
+          <Compare
+            items={[
+              {
+                label: 'The break as recorded',
+                title: 'Eight slices played in order: 1 2 3 4 5 6 7 8',
+                bpm: 88,
+                parts: [{ inst: 'kit-lofi', label: 'Break', notes: drums({ k: 'x.....x...x.....', s: '....x.......x...', h: 'x.x.x.x.x.x.x.x.' }, { bars: 2, swing: 0.12 }) }],
+                caption: 'A plain, steady groove. Imagine each hit is a slice of one recording.',
+              },
+              {
+                label: 'Chopped and rearranged',
+                verdict: 'better',
+                title: 'The same hits in a new order: 1 1 3 5 3 6 3 8',
+                bpm: 88,
+                parts: [{ inst: 'kit-lofi', label: 'Chops', notes: drums({ k: 'x..x..x.......x.', s: '....x..g.x..x...', h: 'x.x.x.x.x.x.x.xx' }, { bars: 2, swing: 0.12 }) }],
+                caption: 'Nothing new was added: kicks doubled, a ghost snare before beat 3, a late snare, a quick hat at the end. Same sound, a different beat.',
+              },
+            ]}
+          />
+          <Steps>
+            <li>Import the recording, switch to <Ui>Slice</Ui> and press <Ui>Auto Chop</Ui>. It puts a slice on each hit. Click a slice to hear it.</li>
+            <li>Fix any slice that starts late or cuts a hit in half: drag its line, double-click to add one, double-click a line to remove it. If the break is perfectly in time, <Ui>Equal</Ui> 8 or 16 can be cleaner.</li>
+            <li>Play the slices from C4 upward and write a new pattern with them in the piano roll, or press <Ui>Make Drum Kit</Ui> to put each slice on a row of the Beat Sequencer.</li>
+            <li>Change the order: the kick from slice 1 on beats 1 and 3, the snare from slice 3 on 2 and 4, and a ghost note from slice 6 just before the snare. Try pitching a slice down a few semitones for a heavier hit.</li>
+          </Steps>
+          <Why>Real drummers never hit twice exactly alike, so chopped real drums have small changes in tone and timing that programmed drum-machine hits don't. That's why chopped breaks feel alive even when you sequence them on a rigid grid.</Why>
+
+          <Try>
+            <Steps>
+              <li>Press <Ui>+</Ui> in the top bar (New Track) and choose <Ui>Sampler</Ui>.</li>
+              <li>Press <Ui>Record</Ui> and make one sound: a sung "ooh", a tap on your desk, a click of your tongue. Press <Ui>Stop</Ui>.</li>
+              <li>Trim it with the handles, then play it on the keyboard below. If it's a pitched sound, check the <Ui>Root</Ui>.</li>
+              <li>Try all three modes on the same sound and listen to what changes. Everything you record is kept in <Ui>My Samples</Ui>, so you can reuse it in any song, including on Beat Sequencer rows (a row's ••• menu → <Ui>From My Samples</Ui>).</li>
+            </Steps>
+          </Try>
+          <Pro>
+            Sampling other people's records without permission can break copyright, even for a short chop, and streaming services do detect it. Professionals either clear their samples or use their own recordings and royalty-free packs. Your own voice, room and objects are free, and they make a sound nobody else has.
+          </Pro>
+        </>
+      ),
+    },
   ],
 };
 

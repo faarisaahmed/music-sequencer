@@ -16,7 +16,8 @@ import { makePatternUnique, newPatternClip, setClipPattern, setTrackInstrument, 
 import { patternUseCounts } from '../../model/patterns';
 import { grooveFor, grooveLabel } from '../../model/groove';
 import GroovePanel from '../groove/GroovePanel';
-import { addClip } from '../../audio/audioStore';
+import { addClip, ensureClips } from '../../audio/audioStore';
+import { addToSampleLibrary, loadSampleLibrary, useSampleLibrary } from '../../audio/sampleLibrary';
 import { Knob } from '../common/controls';
 import { useElementSize } from '../common/useElementSize';
 import { getEngine } from '../../audio/engine';
@@ -85,17 +86,42 @@ function pickAudio(): Promise<File | null> {
 /** Load an audio file as a row's sound on a drum track. */
 async function setRowSample(trackId: string, pitch: number, file: File): Promise<void> {
   const id = uid('aud');
+  let buf: AudioBuffer;
   try {
-    await addClip(id, file, file.name);
+    buf = await addClip(id, file, file.name);
   } catch {
     toast('Could not read that audio file', 'error');
     return;
   }
   const name = file.name.replace(/\.[^.]+$/, '').slice(0, 24) || 'Sound';
+  void addToSampleLibrary(id, name, buf.duration);
+  putRowSample(trackId, pitch, id, name);
+}
+
+/** Put a sound that's already saved (e.g. from My Samples) on a row. */
+function putRowSample(trackId: string, pitch: number, audioId: string, name: string): void {
   updateTrack(trackId, (t) => {
-    t.drumSamples = { ...(t.drumSamples ?? {}), [pitch]: { audioId: id, name } };
+    t.drumSamples = { ...(t.drumSamples ?? {}), [pitch]: { audioId, name: name.slice(0, 24) } };
   });
   getEngine().preview(trackId, pitch, 0.9, 0.5);
+}
+
+/** My Samples as menu items that put the chosen sound on a row. */
+function mySampleItems(trackId: string, pitch: number): MenuItem[] {
+  const list = useSampleLibrary.getState().samples;
+  if (!list.length) return [];
+  return [
+    {
+      label: 'From My Samples',
+      submenu: list.slice(0, 40).map((x) => ({
+        label: x.name,
+        onClick: async () => {
+          await ensureClips([x.id]);
+          putRowSample(trackId, pitch, x.id, x.name);
+        },
+      })),
+    },
+  ];
 }
 
 function midiDraft(d: Draft<Project>, id: string): Draft<MidiRegion> | null {
@@ -152,6 +178,7 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
     return [...set].sort((a, b) => order(a) - order(b));
   }, [notes, extra, hidden, customKey]);
 
+  useEffect(() => void loadSampleLibrary(), []);
   const patternPlaying = useStore((s) => s.patternPlay === regionId);
   // ⇧Space (changeable): loop this pattern on its own, or stop.
   useEffect(() => {
@@ -366,6 +393,7 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
           if (f) await setRowSample(track.id, pitch, f);
         },
       },
+      ...mySampleItems(track.id, pitch),
       ...(own && pitch < 88
         ? [
             {
@@ -449,9 +477,10 @@ export default function StepSequencer({ trackId, regionId }: { trackId: string; 
         if (f) await setRowSample(track.id, freeCustomPitch(new Set(lanes)), f);
       },
     };
+    const fromLibrary = mySampleItems(track.id, freeCustomPitch(new Set(lanes)));
     showContextMenu(
       e,
-      [ownSound, { separator: true }, ...(avail.length
+      [ownSound, ...fromLibrary, { separator: true }, ...(avail.length
         ? avail.map((p) => ({
             label: DRUM_NAMES[p],
             onClick: () => {

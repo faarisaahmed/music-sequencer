@@ -396,25 +396,121 @@
 }
 .smp {
   display: flex;
-  gap: 12px;
-  padding: 10px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px 10px;
   background: #1a1918;
   border-bottom: 1px solid #100f0f;
   flex-shrink: 0;
 }
+.smp-bar,
+.smp-opts {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-height: 26px;
+}
+.smp-modes button:disabled {
+  opacity: 0.45;
+}
+.smp-rec-dot {
+  color: var(--record);
+}
 .smp-wave-box {
-  flex: 1;
-  height: 92px;
+  height: 104px;
   border-radius: 5px;
   background: #111010;
   border: 1px solid var(--border);
   position: relative;
   overflow: hidden;
 }
+.smp-editor {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+  touch-action: none;
+}
 .smp-wave {
   width: 100%;
   height: 100%;
   display: block;
+}
+.smp-dim {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(10, 10, 10, 0.55);
+  pointer-events: none;
+}
+.smp-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--accent);
+  cursor: ew-resize;
+}
+.smp-handle::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 9px;
+  height: 14px;
+  background: var(--accent);
+  border-radius: 0 0 3px 3px;
+}
+.smp-handle.start::before {
+  left: 0;
+}
+.smp-handle.end::before {
+  right: 0;
+}
+.smp-handle::after {
+  /* a wider invisible grab area */
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -6px;
+  right: -6px;
+}
+.smp-loop {
+  position: absolute;
+  bottom: 0;
+  height: 4px;
+  background: var(--cycle);
+  opacity: 0.8;
+  pointer-events: none;
+}
+.smp-cut {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.75);
+  pointer-events: none;
+}
+.smp-cut:nth-child(even of .smp-cut) {
+  background: rgba(255, 255, 255, 0.035);
+}
+.smp-cut.flash {
+  background: rgba(255, 255, 255, 0.16);
+}
+.smp-cut span {
+  position: absolute;
+  left: 3px;
+  bottom: 3px;
+  font-size: 9.5px;
+  font-family: var(--mono);
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 0 3px;
+  border-radius: 2px;
+}
+.smp-editor.mode-slice .smp-cut + .smp-cut,
+.smp-editor.mode-slice .smp-cut:not(:first-of-type) {
+  cursor: ew-resize;
 }
 .smp-empty {
   height: 100%;
@@ -423,18 +519,34 @@
   justify-content: center;
   gap: 10px;
   color: var(--text-dim);
+  padding: 0 16px;
+  text-align: center;
 }
 .smp-meter {
   position: absolute;
   left: 10px;
   bottom: 8px;
 }
-.smp-side {
-  display: flex;
-  flex-direction: column;
+.smp-opt {
   gap: 6px;
-  width: 170px;
+  margin-right: 8px;
 }
-.smp-side select {
-  flex: 1;
+.smp-opt select {
+  height: 24px;
+}
+.smp-opt-l {
+  font-size: 11px;
+  margin-left: 4px;
+}
+.smp-hint {
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+}
+.smp-len {
+  margin-left: auto;
+  font-size: 11px;
+  font-family: var(--mono);
 }

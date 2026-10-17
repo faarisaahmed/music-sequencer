@@ -603,7 +603,10 @@ function noteClipOrigins(d: Delta, from: string): void {
       clipOrigin.set(region.audioId, from);
       for (const k of region.takes ?? []) clipOrigin.set(k.audioId, from);
     }
-  for (const t of d.tracks ?? []) if (t.samplerAudioId) clipOrigin.set(t.samplerAudioId, from);
+  for (const t of d.tracks ?? []) {
+    if (t.samplerAudioId) clipOrigin.set(t.samplerAudioId, from);
+    for (const x of Object.values(t.drumSamples ?? {})) clipOrigin.set(x.audioId, from);
+  }
 }
 
 async function onClipReq(id: string, from: string): Promise<void> {

@@ -1,3 +1,4 @@
+import { loadSound } from '../instruments/samplerLoad';
 import { useEffect, useRef, useState } from 'react';
 import type { Draft } from 'immer';
 import { Mic, Square, Upload, Power } from 'lucide-react';
@@ -152,11 +153,6 @@ function SamplerSource({ t }: { t: Track }) {
   const fileRef = useRef<HTMLInputElement>(null);
   useEffect(() => onAudioChange(() => force((x) => x + 1)), []);
   const peaks = t.samplerAudioId ? getPeaks(t.samplerAudioId, 120) : undefined;
-  const assign = (id: string) =>
-    updateTrack(t.id, (x) => {
-      x.samplerAudioId = id;
-      x.samplerRoot = x.samplerRoot ?? 60;
-    });
   return (
     <div className="col" style={{ gap: 8 }}>
       <div className="label">Sample</div>
@@ -181,9 +177,8 @@ function SamplerSource({ t }: { t: Track }) {
               setRecording(null);
               if (!buf) return toast('Recording failed', 'error');
               const id = uid('a');
-              await addBuffer(id, buf, 'Sample');
-              assign(id);
-              toast('Sample captured — play it on the keyboard', 'success');
+              await addBuffer(id, buf, 'Recorded sample');
+              loadSound(t, id, buf, 'Recorded sample');
             }}
           >
             <Square size={13} fill="currentColor" /> Stop
@@ -212,8 +207,8 @@ function SamplerSource({ t }: { t: Track }) {
             if (!f) return;
             try {
               const id = uid('a');
-              await addClip(id, f, f.name);
-              assign(id);
+              const b = await addClip(id, f, f.name);
+              loadSound(t, id, b, f.name);
             } catch {
               toast('Could not read that audio file', 'error');
             }
@@ -226,7 +221,7 @@ function SamplerSource({ t }: { t: Track }) {
           Root note
         </span>
         <select value={t.samplerRoot ?? 60} onChange={(e) => updateTrack(t.id, (x) => void (x.samplerRoot = Number(e.target.value)))}>
-          {Array.from({ length: 49 }, (_, i) => 36 + i).map((p) => (
+          {Array.from({ length: 73 }, (_, i) => 24 + i).map((p) => (
             <option key={p} value={p}>
               {noteName(p)}
             </option>

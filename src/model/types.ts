@@ -149,6 +149,29 @@ export interface TrackFx {
   inserts?: InsertFx;
 }
 
+/**
+ * The user Sampler's playback settings. Times are fractions (0..1) of the sample's length.
+ *  classic: pitched across the keys, released when the key is let go (optionally looping);
+ *  oneshot: pitched, but always plays to the end;  slice: each key from C4 up plays one slice.
+ */
+export interface SamplerSettings {
+  mode: 'classic' | 'oneshot' | 'slice';
+  start: number;
+  end: number;
+  loop?: boolean;
+  reverse?: boolean;
+  /** Seconds. */
+  fadeIn?: number;
+  fadeOut?: number;
+  /** Slice start points (sorted, within start..end); each slice runs to the next one. */
+  slices?: number[];
+}
+
+/** The first key that plays a slice in slice mode (C4). */
+export const SLICE_BASE = 60;
+
+export const DEFAULT_SAMPLER: SamplerSettings = { mode: 'classic', start: 0, end: 1 };
+
 export interface Track {
   id: string;
   name: string;
@@ -160,6 +183,8 @@ export interface Track {
   /** For the user Sampler instrument: id of the sample in the audio store. */
   samplerAudioId?: string;
   samplerRoot?: number;
+  /** How the Sampler plays its sample (absent: classic, the whole sample). */
+  sampler?: SamplerSettings;
   /**
    * Drum tracks: your own sounds on Beat Sequencer rows, keyed by row pitch.
    * Row mix lives in instrumentParams: level<p>, pan<p>, tune<p>, mute<p>, solo<p>.
