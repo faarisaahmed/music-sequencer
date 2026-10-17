@@ -247,13 +247,30 @@ export async function playExample(id: string, parts: Part[], opts: PlayOpts = {}
   tick();
 }
 
+type NowOpts = { arpeggio?: number; dur?: number; v?: number };
+
 /** Play a few notes right now (keyboard diagrams, inline play chips). Doesn't stop a running example. */
-export async function playNow(pitches: number[], inst = 'grand-piano', opts: { arpeggio?: number; dur?: number; v?: number } = {}): Promise<void> {
+export async function playNow(pitches: number[], inst = 'grand-piano', opts: NowOpts = {}): Promise<void> {
   stopSong();
+  await sound(pitches, inst, 99, opts);
+}
+
+let lastPreview: Instrument | null = null;
+
+/**
+ * Hear a sound from the library without changing any track. The song keeps playing (so you can
+ * try it against the music), and starting another preview cuts this one off.
+ */
+export async function previewNotes(pitches: number[], inst: string, opts: NowOpts = {}): Promise<void> {
+  lastPreview?.allNotesOff(getAudioContext().currentTime);
+  lastPreview = await sound(pitches, inst, 98, opts);
+}
+
+async function sound(pitches: number[], inst: string, slot: number, opts: NowOpts): Promise<Instrument | null> {
   const ctx = await resumeAudio();
   const b = getBus(ctx);
-  const i = await getInst(ctx, inst, 99);
-  if (!i) return;
+  const i = await getInst(ctx, inst, slot);
+  if (!i) return null;
   try {
     i.output.disconnect();
   } catch {
@@ -269,4 +286,5 @@ export async function playNow(pitches: number[], inst = 'grand-piano', opts: { a
   const step = opts.arpeggio ?? 0;
   const dur = opts.dur ?? 1.4;
   pitches.forEach((p, k) => i.playNote(p, opts.v ?? 0.75, now + k * step, dur + (pitches.length - 1 - k) * step));
+  return i;
 }

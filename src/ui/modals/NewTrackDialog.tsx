@@ -1,9 +1,11 @@
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Search, Star, Clock } from 'lucide-react';
 import { useState } from 'react';
 import { closeModal, useStore } from '../../state/store';
 import { addTrack, createEmptyRegion } from '../../state/actions';
-import { CATEGORIES, PRESETS, type InstrumentCategory } from '../../audio/presets';
+import { CATEGORIES, PRESETS, type InstrumentPreset } from '../../audio/presets';
 import { IconFor } from '../common/icons';
+import { SoundActions } from '../library/LibraryPanel';
+import { noteRecent, searchSounds, useSoundPrefs } from '../library/soundSearch';
 import Modal from './Modal';
 
 type Kind = 'instrument' | 'drums' | 'audio' | 'sampler';
@@ -17,9 +19,13 @@ const KINDS: { kind: Kind; title: string; desc: string; icon: string; color: str
 
 export default function NewTrackDialog() {
   const [kind, setKind] = useState<Kind | null>(null);
-  const [cat, setCat] = useState<InstrumentCategory>('Keyboards');
+  const [cat, setCat] = useState<string>('Keyboards');
+  const [query, setQuery] = useState('');
+  const fav = useSoundPrefs((s) => s.fav);
+  const recent = useSoundPrefs((s) => s.recent);
 
   const finish = (instrument: string, type: 'instrument' | 'drums' | 'audio') => {
+    if (instrument) noteRecent(instrument);
     const id = addTrack(type, instrument);
     closeModal();
     if (type !== 'audio') {
@@ -32,6 +38,9 @@ export default function NewTrackDialog() {
   };
 
   const cats = CATEGORIES.filter((c) => c !== 'Drums' && c !== 'Sampler');
+  const pool = PRESETS.filter((p) => p.category !== 'Drums' && p.category !== 'Sampler');
+  const byIds = (ids: string[]) => ids.map((id) => pool.find((p) => p.id === id)).filter((p): p is InstrumentPreset => !!p);
+  const shown = query.trim() ? searchSounds(pool, query) : cat === 'fav' ? byIds(fav) : cat === 'recent' ? byIds(recent) : pool.filter((p) => p.category === cat);
   return (
     <Modal title={kind === 'instrument' ? 'Choose an Instrument' : kind === 'drums' ? 'Choose a Drum Kit' : 'Add a New Track'} width={kind ? 760 : 680}>
       {!kind && (
@@ -58,8 +67,36 @@ export default function NewTrackDialog() {
       {kind === 'instrument' && (
         <div className="newtrack-pick">
           <div className="col newtrack-cats">
+            <div className="lib-search newtrack-search">
+              <Search size={13} />
+              <input
+                type="search"
+                autoFocus
+                placeholder="Search: warm, bass, 80s…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  e.stopPropagation();
+                  if (e.key === 'Enter' && shown[0]) finish(shown[0].id, 'instrument');
+                  if (e.key === 'Escape' && query) {
+                    e.preventDefault();
+                    setQuery('');
+                  }
+                }}
+              />
+            </div>
+            {fav.length > 0 && (
+              <button className={'lib-cat' + (!query && cat === 'fav' ? ' on' : '')} onClick={() => (setCat('fav'), setQuery(''))}>
+                <Star size={12} fill="currentColor" /> Favourites
+              </button>
+            )}
+            {recent.length > 0 && (
+              <button className={'lib-cat' + (!query && cat === 'recent' ? ' on' : '')} onClick={() => (setCat('recent'), setQuery(''))}>
+                <Clock size={12} /> Recent
+              </button>
+            )}
             {cats.map((c) => (
-              <button key={c} className={'lib-cat' + (c === cat ? ' on' : '')} onClick={() => setCat(c)}>
+              <button key={c} className={'lib-cat' + (!query && c === cat ? ' on' : '')} onClick={() => (setCat(c), setQuery(''))}>
                 {c}
               </button>
             ))}
@@ -69,13 +106,10 @@ export default function NewTrackDialog() {
             </button>
           </div>
           <div className="preset-grid">
-            {PRESETS.filter((p) => p.category === cat).map((p) => (
-              <button key={p.id} className="preset-card" onClick={() => finish(p.id, 'instrument')}>
-                <IconFor name={p.icon} size={26} />
-                <div className="preset-name">{p.name}</div>
-                <div className="preset-desc">{p.description}</div>
-              </button>
+            {shown.map((p) => (
+              <PresetCard key={p.id} p={p} sub={query ? p.category : undefined} onPick={() => finish(p.id, 'instrument')} />
             ))}
+            {query && !shown.length && <div className="faint newtrack-none">No instruments match “{query.trim()}”. Try warm, bass, 80s or cinematic.</div>}
           </div>
         </div>
       )}
@@ -83,11 +117,7 @@ export default function NewTrackDialog() {
         <div className="col">
           <div className="preset-grid">
             {PRESETS.filter((p) => p.category === 'Drums').map((p) => (
-              <button key={p.id} className="preset-card drums" onClick={() => finish(p.id, 'drums')}>
-                <IconFor name="drums" size={26} />
-                <div className="preset-name">{p.name}</div>
-                <div className="preset-desc">{p.description}</div>
-              </button>
+              <PresetCard key={p.id} p={p} drums onPick={() => finish(p.id, 'drums')} />
             ))}
           </div>
           <div>
@@ -98,5 +128,29 @@ export default function NewTrackDialog() {
         </div>
       )}
     </Modal>
+  );
+}
+
+function PresetCard({ p, drums = false, sub, onPick }: { p: InstrumentPreset; drums?: boolean; sub?: string; onPick: () => void }) {
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      className={'preset-card' + (drums ? ' drums' : '')}
+      onClick={onPick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onPick();
+        }
+      }}
+    >
+      <div className="preset-card-acts">
+        <SoundActions p={p} drums={drums} />
+      </div>
+      <IconFor name={drums ? 'drums' : p.icon} size={26} />
+      <div className="preset-name">{p.name}</div>
+      <div className="preset-desc">{sub ? `${sub} · ${p.description}` : p.description}</div>
+    </div>
   );
 }

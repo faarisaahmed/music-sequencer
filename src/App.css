@@ -278,6 +278,27 @@
 .preset-card.drums {
   color: var(--drums);
 }
+.preset-card {
+  position: relative;
+}
+.preset-card-acts {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 2px;
+}
+.newtrack-search {
+  margin: 0 0 8px;
+}
+.lib-cat svg {
+  vertical-align: -1px;
+  margin-right: 3px;
+}
+.newtrack-none {
+  grid-column: 1 / -1;
+  padding: 20px 4px;
+}
 .preset-name {
   color: var(--text);
   font-weight: 600;
